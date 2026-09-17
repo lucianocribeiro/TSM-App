@@ -24,6 +24,28 @@ npm run dev
 
 The app runs at http://localhost:3000.
 
+## Local test users
+
+`supabase start` and `supabase db reset` load `supabase/seed.sql`, which creates these users. They are **local and CI test data only**: never create them in the remote project.
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@mitsm.test` | `TestPass123!` |
+| Empleado | `empleado.a@mitsm.test` | `TestPass123!` |
+| Empleado | `empleado.b@mitsm.test` | `TestPass123!` |
+
+Public sign-up is disabled; accounts are created by an Admin.
+
+## Database types
+
+After any migration, with the local stack running:
+
+```bash
+npm run db:types
+```
+
+This regenerates `src/lib/supabase/database.types.ts` from the local database. Commit the result.
+
 ## Checks and tests
 
 ```bash

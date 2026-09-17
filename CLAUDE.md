@@ -17,6 +17,7 @@ You build. You commit, push and open PRs. You merge only when a versioned merge 
 - `npm run test:integration` (needs local Supabase running; use the Supabase CLI version pinned in CI)
 - `npm run test:e2e`
 - `next dev` must not write agent rules; `agentRules: false` is set in `next.config.ts`.
+- `npm run db:types` regenerates `src/lib/supabase/database.types.ts` from the local database; run it after every migration and commit the result.
 
 ## Structure
 - `src/app/` routes (App Router).

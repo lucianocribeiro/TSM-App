@@ -86,6 +86,12 @@ jobs:
           done
           cat "$RUNNER_TEMP/supabase.env" >> "$GITHUB_ENV"
       - run: npm run test:integration
+      # The committed types must match types generated from the migrated database.
+      - name: Check database types are up to date
+        if: ${{ !cancelled() }}
+        run: |
+          npm run db:types
+          git diff --exit-code -- src/lib/supabase/database.types.ts
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup
