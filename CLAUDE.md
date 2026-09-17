@@ -16,6 +16,7 @@ You build. You commit, push and open PRs. You merge only when a versioned merge 
 - `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run build`
 - `npm run test:integration` (needs local Supabase running; use the Supabase CLI version pinned in CI)
 - `npm run test:e2e`
+- `next dev` must not write agent rules; `agentRules: false` is set in `next.config.ts`.
 
 ## Structure
 - `src/app/` routes (App Router).
