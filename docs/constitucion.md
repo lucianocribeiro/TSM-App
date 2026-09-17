@@ -1,5 +1,5 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.2 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Version: 0.3 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -49,7 +49,8 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - The sidebar shows only the TSM logo (`public/logotsm.png`) at the top. No tagline or subtitle.
 
 ## 8. Working model
-- Claude Code builds: commits, pushes, opens PRs. Claude Code merges only when a versioned merge prompt (`TSM-Fx-MRG-NN`) instructs it, always with a merge commit, never squash.
-- Codex audits against this Constitution and the phase PRD. Writes no feature code.
-- Luciano approves every merge by relaying the merge prompt, and is the only one who runs `supabase db push`.
-- Every instruction to Claude Code or Codex is a versioned prompt pasted by Luciano. Prompts and audit reports are not stored in the repo.
+- Luciano creates external accounts and projects and fills `.env.local` with credentials. He does not run commands or edit repo files.
+- Claude Code builds: commits, pushes, opens PRs. It merges only through a versioned merge prompt (`TSM-Fx-MRG-NN`), merge commit only, never squash.
+- Claude Code applies remote changes (migrations with `supabase db push`, remote Supabase settings) only through a versioned runbook prompt (`TSM-Fx-PUSH-NN`), after the related PR is merged, using credentials from `.env.local`. It never prints, logs or copies secret values, and never runs seeds or destructive commands against the remote project.
+- Codex audits against this Constitution and the phase PRD. It writes no code.
+- Every instruction to Claude Code or Codex is a versioned prompt relayed by Luciano. Prompts and audit reports are not stored in the repo.

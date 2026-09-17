@@ -1,5 +1,5 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.2 (draft) | Governed by: `docs/constitucion.md`
+Version: 0.3 (draft) | Governed by: `docs/constitucion.md`
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -11,7 +11,7 @@ Deliver the Legajo module plus the auth, roles and data-isolation foundation tha
 4. User management: Admin creates employee accounts and assigns roles.
 5. Legajo: personal, contact, family, emergency and work data per employee (section 5), with role-based edit permissions.
 6. Legajo documents: upload, list and download from a private bucket. Types: DNI (frente y dorso), required; Licencia de conducir, optional.
-7. App shell: login screen, layout, sidebar menu, logo top left, light and dark modes, TSM palette, centralized es-AR copy.
+7. App shell: login screen, layout, sidebar menu, TSM logo at the top of the sidebar, light and dark modes, TSM palette, centralized es-AR copy.
 8. Production deploy on Vercel with the real domain.
 9. E2E, role-boundary and RLS tests.
 

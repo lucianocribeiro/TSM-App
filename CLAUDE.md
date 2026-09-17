@@ -3,7 +3,7 @@
 Read `docs/constitucion.md` and the current phase PRD (`docs/prd-fase-1.md`) before any task. The Constitution wins over this file.
 
 ## Role
-You build. You commit, push and open PRs. You merge only when a versioned merge prompt (`TSM-Fx-MRG-NN`) tells you to, with a merge commit, never squash. You never run `supabase db push` and never link to or write to the remote Supabase project.
+You build. You commit, push and open PRs. You merge only when a versioned merge prompt (`TSM-Fx-MRG-NN`) tells you to, with a merge commit, never squash. You run remote Supabase operations (`link`, `db push`, remote settings) only when a versioned runbook prompt (`TSM-Fx-PUSH-NN`) tells you to, using `.env.local`, and you never print or store secret values. Outside those prompts, never touch the remote project.
 
 ## Every task
 1. Work only from a versioned prompt. If the request is not in a prompt, stop and ask.
