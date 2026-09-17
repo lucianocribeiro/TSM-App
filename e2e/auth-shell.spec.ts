@@ -4,7 +4,9 @@ import {
   ADMIN,
   EMPLEADO_A,
   EMPLEADO_B,
+  expectNavLinks,
   fillLogin,
+  loginError,
   loginAs,
   mainNav,
   SCREENSHOT_DIR,
@@ -34,13 +36,13 @@ test.describe("login page", () => {
 
   test("wrong password shows the generic error", async ({ page }) => {
     await fillLogin(page, EMPLEADO_A.email, "wrong-password");
-    await expect(page.getByRole("alert")).toHaveText(copy.auth.errors.invalidCredentials);
+    await expect(loginError(page)).toHaveText(copy.auth.errors.invalidCredentials);
     await expect(page).toHaveURL(/\/login$/);
   });
 
   test("unknown email shows the same generic error", async ({ page }) => {
     await fillLogin(page, "nobody@mitsm.test", "wrong-password");
-    await expect(page.getByRole("alert")).toHaveText(copy.auth.errors.invalidCredentials);
+    await expect(loginError(page)).toHaveText(copy.auth.errors.invalidCredentials);
   });
 });
 
@@ -56,9 +58,8 @@ test.describe("session and menu", () => {
       page.getByRole("heading", { level: 1, name: copy.miLegajo.title }),
     ).toBeVisible();
 
+    await expectNavLinks(page, [copy.nav.miLegajo]);
     const links = mainNav(page).getByRole("link");
-    await expect(links).toHaveCount(1);
-    await expect(links).toHaveText([copy.nav.miLegajo]);
     await expect(links.first()).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(copy.auth.roles.empleado, { exact: true })).toBeVisible();
     await expect(page.getByTestId("user-email")).toHaveText(EMPLEADO_A.email);
@@ -73,8 +74,8 @@ test.describe("session and menu", () => {
   test("admin sees Mi Legajo, Legajos and Usuarios", async ({ page }) => {
     await loginAs(page, ADMIN);
 
+    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.usuarios]);
     const links = mainNav(page).getByRole("link");
-    await expect(links).toHaveText([copy.nav.miLegajo, copy.nav.legajos, copy.nav.usuarios]);
     await expect(page.getByText(copy.auth.roles.admin, { exact: true })).toBeVisible();
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-light.png`, fullPage: true });
 

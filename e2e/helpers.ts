@@ -27,6 +27,22 @@ export function mainNav(page: Page) {
   return page.getByRole("navigation", { name: copy.nav.label });
 }
 
+// Menu links in order: accessible name is the label; visible text starts with "01", "02"...
+export async function expectNavLinks(page: Page, labels: string[]) {
+  const links = mainNav(page).getByRole("link");
+  await expect(links).toHaveCount(labels.length);
+  for (const [index, label] of labels.entries()) {
+    const link = links.nth(index);
+    await expect(link).toHaveAccessibleName(label);
+    await expect(link).toHaveText(`${String(index + 1).padStart(2, "0")}${label}`);
+  }
+}
+
+// The login form error. Scoped to the form: Next.js also renders a route announcer with role="alert".
+export function loginError(page: Page) {
+  return page.locator("form").getByRole("alert");
+}
+
 // Sets the theme cookie for the current origin. Call after the first navigation.
 export async function setThemeCookie(page: Page, theme: Theme) {
   await page
