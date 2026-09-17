@@ -45,7 +45,10 @@ You build. You commit, push and open PRs. You merge only when a versioned merge 
 - `new-module`: any new route or feature module.
 - `es-ar-copy`: any user-facing text.
 - `dod-checklist`: before reporting any piece as done.
-- `design-system`: added in F1-04. Until then, do not build styled UI.
+- `design-system`: any UI work.
 
 ## Design
-Added in F1-04 from the approved prototype.
+- Follow the `design-system` skill for any UI. The approved prototype defines style and structure only; fields and scope come from the PRD.
+- Tokens live in `src/app/globals.css`; components in `src/components/ui/`.
+- Light and dark via `data-theme` on `<html>`, switched by the manual toggle and persisted in a cookie.
+- Sidebar shows only the TSM logo (`public/logotsm.png`) at the top.
