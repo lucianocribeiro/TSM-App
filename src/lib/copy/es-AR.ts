@@ -48,6 +48,21 @@ export type Copy = {
     kicker: string;
     title: string;
   };
+  legajo: {
+    validation: {
+      required: string;
+      dniDigits: string;
+      emailInvalid: string;
+      dateInvalid: string;
+      optionInvalid: string;
+      partidoOtroRequired: string;
+      partidoOtroNotAllowed: string;
+      hijosRequired: string;
+      hijosNotAllowed: string;
+      numberInvalid: string;
+      brutoMensualNegative: string;
+    };
+  };
 };
 
 export const copy = {
@@ -99,5 +114,20 @@ export const copy = {
   usuarios: {
     kicker: "Administración",
     title: "Usuarios",
+  },
+  legajo: {
+    validation: {
+      required: "Completá este dato.",
+      dniDigits: "Ingresá el DNI solo con números, sin puntos ni espacios.",
+      emailInvalid: "Ingresá un correo electrónico válido.",
+      dateInvalid: "Ingresá una fecha válida.",
+      optionInvalid: "Elegí una de las opciones.",
+      partidoOtroRequired: "Indicá el partido.",
+      partidoOtroNotAllowed: "Completá este dato solo si elegiste «Otro».",
+      hijosRequired: "Agregá al menos un hijo o elegí «No».",
+      hijosNotAllowed: "Si elegiste «No», no agregues hijos.",
+      numberInvalid: "Ingresá un número válido.",
+      brutoMensualNegative: "El bruto mensual no puede ser negativo.",
+    },
   },
 } as const satisfies Copy;
