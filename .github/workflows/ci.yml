@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # No Supabase env is needed at build time.
+      - run: npm run build
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.117.0
+      - name: Start local Supabase
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit
+      - name: Export local Supabase env
+        run: |
+          supabase status -o env \
+            --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
+            --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY \
+            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
+            | grep -E '^(NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=' \
+            | sed -E 's/="(.*)"$/=\1/' > "$RUNNER_TEMP/supabase.env"
+          for name in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
+            grep -q "^${name}=." "$RUNNER_TEMP/supabase.env" || { echo "Missing ${name} from supabase status"; exit 1; }
+          done
+          cat "$RUNNER_TEMP/supabase.env" >> "$GITHUB_ENV"
+      - run: npm run test:integration
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholder public values so the session-refresh proxy can initialize.
+      # Not real credentials; no network call is made without a session cookie.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
