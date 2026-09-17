@@ -1,5 +1,5 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.1 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Version: 0.2 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -18,7 +18,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Repo: https://github.com/lucianocribeiro/TSM-App
 
 ## 3. Roles
-- **Empleado**: reads own legajo and own documents; edits all own personal data (identity, contact, family, emergency); work data is read-only. Never sees another employee's data.
+- **Empleado**: reads own legajo and own documents; edits own personal data (groups A to D); reads own work data (group E, including Bruto mensual) without editing it. Never sees any other employee's data, rows or files.
 - **Admin**: sees and manages all data; manages users and roles; edits all legajo data of any employee; uploads documents.
 - No other roles exist. Adding one requires a Constitution change.
 
@@ -44,10 +44,9 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Later phases add: Mis Recibos / Recibos, Licencias, Comunicados.
 
 ## 7. Brand and UI
-- Visual design follows the approved Claude Design prototype, translated into `CLAUDE.md` (design section) and the `design-system` skill in F1-04.
-- Light and dark modes are both supported for every screen. Colors are defined as theme tokens, never as hardcoded values in components.
-- The TSM logo is shown at the top left of the app shell. The logo file lives in `public/`.
-- TSM palette values come from the prototype; none are invented.
+- Visual style and layout follow the approved Claude Design prototype ("Gestión de Empleados"). The prototype defines style and structure only; fields and scope come from the PRD.
+- Light and dark modes on every screen, switched with a manual toggle. Colors only through theme tokens.
+- The sidebar shows only the TSM logo (`public/logotsm.png`) at the top. No tagline or subtitle.
 
 ## 8. Working model
 - Claude Code builds: commits, pushes, opens PRs. Claude Code merges only when a versioned merge prompt (`TSM-Fx-MRG-NN`) instructs it, always with a merge commit, never squash.

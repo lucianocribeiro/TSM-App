@@ -1,5 +1,5 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.1 (draft) | Governed by: `docs/constitucion.md`
+Version: 0.2 (draft) | Governed by: `docs/constitucion.md`
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -10,7 +10,7 @@ Deliver the Legajo module plus the auth, roles and data-isolation foundation tha
 3. Roles and profiles: one profile per auth user, role Empleado or Admin.
 4. User management: Admin creates employee accounts and assigns roles.
 5. Legajo: personal, contact, family, emergency and work data per employee (section 5), with role-based edit permissions.
-6. Legajo documents: upload, list and download from a private bucket.
+6. Legajo documents: upload, list and download from a private bucket. Types: DNI (frente y dorso), required; Licencia de conducir, optional.
 7. App shell: login screen, layout, sidebar menu, logo top left, light and dark modes, TSM palette, centralized es-AR copy.
 8. Production deploy on Vercel with the real domain.
 9. E2E, role-boundary and RLS tests.
@@ -38,15 +38,16 @@ As an Empleado, I see my legajo and edit my personal data (groups A to D in sect
 As Admin, I see the list of employees and open any legajo.
 - I can edit all legajo data (groups A to E).
 - I can upload documents to any employee's legajo; files go to a private bucket.
+- The Legajos list shows a KPI strip with legajo-based numbers only (no licencias or recibos metrics in Fase 1).
 
 ### US-5 User management
 As Admin, I create an employee account and assign a role.
 - The new user can log in and sees only their own legajo.
 
 ### US-6 Branding, theme and copy
-- The TSM logo appears at the top left of the shell.
-- The TSM palette from the prototype is applied.
-- Every screen works in light and dark mode.
+- The TSM logo (`public/logotsm.png`) is the only element at the top of the sidebar.
+- The TSM palette and typography from the prototype are applied.
+- Every screen works in light and dark mode; the user switches with a manual toggle.
 - All UI text comes from the es-AR copy module.
 
 ### US-7 Production
@@ -97,25 +98,30 @@ Source: TSM validated employee update form ("Formulario de actualización - Tecn
 - Teléfono de contacto de emergencia*
 
 ### 5.5 Datos laborales (group E)
-- Included in the legajo. Field list pending (see open decisions).
+- Número de legajo*
+- Área*
+- Puesto*
+- Fecha de ingreso*
+- Antigüedad — calculated from Fecha de ingreso, not stored
+- Estado* — options: Activo, En prueba ("En licencia" is added with the Licencias module in Fase 3)
+- Sede*
+- Modalidad*
+- Convenio*
+- Bruto mensual*
 
 ### 5.6 Edit permissions
 | Group | Empleado (own legajo only) | Admin (any legajo) |
 |---|---|---|
 | A to D | Read and edit | Read and edit |
-| E (laborales) | Read only | Read and edit |
+| E (laborales, including Bruto mensual) | Read only | Read and edit |
 
 Validation (required fields, DNI digits only, Partido otro, children rule) is enforced on the server, not only in the form.
 
 ## 6. Open decisions
 | # | Decision | Needed before |
 |---|---|---|
-| 1 | Work data (group E) field list | F1-05 |
-| 2 | Document types for the legajo | F1-06 |
-| 3 | How a new employee gets the first password | F1-07 |
-| 4 | Theme switching behavior (follow system, manual toggle, or both) | F1-04 |
-| 5 | Logo file name(s) in `public/` | F1-04 |
-| 6 | Real domain and DNS | F1-12 |
+| 1 | How a new employee gets the first password | F1-07 |
+| 2 | Real domain and DNS | F1-12 |
 
 ## 7. Definition of Done
 - All CI jobs green.
