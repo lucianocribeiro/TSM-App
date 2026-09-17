@@ -32,6 +32,13 @@ test.describe("login page", () => {
     await expect(html).toHaveAttribute("data-theme", "dark");
     await expect(title).toBeVisible();
     await page.screenshot({ path: `${SCREENSHOT_DIR}/login-dark.png`, fullPage: true });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/login-dark-390.png`, fullPage: true });
+    await setThemeCookie(page, "light");
+    await page.reload();
+    await expect(html).toHaveAttribute("data-theme", "light");
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/login-light-390.png`, fullPage: true });
   });
 
   test("wrong password shows the generic error", async ({ page }) => {
@@ -111,6 +118,13 @@ test.describe("session and menu", () => {
     await expect(nav).toBeVisible();
     await expect(nav.getByRole("link")).toHaveCount(3);
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-mobile-menu.png` });
+
+    await setThemeCookie(page, "dark");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.getByRole("button", { name: copy.common.openMenu }).click();
+    await expect(nav).toBeVisible();
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-mobile-menu-dark.png` });
 
     await nav.getByRole("link", { name: copy.nav.usuarios }).click();
     await expect(page).toHaveURL(/\/usuarios$/);
