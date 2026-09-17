@@ -54,6 +54,8 @@ a { color: var(--accent-deep); }
 *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 ::selection { background: var(--accent-soft); }
 ```
+In `globals.css` the element rules (`body`, headings, `a`, `:focus-visible`, `::selection`) sit inside `@layer base` so Tailwind utilities can override them.
+
 Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink`, `ink-soft`, `line`, `line-soft`, `rail`, `rail-ink`, `accent`, `accent-deep`, `accent-soft`, `accent-100` to `accent-900`; fonts `font-heading`, `font-body`; radii `rounded-sm`, `rounded-md`, `rounded-lg`; shadow `shadow-panel`. Breakpoint `nav` = 900px (sidebar collapses below it).
 
 ## Style rules
