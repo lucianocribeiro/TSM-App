@@ -14,4 +14,4 @@ description: Use for any database schema, RLS policy, RPC, trigger or storage po
 8. Apply locally with `supabase db reset` and confirm it runs clean from zero.
 9. Regenerate types locally into the project's types file and commit them.
 10. Add or update RLS tests (`rls-tests` skill).
-11. Never run `supabase db push` or `supabase link`. In the PR description, list: migration file names, objects created or changed, and a note that Luciano must run the `db push` runbook.
+11. Never run remote commands in a build piece. In the PR description list migration file names and objects, and note that a runbook prompt (TSM-Fx-PUSH-NN) applies them after merge.

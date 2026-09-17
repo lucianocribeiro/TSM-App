@@ -1,9 +1,7 @@
-import { copy } from "@/lib/copy/es-AR";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth/session";
 
-export default function Home() {
-  return (
-    <main className="flex flex-1 items-center justify-center p-8">
-      <h1 className="text-3xl font-semibold">{copy.app.placeholder}</h1>
-    </main>
-  );
+export default async function Home() {
+  const user = await getSessionUser();
+  redirect(user ? "/mi-legajo" : "/login");
 }

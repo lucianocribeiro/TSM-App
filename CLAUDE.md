@@ -3,7 +3,7 @@
 Read `docs/constitucion.md` and the current phase PRD (`docs/prd-fase-1.md`) before any task. The Constitution wins over this file.
 
 ## Role
-You build. You commit, push and open PRs. You merge only when a versioned merge prompt (`TSM-Fx-MRG-NN`) tells you to, with a merge commit, never squash. You never run `supabase db push` and never link to or write to the remote Supabase project.
+You build. You commit, push and open PRs. You merge only when a versioned merge prompt (`TSM-Fx-MRG-NN`) tells you to, with a merge commit, never squash. You run remote Supabase operations (`link`, `db push`, remote settings) only when a versioned runbook prompt (`TSM-Fx-PUSH-NN`) tells you to, using `.env.local`, and you never print or store secret values. Outside those prompts, never touch the remote project.
 
 ## Every task
 1. Work only from a versioned prompt. If the request is not in a prompt, stop and ask.
@@ -45,7 +45,10 @@ You build. You commit, push and open PRs. You merge only when a versioned merge 
 - `new-module`: any new route or feature module.
 - `es-ar-copy`: any user-facing text.
 - `dod-checklist`: before reporting any piece as done.
-- `design-system`: added in F1-04. Until then, do not build styled UI.
+- `design-system`: any UI work.
 
 ## Design
-Added in F1-04 from the approved prototype.
+- Follow the `design-system` skill for any UI. The approved prototype defines style and structure only; fields and scope come from the PRD.
+- Tokens live in `src/app/globals.css`; components in `src/components/ui/`.
+- Light and dark via `data-theme` on `<html>`, switched by the manual toggle and persisted in a cookie.
+- Sidebar shows only the TSM logo (`public/logotsm.png`) at the top.
