@@ -185,21 +185,55 @@ describe("profiles RLS and role helpers", () => {
   });
 
   describe("profile creation trigger", () => {
-    it("creates an empleado profile even when metadata asks for admin", async () => {
-      const { data, error } = await service.auth.admin.createUser({
-        email: uniqueEmail("metadata-admin"),
-        password: TEST_PASSWORD,
-        email_confirm: true,
-        user_metadata: { role: "admin" },
-        app_metadata: { role: "admin" },
-      });
-      expect(error).toBeNull();
-      const id = data.user?.id;
-      expect(id).toBeDefined();
-      if (!id) return;
-      createdIds.push(id);
+    describe("with sign-up metadata asking for admin", () => {
+      let metadataUser: { id: string; email: string } | undefined;
 
-      expect(await roleOf(id)).toBe("empleado");
+      // Setup only: the service-role client creates the user through Auth.
+      beforeAll(async () => {
+        const email = uniqueEmail("metadata-admin");
+        const { data, error } = await service.auth.admin.createUser({
+          email,
+          password: TEST_PASSWORD,
+          email_confirm: true,
+          user_metadata: { role: "admin" },
+          app_metadata: { role: "admin" },
+        });
+        if (error || !data.user) {
+          throw new Error(`createUser failed for metadata-admin: ${error?.message}`);
+        }
+        metadataUser = { id: data.user.id, email };
+      });
+
+      afterAll(async () => {
+        if (metadataUser) await deleteTestUsers(service, [metadataUser.id]);
+      });
+
+      it("creates an empleado profile, verified from the user's own session", async () => {
+        if (!metadataUser) throw new Error("metadata-admin setup did not run");
+        const client = anonClient();
+        const { error: signInError } = await client.auth.signInWithPassword({
+          email: metadataUser.email,
+          password: TEST_PASSWORD,
+        });
+        expect(signInError).toBeNull();
+
+        const role = await client.rpc("current_app_role");
+        expect(role.error).toBeNull();
+        expect(role.data).toBe("empleado");
+
+        const isAdmin = await client.rpc("is_admin");
+        expect(isAdmin.error).toBeNull();
+        expect(isAdmin.data).toBe(false);
+
+        const { data, error } = await client
+          .from("profiles")
+          .select("id, role")
+          .eq("id", metadataUser.id);
+        expect(error).toBeNull();
+        expect(data).toEqual([{ id: metadataUser.id, role: "empleado" }]);
+
+        await client.auth.signOut();
+      });
     });
 
     it("rejects public sign-up", async () => {
