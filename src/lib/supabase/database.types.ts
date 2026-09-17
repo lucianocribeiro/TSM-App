@@ -9,6 +9,172 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      legajo_hijos: {
+        Row: {
+          created_at: string
+          fecha_nacimiento: string
+          id: string
+          legajo_id: string
+          nombre_completo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fecha_nacimiento: string
+          id?: string
+          legajo_id: string
+          nombre_completo: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fecha_nacimiento?: string
+          id?: string
+          legajo_id?: string
+          nombre_completo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legajo_hijos_legajo_id_fkey"
+            columns: ["legajo_id"]
+            isOneToOne: false
+            referencedRelation: "legajos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legajos: {
+        Row: {
+          alergias: string | null
+          apellido: string | null
+          area: string | null
+          bruto_mensual: number | null
+          calle_altura: string | null
+          convenio: string | null
+          created_at: string
+          cuil: string | null
+          dni: string | null
+          email_personal: string | null
+          emergencia_domicilio: string | null
+          emergencia_nombre: string | null
+          emergencia_parentesco: string | null
+          emergencia_telefono: string | null
+          estado_civil: Database["public"]["Enums"]["estado_civil"] | null
+          estado_laboral: Database["public"]["Enums"]["estado_laboral"] | null
+          fecha_ingreso: string | null
+          fecha_nacimiento: string | null
+          grupo_sanguineo: string | null
+          id: string
+          localidad: string | null
+          medicacion_habitual: string | null
+          modalidad: string | null
+          nacionalidad: string | null
+          nombre_conyuge: string | null
+          nombres: string | null
+          numero_afiliado: string | null
+          numero_legajo: string | null
+          obra_social: string | null
+          partido: string | null
+          partido_otro: string | null
+          piso_depto: string | null
+          profile_id: string
+          puesto: string | null
+          sede: string | null
+          telefono_celular: string | null
+          tiene_hijos: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          alergias?: string | null
+          apellido?: string | null
+          area?: string | null
+          bruto_mensual?: number | null
+          calle_altura?: string | null
+          convenio?: string | null
+          created_at?: string
+          cuil?: string | null
+          dni?: string | null
+          email_personal?: string | null
+          emergencia_domicilio?: string | null
+          emergencia_nombre?: string | null
+          emergencia_parentesco?: string | null
+          emergencia_telefono?: string | null
+          estado_civil?: Database["public"]["Enums"]["estado_civil"] | null
+          estado_laboral?: Database["public"]["Enums"]["estado_laboral"] | null
+          fecha_ingreso?: string | null
+          fecha_nacimiento?: string | null
+          grupo_sanguineo?: string | null
+          id?: string
+          localidad?: string | null
+          medicacion_habitual?: string | null
+          modalidad?: string | null
+          nacionalidad?: string | null
+          nombre_conyuge?: string | null
+          nombres?: string | null
+          numero_afiliado?: string | null
+          numero_legajo?: string | null
+          obra_social?: string | null
+          partido?: string | null
+          partido_otro?: string | null
+          piso_depto?: string | null
+          profile_id: string
+          puesto?: string | null
+          sede?: string | null
+          telefono_celular?: string | null
+          tiene_hijos?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          alergias?: string | null
+          apellido?: string | null
+          area?: string | null
+          bruto_mensual?: number | null
+          calle_altura?: string | null
+          convenio?: string | null
+          created_at?: string
+          cuil?: string | null
+          dni?: string | null
+          email_personal?: string | null
+          emergencia_domicilio?: string | null
+          emergencia_nombre?: string | null
+          emergencia_parentesco?: string | null
+          emergencia_telefono?: string | null
+          estado_civil?: Database["public"]["Enums"]["estado_civil"] | null
+          estado_laboral?: Database["public"]["Enums"]["estado_laboral"] | null
+          fecha_ingreso?: string | null
+          fecha_nacimiento?: string | null
+          grupo_sanguineo?: string | null
+          id?: string
+          localidad?: string | null
+          medicacion_habitual?: string | null
+          modalidad?: string | null
+          nacionalidad?: string | null
+          nombre_conyuge?: string | null
+          nombres?: string | null
+          numero_afiliado?: string | null
+          numero_legajo?: string | null
+          obra_social?: string | null
+          partido?: string | null
+          partido_otro?: string | null
+          piso_depto?: string | null
+          profile_id?: string
+          puesto?: string | null
+          sede?: string | null
+          telefono_celular?: string | null
+          tiene_hijos?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legajos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -43,6 +209,13 @@ export type Database = {
     }
     Enums: {
       app_role: "empleado" | "admin"
+      estado_civil:
+        | "soltero"
+        | "casado"
+        | "divorciado"
+        | "viudo"
+        | "union_convivencial"
+      estado_laboral: "activo" | "en_prueba"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -171,6 +344,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["empleado", "admin"],
+      estado_civil: [
+        "soltero",
+        "casado",
+        "divorciado",
+        "viudo",
+        "union_convivencial",
+      ],
+      estado_laboral: ["activo", "en_prueba"],
     },
   },
 } as const
