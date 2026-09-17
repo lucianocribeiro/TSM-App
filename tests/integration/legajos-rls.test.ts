@@ -387,6 +387,12 @@ describe("legajos and legajo_hijos RLS", () => {
       await expectCheckViolation({ partido: "Otro", partido_otro: "  " });
     });
 
+    it("rejects a whitespace-only partido_otro", async () => {
+      await expectCheckViolation({ partido: "Otro", partido_otro: "\t" });
+      await expectCheckViolation({ partido: "Otro", partido_otro: "\n" });
+      await expectCheckViolation({ partido: "Otro", partido_otro: " \t\n " });
+    });
+
     it("rejects partido_otro with another partido", async () => {
       await expectCheckViolation({ partido: "Tigre", partido_otro: "Algo" });
     });
@@ -403,6 +409,32 @@ describe("legajos and legajo_hijos RLS", () => {
         .select();
       expect(data).toBeNull();
       expect(error?.code).toBe(CHECK_VIOLATION);
+    });
+
+    it("rejects NaN in bruto_mensual on update and on insert", async () => {
+      // PostgREST casts the string "NaN" to numeric NaN.
+      const update = await admin.client
+        .from("legajos")
+        .update({ bruto_mensual: "NaN" as unknown as number })
+        .eq("id", legajoB)
+        .select();
+      expect(update.data).toBeNull();
+      expect(update.error?.code).toBe(CHECK_VIOLATION);
+
+      // Insert path: remove the trigger-created legajo first, so the only
+      // reason this insert can fail is the constraint.
+      const user = await createTestUser(service, "legajo-nan");
+      createdIds.push(user.id);
+      const removed = await service.from("legajos").delete().eq("profile_id", user.id).select();
+      expect(removed.error).toBeNull();
+      expect(removed.data).toHaveLength(1);
+
+      const insert = await admin.client
+        .from("legajos")
+        .insert({ profile_id: user.id, bruto_mensual: "NaN" as unknown as number })
+        .select();
+      expect(insert.data).toBeNull();
+      expect(insert.error?.code).toBe(CHECK_VIOLATION);
     });
   });
 });

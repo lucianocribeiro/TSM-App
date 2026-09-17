@@ -89,15 +89,20 @@ create table public.legajos (
       )
     ),
 
-  -- partido_otro is present (non-empty) exactly when partido = 'Otro'.
+  -- partido_otro holds at least one non-whitespace character exactly when
+  -- partido = 'Otro', and is null otherwise.
   constraint legajos_partido_otro
     check (
-      (partido = 'Otro' and partido_otro is not null and btrim(partido_otro) <> '')
+      (partido = 'Otro' and partido_otro is not null and partido_otro ~ '[^[:space:]]')
       or (partido is distinct from 'Otro' and partido_otro is null)
     ),
 
+  -- In Postgres 'NaN' sorts above every number, so it has to be excluded explicitly.
   constraint legajos_bruto_mensual_no_negativo
-    check (bruto_mensual is null or bruto_mensual >= 0)
+    check (
+      bruto_mensual is null
+      or (bruto_mensual <> 'NaN'::numeric and bruto_mensual >= 0)
+    )
 );
 
 alter table public.legajos enable row level security;
