@@ -40,6 +40,17 @@ test.describe("login page", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
+  test("empty fields submitted without native validation show the generic error", async ({ page }) => {
+    await page.goto("/login");
+    // Bypass the inputs' `required` attributes to exercise the server response.
+    await page.locator("form").evaluate((form) => {
+      (form as HTMLFormElement).noValidate = true;
+    });
+    await page.getByRole("button", { name: copy.auth.login.submit }).click();
+    await expect(loginError(page)).toHaveText(copy.auth.errors.invalidCredentials);
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
   test("unknown email shows the same generic error", async ({ page }) => {
     await fillLogin(page, "nobody@mitsm.test", "wrong-password");
     await expect(loginError(page)).toHaveText(copy.auth.errors.invalidCredentials);

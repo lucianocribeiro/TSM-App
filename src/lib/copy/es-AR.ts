@@ -18,7 +18,6 @@ export type Copy = {
     };
     errors: {
       invalidCredentials: string;
-      requiredFields: string;
       logoutFailed: string;
     };
     logout: string;
@@ -71,7 +70,6 @@ export const copy = {
     },
     errors: {
       invalidCredentials: "Email o contraseña incorrectos.",
-      requiredFields: "Completá tu email y tu contraseña.",
       logoutFailed: "No pudimos cerrar la sesión. Intentá de nuevo.",
     },
     logout: "Cerrar sesión",

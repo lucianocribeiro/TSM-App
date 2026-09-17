@@ -31,7 +31,6 @@ describe("es-AR copy", () => {
       copy.auth.login.submit,
       copy.auth.login.submitting,
       copy.auth.errors.invalidCredentials,
-      copy.auth.errors.requiredFields,
       copy.auth.errors.logoutFailed,
       copy.auth.logout,
       copy.auth.roles.empleado,
