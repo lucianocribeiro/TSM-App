@@ -63,6 +63,25 @@ export type Copy = {
       brutoMensualNegative: string;
     };
   };
+  documentos: {
+    tipos: {
+      dni_frente: string;
+      dni_dorso: string;
+      licencia_conducir: string;
+    };
+    validation: {
+      fileRequired: string;
+      fileNameTooLong: string;
+      fileEmpty: string;
+      fileTooLarge: string;
+      fileTypeNotAllowed: string;
+      fileTypeMismatch: string;
+      tipoInvalid: string;
+    };
+    errors: {
+      downloadFailed: string;
+    };
+  };
 };
 
 export const copy = {
@@ -128,6 +147,26 @@ export const copy = {
       hijosNotAllowed: "Si elegiste «No», no agregues hijos.",
       numberInvalid: "Ingresá un número válido.",
       brutoMensualNegative: "El bruto mensual no puede ser negativo.",
+    },
+  },
+  documentos: {
+    tipos: {
+      dni_frente: "DNI (frente)",
+      dni_dorso: "DNI (dorso)",
+      licencia_conducir: "Licencia de conducir",
+    },
+    validation: {
+      fileRequired: "Elegí un archivo para subir.",
+      fileNameTooLong: "El nombre del archivo es demasiado largo. Renombralo y volvé a intentar.",
+      fileEmpty: "El archivo está vacío. Elegí otro.",
+      fileTooLarge: "El archivo supera los 10 MB. Elegí uno más liviano.",
+      fileTypeNotAllowed: "Subí un archivo PDF, JPG o PNG.",
+      fileTypeMismatch:
+        "La extensión del archivo no coincide con su formato. Revisalo y volvé a intentar.",
+      tipoInvalid: "Elegí un tipo de documento válido.",
+    },
+    errors: {
+      downloadFailed: "No pudimos abrir el documento. Intentá de nuevo.",
     },
   },
 } as const satisfies Copy;
