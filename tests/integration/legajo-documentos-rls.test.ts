@@ -588,6 +588,7 @@ describe("legajo_documentos and legajo-docs storage RLS", () => {
       expect(inserted.error).toBeNull();
       expect(await storedRows(legajo)).toHaveLength(1);
 
+      // The user uploaded the document to their own legajo (uploaded_by).
       // Auth refuses to delete a user who still owns storage objects, so the
       // objects are removed first.
       const blocked = await service.auth.admin.deleteUser(user.id);

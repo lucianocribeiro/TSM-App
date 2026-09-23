@@ -68,7 +68,10 @@ create table public.legajo_documentos (
   file_name text not null,
   mime_type text not null,
   size_bytes bigint not null,
-  uploaded_by uuid not null references public.profiles (id),
+  -- Deferred: when a profile is deleted, the cascade through legajos removes
+  -- the documents it uploaded to its own legajo before this is checked. A
+  -- profile that uploaded documents to other legajos still cannot be deleted.
+  uploaded_by uuid not null references public.profiles (id) deferrable initially deferred,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
