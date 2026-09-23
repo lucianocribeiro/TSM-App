@@ -123,6 +123,16 @@ file_size_limit = "50MiB"
 # allowed_mime_types = ["image/png", "image/jpeg"]
 # objects_path = "./images"
 
+# LOCAL AND CI ONLY. The legajo-docs bucket is created by migration
+# 20260923144227_legajo_documentos_storage.sql. It is declared here only so the
+# CLI uploads the fake seed files in objects_path (rows in seed.sql). Keep these
+# values identical to the migration: the CLI applies them to the local bucket.
+[storage.buckets.legajo-docs]
+public = false
+file_size_limit = "10MiB"
+allowed_mime_types = ["application/pdf", "image/jpeg", "image/png"]
+objects_path = "./seed/legajo-docs"
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true

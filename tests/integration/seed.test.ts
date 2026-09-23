@@ -29,3 +29,39 @@ describe("local seed users", () => {
     });
   }
 });
+
+describe("local seed documents", () => {
+  async function signIn(email: string) {
+    const client = anonClient();
+    const { error } = await client.auth.signInWithPassword({ email, password: SEED_PASSWORD });
+    expect(error).toBeNull();
+    return client;
+  }
+
+  it("Empleado A has DNI frente and dorso with readable fake files", async () => {
+    const client = await signIn("empleado.a@mitsm.test");
+    const { data, error } = await client
+      .from("legajo_documentos")
+      .select("tipo, storage_path, size_bytes")
+      .order("tipo");
+    expect(error).toBeNull();
+    expect(data?.map((row) => row.tipo)).toEqual(["dni_frente", "dni_dorso"]);
+
+    for (const row of data ?? []) {
+      const file = await client.storage.from("legajo-docs").download(row.storage_path);
+      expect(file.error, row.tipo).toBeNull();
+      const text = (await file.data?.text()) ?? "";
+      expect(text, row.tipo).toContain("FAKE TEST FILE");
+      expect(file.data?.size, row.tipo).toBe(row.size_bytes);
+    }
+    await client.auth.signOut();
+  });
+
+  it("Empleado B has no documents", async () => {
+    const client = await signIn("empleado.b@mitsm.test");
+    const { data, error } = await client.from("legajo_documentos").select("id");
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
+    await client.auth.signOut();
+  });
+});
