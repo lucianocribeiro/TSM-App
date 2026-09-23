@@ -588,7 +588,14 @@ describe("legajo_documentos and legajo-docs storage RLS", () => {
       expect(inserted.error).toBeNull();
       expect(await storedRows(legajo)).toHaveLength(1);
 
-      await deleteTestUsers(service, [user.id]);
+      // Auth refuses to delete a user who still owns storage objects, so the
+      // objects are removed first.
+      const blocked = await service.auth.admin.deleteUser(user.id);
+      expect(blocked.error).not.toBeNull();
+      expect((await bucket(service).remove([path])).error).toBeNull();
+
+      const deleted = await service.auth.admin.deleteUser(user.id);
+      expect(deleted.error).toBeNull();
 
       const { data, error } = await service.from("legajo_documentos").select("id").eq("storage_path", path);
       expect(error).toBeNull();
