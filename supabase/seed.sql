@@ -198,3 +198,36 @@ cross join (
     ('Hija Ficticia Dos', '2019-12-05'::date)
 ) as h (nombre_completo, fecha_nacimiento)
 where l.profile_id = '00000000-0000-4000-a000-000000000002';
+
+-- Legajo documents for Empleado A only (Empleado B and Admin have none).
+-- The files are tiny fake PDFs in supabase/seed/legajo-docs, uploaded to the
+-- local legajo-docs bucket by the CLI (config.toml, storage.buckets.legajo-docs).
+-- size_bytes matches each file.
+insert into public.legajo_documentos (
+  legajo_id, tipo, storage_path, file_name, mime_type, size_bytes, uploaded_by
+)
+select
+  l.id,
+  d.tipo::public.documento_tipo,
+  d.storage_path,
+  d.file_name,
+  'application/pdf',
+  d.size_bytes,
+  l.profile_id
+from public.legajos as l
+cross join (
+  values
+    (
+      'dni_frente',
+      '00000000-0000-4000-a000-000000000002/dni_frente/00000000-0000-4000-b000-000000000001.pdf',
+      'dni-frente-prueba.pdf',
+      78
+    ),
+    (
+      'dni_dorso',
+      '00000000-0000-4000-a000-000000000002/dni_dorso/00000000-0000-4000-b000-000000000002.pdf',
+      'dni-dorso-prueba.pdf',
+      77
+    )
+) as d (tipo, storage_path, file_name, size_bytes)
+where l.profile_id = '00000000-0000-4000-a000-000000000002';
