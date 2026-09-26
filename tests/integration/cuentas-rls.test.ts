@@ -222,6 +222,16 @@ describe("account functions, profile columns and cuenta_eventos", () => {
       expect(missing.error?.code).toBe(NOT_FOUND);
     });
 
+    it("marcar_password_temporal refuses the caller's own account, changing nothing", async () => {
+      const { error } = await admin.client.rpc("marcar_password_temporal", { p_profile_id: admin.id });
+      expect(error?.code).toBe(BUSINESS_RULE);
+      expect(error?.hint).toBe("cuenta_propia");
+      expect((await storedProfile(admin.id)).debe_cambiar_password).toBe(false);
+      expect(await eventsOf(admin.id)).toEqual([]);
+      // The Admin's own session was not ended.
+      expect((await admin.client.auth.refreshSession()).error).toBeNull();
+    });
+
     it("marcar_password_temporal flags the change, logs it and ends the account's sessions", async () => {
       const target = await newEmpleado("cuentas-temporal");
       expect((await admin.client.rpc("marcar_password_temporal", { p_profile_id: target.id })).error).toBeNull();

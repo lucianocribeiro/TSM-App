@@ -20,8 +20,8 @@ export function localServiceClient() {
   return createClient<Database>(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-// A confirmed Empleado for one test. Delete it with deleteE2EUser.
-export async function createE2EUser(label: string) {
+// A confirmed user for one test (Empleado unless asked). Delete it with deleteE2EUser.
+export async function createE2EUser(label: string, role: Database["public"]["Enums"]["app_role"] = "empleado") {
   const service = localServiceClient();
   const email = `e2e.${label}.${randomUUID()}@mitsm.test`;
   const { data, error } = await service.auth.admin.createUser({
@@ -30,6 +30,10 @@ export async function createE2EUser(label: string) {
     email_confirm: true,
   });
   if (error || !data.user) throw new Error(`e2e user setup failed: ${error?.message}`);
+  if (role !== "empleado") {
+    const promoted = await service.from("profiles").update({ role }).eq("id", data.user.id);
+    if (promoted.error) throw new Error(`e2e role setup failed: ${promoted.error.message}`);
+  }
   return { id: data.user.id, email, password: E2E_PASSWORD };
 }
 

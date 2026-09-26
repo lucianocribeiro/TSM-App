@@ -171,6 +171,20 @@ describe("Admin account module", () => {
       expect(await eventTypes(target.id)).toEqual([{ tipo: "password_temporal", actor_id: admin.id }]);
     });
 
+    it("refuses the caller's own account before changing anything", async () => {
+      as(admin);
+      expect(await cuentas.resetPasswordTemporal({ profileId: admin.id, passwordTemporal: "PropiaTemporal-1" })).toEqual({
+        ok: false,
+        error: errors.cuentaPropia,
+      });
+      // Password, session, flag and history are unchanged.
+      expect((await signIn(admin.email, "IntegrationTest123!")).error).toBeNull();
+      expect((await signIn(admin.email, "PropiaTemporal-1")).error).not.toBeNull();
+      expect((await admin.client.auth.refreshSession()).error).toBeNull();
+      expect((await storedProfile(admin.id))?.debe_cambiar_password).toBe(false);
+      expect(await eventTypes(admin.id)).toEqual([]);
+    });
+
     it("rejects a short password and an unknown account", async () => {
       as(admin);
       expect(await cuentas.resetPasswordTemporal({ profileId: empleado.id, passwordTemporal: "corta" })).toEqual({
@@ -207,6 +221,27 @@ describe("Admin account module", () => {
       expect(await cuentas.reactivarCuenta({ profileId: target.id })).toEqual({ ok: false, error: errors.yaActiva });
 
       expect((await eventTypes(target.id)).map((event) => event.tipo)).toEqual(["desactivacion", "reactivacion"]);
+    });
+
+    it("is safe to retry when the account was deactivated but the ban was not applied", async () => {
+      const target = await createTestUser(service, "modulo-baja-reintento");
+      accountIds.push(target.id);
+
+      // First run stopped after the database part: inactive, logged, not banned.
+      expect((await admin.client.rpc("desactivar_cuenta", { p_profile_id: target.id, p_motivo: "Baja (prueba)" })).error).toBeNull();
+      expect((await signIn(target.email, "IntegrationTest123!")).error).toBeNull();
+
+      as(admin);
+      expect(await cuentas.desactivarCuenta({ profileId: target.id, motivo: "Baja (prueba)" })).toEqual({ ok: true });
+      expect((await signIn(target.email, "IntegrationTest123!")).error?.code).toBe("user_banned");
+
+      // Once complete, another run is refused as before.
+      expect(await cuentas.desactivarCuenta({ profileId: target.id, motivo: "Baja (prueba)" })).toEqual({
+        ok: false,
+        error: errors.yaInactiva,
+      });
+      // No duplicate history.
+      expect((await eventTypes(target.id)).map((event) => event.tipo)).toEqual(["desactivacion"]);
     });
 
     it("refuses the caller's own account and a blank reason", async () => {
@@ -318,6 +353,41 @@ describe("Admin account module", () => {
       for (const path of paths) {
         expect((await service.storage.from(DOCUMENTOS_BUCKET).download(path)).data).toBeNull();
       }
+    });
+
+    it("is safe to retry after the files were already removed", async () => {
+      const { user, legajoId, solicitudId, paths } = await cuentaCompleta("modulo-purga-reintento");
+      // A previous run removed the files and stopped before deleting the account.
+      const removed = await service.storage.from(DOCUMENTOS_BUCKET).remove(paths);
+      expect(removed.data).toHaveLength(2);
+
+      as(admin);
+      expect(await cuentas.purgarCuenta({ profileId: user.id, emailConfirmacion: user.email })).toEqual({
+        ok: true,
+        data: { objetos: 0, documentos: 1, hijos: 1, solicitudes: 1, eventos: 1 },
+      });
+      expect((await service.auth.admin.getUserById(user.id)).data.user).toBeNull();
+      expect(await remaining(service, user.id, legajoId, solicitudId)).toEqual({
+        profiles: 0,
+        legajos: 0,
+        hijos: 0,
+        documentos: 0,
+        solicitudes: 0,
+        items: 0,
+        eventos: 0,
+        objetos: 0,
+      });
+    });
+
+    it("continues from a partial file removal", async () => {
+      const { user, paths } = await cuentaCompleta("modulo-purga-parcial");
+      await service.storage.from(DOCUMENTOS_BUCKET).remove([paths[0]]);
+
+      as(admin);
+      const result = await cuentas.purgarCuenta({ profileId: user.id, emailConfirmacion: user.email });
+      expect(result.ok && result.data?.objetos).toBe(1);
+      expect((await service.auth.admin.getUserById(user.id)).data.user).toBeNull();
+      expect((await service.storage.from(DOCUMENTOS_BUCKET).download(paths[1])).data).toBeNull();
     });
 
     it("refuses the caller's own account", async () => {

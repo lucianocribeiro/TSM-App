@@ -85,8 +85,11 @@ test.describe("forced password change", () => {
     await expect(page.getByRole("heading", { level: 1, name: copy.miLegajo.title })).toBeVisible();
     await expectNavLinks(page, [copy.nav.miLegajo]);
 
+    // Still reachable, now as a voluntary change with the usual navigation.
     await page.goto("/cambiar-password");
-    await expect(page).toHaveURL(/\/mi-legajo$/);
+    await expect(page).toHaveURL(/\/cambiar-password$/);
+    await expect(page.getByText(copy.password.introVoluntaria)).toBeVisible();
+    await expectNavLinks(page, [copy.nav.miLegajo]);
 
     await page.getByRole("button", { name: copy.auth.logout }).click();
     await expect(page).toHaveURL(/\/login$/);
@@ -94,6 +97,30 @@ test.describe("forced password change", () => {
     await fillLogin(page, EMPLEADO_B.email, SEED_PASSWORD);
     await expect(loginError(page)).toHaveText(copy.auth.errors.invalidCredentials);
     await loginAs(page, { email: EMPLEADO_B.email, password: NEW_PASSWORD });
+  });
+});
+
+test.describe("voluntary password change", () => {
+  test("an Admin changes their own password at /cambiar-password", async ({ page }) => {
+    const user = await createE2EUser("admin-cambio", "admin");
+    try {
+      await loginAs(page, user);
+      await page.goto("/cambiar-password");
+      await expect(page).toHaveURL(/\/cambiar-password$/);
+      await expect(page.getByText(copy.password.introVoluntaria)).toBeVisible();
+      await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.usuarios]);
+
+      await fillCambioPassword(page, NEW_PASSWORD);
+      await expect(page).toHaveURL(/\/mi-legajo$/);
+
+      await page.getByRole("button", { name: copy.auth.logout }).click();
+      await expect(page).toHaveURL(/\/login$/);
+      await fillLogin(page, user.email, user.password);
+      await expect(loginError(page)).toHaveText(copy.auth.errors.invalidCredentials);
+      await loginAs(page, { email: user.email, password: NEW_PASSWORD });
+    } finally {
+      await deleteE2EUser(user.id);
+    }
   });
 });
 
