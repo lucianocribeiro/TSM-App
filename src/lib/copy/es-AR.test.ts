@@ -54,6 +54,27 @@ describe("es-AR copy", () => {
     }
   });
 
+  it("defines the approval states, reason label and errors", () => {
+    const aprobacionKeys = [
+      ...Object.values(copy.aprobaciones.solicitudEstados),
+      ...Object.values(copy.aprobaciones.documentoEstados),
+      copy.aprobaciones.pendienteHint,
+      copy.aprobaciones.motivoRechazoLabel,
+      ...Object.values(copy.aprobaciones.errors),
+    ];
+    for (const text of aprobacionKeys) {
+      expect(typeof text).toBe("string");
+      expect(text.trim()).not.toBe("");
+    }
+    expect(Object.keys(copy.aprobaciones.solicitudEstados).sort()).toEqual(
+      ["aprobada", "cancelada", "pendiente", "rechazada"],
+    );
+    expect(Object.keys(copy.aprobaciones.documentoEstados).sort()).toEqual(
+      ["aprobado", "pendiente", "rechazado", "reemplazado"],
+    );
+    expect(copy.aprobaciones.errors.solicitudPendiente).toMatch(/^Ya tenés una solicitud pendiente/);
+  });
+
   it("uses the generic login error from the PRD", () => {
     expect(copy.auth.errors.invalidCredentials).toBe(
       "Email o contraseña incorrectos.",
