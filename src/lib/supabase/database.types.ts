@@ -376,6 +376,10 @@ export type Database = {
         Returns: undefined
       }
       campos_solicitud_permitidos: { Args: never; Returns: string[] }
+      crear_solicitud: {
+        Args: { p_items: Json; p_legajo_id: string }
+        Returns: string
+      }
       current_app_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]

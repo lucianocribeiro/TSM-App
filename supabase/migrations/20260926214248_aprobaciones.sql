@@ -1,7 +1,9 @@
 -- F1-06B: approval of employee changes and documents (Constitution §9, PRD US-7).
 -- An Empleado's changes to groups A to D and their document uploads are stored
 -- as pending and take effect only when an Admin approves them. Admin changes
--- apply directly.
+-- apply directly. Requests are created only through crear_solicitud, by
+-- employees. The file behind a decided document cannot be changed by the
+-- employee.
 
 -- ---------------------------------------------------------------------------
 -- Enums (stable codes; display labels live in the copy module)
@@ -68,8 +70,12 @@ begin
   end if;
 
   for hijo in select value from pg_catalog.jsonb_array_elements(hijos) loop
-    if pg_catalog.jsonb_typeof(hijo) <> 'object'
-      or (
+    -- Checked on its own: jsonb_object_keys raises on a non-object.
+    if pg_catalog.jsonb_typeof(hijo) <> 'object' then
+      return false;
+    end if;
+
+    if (
         select pg_catalog.array_agg(key order by key)
         from pg_catalog.jsonb_object_keys(hijo) as key
       ) is distinct from array['fecha_nacimiento', 'nombre_completo']::text[]
@@ -169,7 +175,7 @@ create trigger solicitudes_cambio_set_updated_at
 -- ---------------------------------------------------------------------------
 -- valor_propuesto null means "clear the field". For 'hijos' it is the JSON
 -- children set ('[]' clears it). valor_anterior is filled by a trigger from
--- the legajo at submission time; any value sent by the client is replaced.
+-- the legajo at submission time.
 create table public.solicitudes_cambio_items (
   id uuid primary key default gen_random_uuid(),
   solicitud_id uuid not null references public.solicitudes_cambio (id) on delete cascade,
@@ -189,9 +195,9 @@ create table public.solicitudes_cambio_items (
 
 alter table public.solicitudes_cambio_items enable row level security;
 
--- Reads under the caller's RLS: the Empleado only reaches their own request
--- and legajo. The value is read as text in the same format the application
--- uses (dates YYYY-MM-DD, booleans true/false, children as a JSON array).
+-- Runs inside crear_solicitud (as its owner) and in seeds. The value is read
+-- as text in the same format the application uses (dates YYYY-MM-DD, booleans
+-- true/false, children as a JSON array).
 create function public.set_solicitud_item_valor_anterior()
 returns trigger
 language plpgsql
@@ -239,19 +245,18 @@ create trigger solicitudes_cambio_items_set_valor_anterior
 -- ---------------------------------------------------------------------------
 -- Grants: change requests
 -- ---------------------------------------------------------------------------
--- anon: none. authenticated: RLS decides the rows. The review columns are
--- never writable through the API; decisions go through the functions below.
--- No DELETE for anyone: history is kept.
+-- anon: none. authenticated: read (RLS decides the rows) and the cancel-own
+-- update. No INSERT: a request is created only through crear_solicitud, so it
+-- never exists without items. The review columns are never writable through
+-- the API; decisions go through the functions below. No DELETE for anyone:
+-- history is kept.
 revoke all on table public.solicitudes_cambio from anon, authenticated;
 revoke all on table public.solicitudes_cambio_items from anon, authenticated;
 
 grant select on table public.solicitudes_cambio to authenticated;
-grant insert (legajo_id, solicitado_por, estado) on table public.solicitudes_cambio to authenticated;
 grant update (estado) on table public.solicitudes_cambio to authenticated;
 
 grant select on table public.solicitudes_cambio_items to authenticated;
-grant insert (solicitud_id, campo, valor_propuesto, valor_anterior)
-  on table public.solicitudes_cambio_items to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Policies: solicitudes_cambio
@@ -263,20 +268,6 @@ create policy solicitudes_cambio_select_own_or_admin
   using (
     (select public.is_admin())
     or exists (
-      select 1 from public.legajos as l
-      where l.id = legajo_id and l.profile_id = (select auth.uid())
-    )
-  );
-
--- A new request is always pending, submitted by the caller, for their own legajo.
-create policy solicitudes_cambio_insert_own
-  on public.solicitudes_cambio
-  for insert
-  to authenticated
-  with check (
-    estado = 'pendiente'
-    and solicitado_por = (select auth.uid())
-    and exists (
       select 1 from public.legajos as l
       where l.id = legajo_id and l.profile_id = (select auth.uid())
     )
@@ -309,20 +300,7 @@ create policy solicitudes_cambio_items_select_own_or_admin
     )
   );
 
--- Items go only into the caller's own pending request. The allowed fields are
--- enforced by the solicitudes_cambio_items_campo_permitido constraint.
-create policy solicitudes_cambio_items_insert_own
-  on public.solicitudes_cambio_items
-  for insert
-  to authenticated
-  with check (
-    exists (
-      select 1 from public.solicitudes_cambio as s
-      where s.id = solicitud_id
-        and s.estado = 'pendiente'
-        and s.solicitado_por = (select auth.uid())
-    )
-  );
+-- INSERT: no policy on either table (see crear_solicitud).
 
 -- ---------------------------------------------------------------------------
 -- legajos and legajo_hijos: direct writes are Admin only from now on
@@ -446,6 +424,40 @@ create trigger legajo_documentos_set_estado_inicial
   for each row
   execute function public.set_documento_estado_inicial();
 
+-- When an Admin replaces the file of a decided document in place, the Admin
+-- who put the current file there becomes the reviewer. Only a file change
+-- (storage_path) restamps: state changes made by aprobar_documento keep the
+-- original reviewer of the replaced document. A pending document keeps no
+-- reviewer until it is decided.
+create function public.restamp_documento_reemplazo()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  jwt_role text := auth.jwt() ->> 'role';
+begin
+  if jwt_role is not null
+    and jwt_role <> 'service_role'
+    and public.is_admin()
+    and new.storage_path is distinct from old.storage_path
+    and new.estado <> 'pendiente'
+  then
+    new.revisado_por := auth.uid();
+    new.revisado_en := pg_catalog.now();
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.restamp_documento_reemplazo() from public, anon, authenticated;
+
+create trigger legajo_documentos_restamp_reemplazo
+  before update on public.legajo_documentos
+  for each row
+  execute function public.restamp_documento_reemplazo();
+
 -- Policies. Insert: as before, plus the initial state. Update (replace in
 -- place): Admin only; an Empleado submits a new pending document instead.
 -- Delete: Admin any; Empleado own while pending.
@@ -502,6 +514,170 @@ create policy legajo_documentos_delete_admin_or_own_pending
       )
     )
   );
+
+-- ---------------------------------------------------------------------------
+-- Storage: the file behind a decided document is not the employee's to change
+-- ---------------------------------------------------------------------------
+-- Replaces the F1-06 UPDATE and DELETE policies on storage.objects for
+-- legajo-docs. SELECT and INSERT are unchanged: on upload the metadata row for
+-- the path does not exist yet. A non-admin may overwrite, move or delete an
+-- object in their own folder only while its document is pending, or when no
+-- document row points to it (an orphan from a failed upload). The subqueries
+-- read legajo_documentos under the caller's RLS; every row for a path in the
+-- caller's folder belongs to the caller's legajo (insert policy).
+drop policy legajo_docs_update_own_or_admin on storage.objects;
+drop policy legajo_docs_delete_own_or_admin on storage.objects;
+
+create policy legajo_docs_update_admin_or_own_pending
+  on storage.objects
+  for update
+  to authenticated
+  using (
+    bucket_id = 'legajo-docs'
+    and (
+      (select public.is_admin())
+      or (
+        split_part(objects.name, '/', 1) = (select auth.uid())::text
+        and (
+          not exists (
+            select 1 from public.legajo_documentos as d
+            where d.storage_path = objects.name
+          )
+          or exists (
+            select 1
+            from public.legajo_documentos as d
+            join public.legajos as l on l.id = d.legajo_id
+            where d.storage_path = objects.name
+              and d.estado = 'pendiente'
+              and l.profile_id = (select auth.uid())
+          )
+        )
+      )
+    )
+  )
+  with check (
+    bucket_id = 'legajo-docs'
+    and public.is_valid_legajo_doc_path(objects.name)
+    and (
+      split_part(objects.name, '/', 1) = (select auth.uid())::text
+      or (
+        (select public.is_admin())
+        and exists (
+          select 1 from public.profiles as p
+          where p.id::text = split_part(objects.name, '/', 1)
+        )
+      )
+    )
+  );
+
+create policy legajo_docs_delete_admin_or_own_pending
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'legajo-docs'
+    and (
+      (select public.is_admin())
+      or (
+        split_part(objects.name, '/', 1) = (select auth.uid())::text
+        and (
+          not exists (
+            select 1 from public.legajo_documentos as d
+            where d.storage_path = objects.name
+          )
+          or exists (
+            select 1
+            from public.legajo_documentos as d
+            join public.legajos as l on l.id = d.legajo_id
+            where d.storage_path = objects.name
+              and d.estado = 'pendiente'
+              and l.profile_id = (select auth.uid())
+          )
+        )
+      )
+    )
+  );
+
+-- ---------------------------------------------------------------------------
+-- Submission (Empleado only)
+-- ---------------------------------------------------------------------------
+-- Creates the request and all its items in one transaction and returns its id.
+-- p_items: a non-empty JSON array of {"campo": text, "valor_propuesto": text
+-- or null}, with no other keys and no repeated campo. The allowed fields and
+-- values are the items table constraints (23514); another pending request for
+-- the legajo is the partial unique index (23505). valor_anterior is filled by
+-- the items trigger.
+-- Error codes: 42501 caller is not an empleado or does not own the legajo;
+-- 22023 p_items missing, empty, malformed or with a repeated campo.
+create function public.crear_solicitud(p_legajo_id uuid, p_items jsonb)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  nueva uuid;
+begin
+  if public.current_app_role() is distinct from 'empleado'::public.app_role then
+    raise exception 'Only an empleado can submit change requests' using errcode = '42501';
+  end if;
+
+  if not exists (
+    select 1 from public.legajos as l
+    where l.id = p_legajo_id and l.profile_id = auth.uid()
+  ) then
+    raise exception 'Change requests are only for the own legajo' using errcode = '42501';
+  end if;
+
+  if p_items is null
+    or pg_catalog.jsonb_typeof(p_items) <> 'array'
+    or pg_catalog.jsonb_array_length(p_items) = 0
+  then
+    raise exception 'At least one item is required' using errcode = '22023';
+  end if;
+
+  -- Objects first, on their own: jsonb_object_keys raises on a non-object.
+  if exists (
+    select 1
+    from pg_catalog.jsonb_array_elements(p_items) as item
+    where pg_catalog.jsonb_typeof(item) <> 'object'
+  ) then
+    raise exception 'Each item needs exactly campo and valor_propuesto' using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.jsonb_array_elements(p_items) as item
+    where (
+        select pg_catalog.array_agg(key order by key)
+        from pg_catalog.jsonb_object_keys(item) as key
+      ) is distinct from array['campo', 'valor_propuesto']::text[]
+      or pg_catalog.jsonb_typeof(item -> 'campo') <> 'string'
+      or pg_catalog.jsonb_typeof(item -> 'valor_propuesto') not in ('string', 'null')
+  ) then
+    raise exception 'Each item needs exactly campo and valor_propuesto' using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from pg_catalog.jsonb_array_elements(p_items) as item
+    group by item ->> 'campo'
+    having pg_catalog.count(*) > 1
+  ) then
+    raise exception 'A field appears more than once' using errcode = '22023';
+  end if;
+
+  insert into public.solicitudes_cambio (legajo_id, solicitado_por)
+  values (p_legajo_id, auth.uid())
+  returning id into nueva;
+
+  insert into public.solicitudes_cambio_items (solicitud_id, campo, valor_propuesto)
+  select nueva, item ->> 'campo', item ->> 'valor_propuesto'
+  from pg_catalog.jsonb_array_elements(p_items) as item;
+
+  return nueva;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Decisions (Admin only). SECURITY DEFINER: they write columns and rows that
@@ -743,11 +919,13 @@ begin
 end;
 $$;
 
+revoke execute on function public.crear_solicitud(uuid, jsonb) from public, anon;
 revoke execute on function public.aprobar_solicitud(uuid) from public, anon;
 revoke execute on function public.rechazar_solicitud(uuid, text) from public, anon;
 revoke execute on function public.aprobar_documento(uuid) from public, anon;
 revoke execute on function public.rechazar_documento(uuid, text) from public, anon;
 revoke execute on function public.pendientes_admin() from public, anon;
+grant execute on function public.crear_solicitud(uuid, jsonb) to authenticated;
 grant execute on function public.aprobar_solicitud(uuid) to authenticated;
 grant execute on function public.rechazar_solicitud(uuid, text) to authenticated;
 grant execute on function public.aprobar_documento(uuid) to authenticated;
