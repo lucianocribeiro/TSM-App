@@ -50,11 +50,8 @@ describe("decideAccountGate", () => {
     });
   });
 
-  it("keeps /cambiar-password out of reach when no change is pending", () => {
-    expect(decideAccountGate(input({ pathname: "/cambiar-password" }))).toEqual({
-      action: "redirect",
-      to: "/mi-legajo",
-    });
+  it("keeps /cambiar-password reachable for a voluntary change", () => {
+    expect(decideAccountGate(input({ pathname: "/cambiar-password" }))).toEqual({ action: "continue" });
   });
 
   it("does not redirect form posts; the Server Action answers them", () => {

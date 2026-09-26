@@ -4,8 +4,9 @@ import type { Database } from "@/lib/supabase/database.types";
 // for a signed-in user whose profile could be read:
 // - an inactive account is signed out and sent to the login page, which then
 //   shows the inactive-account message;
-// - a user who must change their password reaches only /cambiar-password;
-// - /cambiar-password is not reachable otherwise.
+// - a user who must change their password reaches only /cambiar-password.
+// /cambiar-password is also where any user, an Admin included, changes their
+// own password voluntarily.
 // Pure: the proxy applies the decision, and the app layout repeats it for the
 // path the proxy forwards.
 
@@ -53,9 +54,6 @@ export function decideAccountGate(input: GateInput): GateDecision {
 
   if (input.debeCambiarPassword && input.pathname !== CAMBIAR_PASSWORD_PATH) {
     return { action: "redirect", to: CAMBIAR_PASSWORD_PATH };
-  }
-  if (!input.debeCambiarPassword && input.pathname === CAMBIAR_PASSWORD_PATH) {
-    return { action: "redirect", to: HOME_PATH };
   }
   return { action: "continue" };
 }

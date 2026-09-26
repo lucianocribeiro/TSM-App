@@ -139,6 +139,7 @@ export type Copy = {
     kicker: string;
     title: string;
     intro: string;
+    introVoluntaria: string;
     nuevaLabel: string;
     confirmacionLabel: string;
     hint: string;
@@ -327,6 +328,7 @@ export const copy = {
     title: "Cambiá tu contraseña",
     intro:
       "Estás usando una contraseña temporal. Elegí una nueva para seguir usando Mi TSM.",
+    introVoluntaria: "Elegí una nueva contraseña para tu cuenta.",
     nuevaLabel: "Nueva contraseña",
     confirmacionLabel: "Repetí la nueva contraseña",
     hint: "Usá al menos 8 caracteres.",
