@@ -57,13 +57,15 @@ const HIJOS_INICIALES = [
   { nombre_completo: "Hijo Inicial Dos (prueba)", fecha_nacimiento: "2017-07-07" },
 ];
 
-type ItemInput = { campo: string; valor_propuesto: string | null; valor_anterior?: string | null };
+type ItemInput = { campo: string; valor_propuesto: string | null };
 
 describe("change requests and document approval", () => {
   const service = serviceClient();
   let empleadoA: TestUser;
   let empleadoB: TestUser;
   let admin: TestUser;
+  // A second Admin, to tell who reviewed or replaced a document.
+  let admin2: TestUser;
   let legajoA: string;
   let legajoB: string;
   // Deleted in order: employees before the admin who reviewed their items.
@@ -103,18 +105,18 @@ describe("change requests and document approval", () => {
     return data;
   }
 
-  // Header plus items, through the given session. Fails the test on error.
+  // crear_solicitud through the given session. Fails the test on error.
   async function crearSolicitud(client: TypedClient, legajoId: string, items: ItemInput[]): Promise<string> {
-    const header = await client.from("solicitudes_cambio").insert({ legajo_id: legajoId }).select("id").single();
-    expect(header.error).toBeNull();
-    const id = header.data?.id ?? "";
-    if (items.length > 0) {
-      const inserted = await client
-        .from("solicitudes_cambio_items")
-        .insert(items.map((item) => ({ solicitud_id: id, ...item })));
-      expect(inserted.error).toBeNull();
-    }
-    return id;
+    const { data, error } = await client.rpc("crear_solicitud", { p_legajo_id: legajoId, p_items: items });
+    expect(error).toBeNull();
+    expect(typeof data).toBe("string");
+    return data ?? "";
+  }
+
+  async function solicitudesDe(legajoId: string) {
+    const { data, error } = await service.from("solicitudes_cambio").select("id, estado").eq("legajo_id", legajoId);
+    expect(error).toBeNull();
+    return data ?? [];
   }
 
   // A request created with the service role (setup for another employee).
@@ -164,6 +166,7 @@ describe("change requests and document approval", () => {
     empleadoA = await createTestUser(service, "aprob-empleado-a");
     empleadoB = await createTestUser(service, "aprob-empleado-b");
     admin = await createTestUser(service, "aprob-admin", "admin");
+    admin2 = await createTestUser(service, "aprob-admin-2", "admin");
     employeeIds.push(empleadoA.id, empleadoB.id);
     legajoA = await legajoIdOf(empleadoA.id);
     legajoB = await legajoIdOf(empleadoB.id);
@@ -185,7 +188,7 @@ describe("change requests and document approval", () => {
   });
 
   afterAll(async () => {
-    await deleteTestUsers(service, [...employeeIds, admin.id]);
+    await deleteTestUsers(service, [...employeeIds, admin.id, admin2.id]);
   });
 
   describe("allow-list", () => {
@@ -209,9 +212,10 @@ describe("change requests and document approval", () => {
   });
 
   describe("empleado submits", () => {
-    it("creates a pending request for the own legajo, submitted by themselves", async () => {
+    it("crear_solicitud creates a pending request with its items, submitted by the caller", async () => {
       const id = await crearSolicitud(empleadoA.client, legajoA, [
-        { campo: "nombres", valor_propuesto: "Nuevo Nombre (prueba)", valor_anterior: "valor inventado" },
+        { campo: "nombres", valor_propuesto: "Nuevo Nombre (prueba)" },
+        { campo: "piso_depto", valor_propuesto: null },
         { campo: "hijos", valor_propuesto: "[]" },
       ]);
       const stored = await storedSolicitud(id);
@@ -224,71 +228,101 @@ describe("change requests and document approval", () => {
         revisado_en: null,
       });
 
-      // valor_anterior comes from the legajo, not from the client.
+      // valor_anterior comes from the legajo.
       const { data: items } = await empleadoA.client
         .from("solicitudes_cambio_items")
         .select("campo, valor_propuesto, valor_anterior")
         .eq("solicitud_id", id)
         .order("campo");
+      expect(items).toHaveLength(3);
       expect(items?.[0]).toEqual({ campo: "hijos", valor_propuesto: "[]", valor_anterior: expect.any(String) });
       expect(parseHijosValor(items?.[0]?.valor_anterior ?? null)).toEqual(HIJOS_INICIALES);
-      expect(items?.[1]).toEqual({
-        campo: "nombres",
-        valor_propuesto: "Nuevo Nombre (prueba)",
-        valor_anterior: PERSONAL.nombres,
-      });
+      expect(items?.[1]).toEqual({ campo: "nombres", valor_propuesto: "Nuevo Nombre (prueba)", valor_anterior: PERSONAL.nombres });
+      expect(items?.[2]).toEqual({ campo: "piso_depto", valor_propuesto: null, valor_anterior: PERSONAL.piso_depto });
 
       // The legajo does not change while the request is pending.
       expect((await storedLegajo(legajoA)).nombres).toBe(PERSONAL.nombres);
     });
 
-    it("cannot create a request for another employee's legajo or as someone else", async () => {
-      const forB = await empleadoA.client.from("solicitudes_cambio").insert({ legajo_id: legajoB }).select();
-      expect(forB.error?.code).toBe(PERMISSION_DENIED);
-
-      const asB = await empleadoA.client
-        .from("solicitudes_cambio")
-        .insert({ legajo_id: legajoA, solicitado_por: empleadoB.id })
-        .select();
-      expect(asB.error?.code).toBe(PERMISSION_DENIED);
+    it("fails for another employee's legajo", async () => {
+      const { data, error } = await empleadoA.client.rpc("crear_solicitud", {
+        p_legajo_id: legajoB,
+        p_items: [{ campo: "nombres", valor_propuesto: "Intruso" }],
+      });
+      expect(data).toBeNull();
+      expect(error?.code).toBe(PERMISSION_DENIED);
+      expect(await solicitudesDe(legajoB)).toEqual([]);
     });
 
-    it("cannot create a request in any state but pendiente, or set the review columns", async () => {
-      for (const estado of ["aprobada", "rechazada", "cancelada"] as const) {
-        const { error } = await empleadoA.client.from("solicitudes_cambio").insert({ legajo_id: legajoA, estado }).select();
-        expect(error?.code, estado).toBe(PERMISSION_DENIED);
-      }
-      const review = [
-        { revisado_por: admin.id },
-        { revisado_en: new Date().toISOString() },
-        { motivo_rechazo: "Motivo inventado" },
+    it("fails for an Admin, even on their own legajo", async () => {
+      const legajoAdmin = await legajoIdOf(admin.id);
+      const { data, error } = await admin.client.rpc("crear_solicitud", {
+        p_legajo_id: legajoAdmin,
+        p_items: [{ campo: "nombres", valor_propuesto: "Admin (prueba)" }],
+      });
+      expect(data).toBeNull();
+      expect(error?.code).toBe(PERMISSION_DENIED);
+      expect(await solicitudesDe(legajoAdmin)).toEqual([]);
+    });
+
+    it("fails with an empty, missing or malformed item list", async () => {
+      const invalid: unknown[] = [
+        [],
+        null,
+        {},
+        "nombres",
+        [{ campo: "nombres" }],
+        [{ valor_propuesto: "x" }],
+        [{ campo: "nombres", valor_propuesto: "x", valor_anterior: "y" }],
+        [{ campo: 1, valor_propuesto: "x" }],
+        [{ campo: "nombres", valor_propuesto: 5 }],
+        ["nombres"],
       ];
-      for (const columns of review) {
-        const { error } = await empleadoA.client
-          .from("solicitudes_cambio")
-          .insert({ legajo_id: legajoA, ...columns })
-          .select();
-        expect(error?.code, Object.keys(columns)[0]).toBe(PERMISSION_DENIED);
+      for (const items of invalid) {
+        const { data, error } = await empleadoA.client.rpc("crear_solicitud", {
+          p_legajo_id: legajoA,
+          p_items: items as never,
+        });
+        expect(data, JSON.stringify(items)).toBeNull();
+        expect(error?.code, JSON.stringify(items)).toBe(INVALID_PARAMETER);
       }
+      expect(await solicitudesDe(legajoA)).toEqual([]);
+    });
+
+    it("fails when a field appears twice", async () => {
+      const { error } = await empleadoA.client.rpc("crear_solicitud", {
+        p_legajo_id: legajoA,
+        p_items: [
+          { campo: "alergias", valor_propuesto: "Polen" },
+          { campo: "alergias", valor_propuesto: "Ácaros" },
+        ],
+      });
+      expect(error?.code).toBe(INVALID_PARAMETER);
+      expect(await solicitudesDe(legajoA)).toEqual([]);
+    });
+
+    it("rejects a group E field, a key or a column outside the allow-list, leaving no header behind", async () => {
+      for (const campo of ["area", "bruto_mensual", "estado_laboral", "numero_legajo", "profile_id", "id", "updated_at", "no_existe"]) {
+        const { error } = await empleadoA.client.rpc("crear_solicitud", {
+          p_legajo_id: legajoA,
+          // A valid item first: the whole submission must still fail.
+          p_items: [
+            { campo: "alergias", valor_propuesto: "Polen" },
+            { campo, valor_propuesto: "1" },
+          ],
+        });
+        expect(error?.code, campo).toBe(CHECK_VIOLATION);
+      }
+      expect(await solicitudesDe(legajoA)).toEqual([]);
       const { count } = await service
-        .from("solicitudes_cambio")
+        .from("solicitudes_cambio_items")
         .select("id", { count: "exact", head: true })
-        .eq("legajo_id", legajoA);
+        .eq("campo", "alergias")
+        .eq("valor_propuesto", "Polen");
       expect(count).toBe(0);
     });
 
-    it("cannot include a group E field, a key or a column outside the allow-list", async () => {
-      const id = await crearSolicitud(empleadoA.client, legajoA, []);
-      for (const campo of ["area", "bruto_mensual", "estado_laboral", "numero_legajo", "profile_id", "id", "updated_at", "no_existe"]) {
-        const { error } = await empleadoA.client
-          .from("solicitudes_cambio_items")
-          .insert({ solicitud_id: id, campo, valor_propuesto: "1" });
-        expect(error?.code, campo).toBe(CHECK_VIOLATION);
-      }
-    });
-
-    it("cannot propose a value that does not fit the field", async () => {
-      const id = await crearSolicitud(empleadoA.client, legajoA, []);
+    it("rejects a value that does not fit the field, leaving no header behind", async () => {
       const invalid: ItemInput[] = [
         { campo: "fecha_nacimiento", valor_propuesto: "no es una fecha" },
         { campo: "fecha_nacimiento", valor_propuesto: "1990-02-30" },
@@ -297,24 +331,59 @@ describe("change requests and document approval", () => {
         { campo: "hijos", valor_propuesto: null },
         { campo: "hijos", valor_propuesto: "no json" },
         { campo: "hijos", valor_propuesto: '{"nombre_completo":"Hijo"}' },
+        { campo: "hijos", valor_propuesto: "[1]" },
+        { campo: "hijos", valor_propuesto: '["Hijo"]' },
         { campo: "hijos", valor_propuesto: '[{"nombre_completo":"Hijo"}]' },
         { campo: "hijos", valor_propuesto: '[{"nombre_completo":" ","fecha_nacimiento":"2015-01-01"}]' },
         { campo: "hijos", valor_propuesto: '[{"nombre_completo":"Hijo","fecha_nacimiento":"2015-13-01"}]' },
         { campo: "hijos", valor_propuesto: '[{"nombre_completo":"Hijo","fecha_nacimiento":"2015-01-01","dni":"1"}]' },
       ];
       for (const item of invalid) {
-        const { error } = await empleadoA.client.from("solicitudes_cambio_items").insert({ solicitud_id: id, ...item });
+        const { error } = await empleadoA.client.rpc("crear_solicitud", {
+          p_legajo_id: legajoA,
+          p_items: [{ campo: "alergias", valor_propuesto: "Polen" }, item],
+        });
         expect(error?.code, JSON.stringify(item)).toBe(CHECK_VIOLATION);
       }
+      expect(await solicitudesDe(legajoA)).toEqual([]);
     });
 
-    it("cannot add items to another employee's request, or change or delete items and requests", async () => {
-      const deB = await solicitudDeServicio(legajoB, empleadoB.id);
-      const intoB = await empleadoA.client
-        .from("solicitudes_cambio_items")
-        .insert({ solicitud_id: deB, campo: "nombres", valor_propuesto: "Intruso" });
-      expect(intoB.error?.code).toBe(PERMISSION_DENIED);
+    it("allows only one pending request per legajo", async () => {
+      await crearSolicitud(empleadoA.client, legajoA, [{ campo: "alergias", valor_propuesto: "Polen" }]);
+      const { data, error } = await empleadoA.client.rpc("crear_solicitud", {
+        p_legajo_id: legajoA,
+        p_items: [{ campo: "nombres", valor_propuesto: "Segunda" }],
+      });
+      expect(data).toBeNull();
+      expect(error?.code).toBe(UNIQUE_VIOLATION);
+      expect(error?.message).toContain(SOLICITUD_PENDIENTE_INDEX);
+      expect(await solicitudesDe(legajoA)).toHaveLength(1);
+    });
 
+    it("rejects direct inserts into either table, for Empleado and Admin", async () => {
+      const own = await crearSolicitud(empleadoA.client, legajoA, [{ campo: "alergias", valor_propuesto: "Polen" }]);
+      const legajoAdmin = await legajoIdOf(admin.id);
+      const attempts: [TypedClient, string, string][] = [
+        [empleadoA.client, legajoA, own],
+        [admin.client, legajoAdmin, own],
+      ];
+      for (const [client, legajoId, solicitudId] of attempts) {
+        const header = await client.from("solicitudes_cambio").insert({ legajo_id: legajoId }).select();
+        expect(header.error?.code).toBe(PERMISSION_DENIED);
+        const item = await client
+          .from("solicitudes_cambio_items")
+          .insert({ solicitud_id: solicitudId, campo: "nombres", valor_propuesto: "Directo" })
+          .select();
+        expect(item.error?.code).toBe(PERMISSION_DENIED);
+      }
+      const { count } = await service
+        .from("solicitudes_cambio_items")
+        .select("id", { count: "exact", head: true })
+        .eq("solicitud_id", own);
+      expect(count).toBe(1);
+    });
+
+    it("cannot change or delete items and requests", async () => {
       const own = await crearSolicitud(empleadoA.client, legajoA, [{ campo: "alergias", valor_propuesto: "Polen" }]);
       const itemUpdate = await empleadoA.client
         .from("solicitudes_cambio_items")
@@ -333,13 +402,6 @@ describe("change requests and document approval", () => {
       expect(adminDelete.error?.code).toBe(PERMISSION_DENIED);
 
       expect((await storedSolicitud(own)).estado).toBe("pendiente");
-    });
-
-    it("allows only one pending request per legajo", async () => {
-      await crearSolicitud(empleadoA.client, legajoA, [{ campo: "alergias", valor_propuesto: "Polen" }]);
-      const second = await empleadoA.client.from("solicitudes_cambio").insert({ legajo_id: legajoA }).select();
-      expect(second.error?.code).toBe(UNIQUE_VIOLATION);
-      expect(second.error?.message).toContain(SOLICITUD_PENDIENTE_INDEX);
     });
   });
 
@@ -675,9 +737,9 @@ describe("change requests and document approval", () => {
     });
 
     it("approving a document marks the previous approved one of that type as reemplazado and keeps both", async () => {
-      const previo = await admin.client
+      const previo = await admin2.client
         .from("legajo_documentos")
-        .insert(docMetadata(legajoA, empleadoA.id, "dni_frente", admin.id))
+        .insert(docMetadata(legajoA, empleadoA.id, "dni_frente", admin2.id))
         .select("id")
         .single();
       const nuevo = await empleadoA.client
@@ -697,7 +759,8 @@ describe("change requests and document approval", () => {
 
       const byId = Object.fromEntries((await storedDocs(legajoA)).map((doc) => [doc.id, doc]));
       expect(Object.keys(byId)).toHaveLength(3);
-      expect(byId[previo.data?.id ?? ""].estado).toBe("reemplazado");
+      // A state change does not restamp: the replaced document keeps its reviewer.
+      expect(byId[previo.data?.id ?? ""]).toMatchObject({ estado: "reemplazado", revisado_por: admin2.id });
       expect(byId[nuevo.data?.id ?? ""]).toMatchObject({ estado: "aprobado", revisado_por: admin.id });
       expect(byId[nuevo.data?.id ?? ""].revisado_en).not.toBeNull();
       expect(byId[otroTipo.data?.id ?? ""].estado).toBe("aprobado");
@@ -729,6 +792,51 @@ describe("change requests and document approval", () => {
         .from("legajo_documentos")
         .insert(docMetadata(legajoA, empleadoA.id, "licencia_conducir", empleadoA.id));
       expect(retry.error).toBeNull();
+    });
+
+    it("an Admin replacing a decided document in place becomes its reviewer", async () => {
+      const original = await admin2.client
+        .from("legajo_documentos")
+        .insert(docMetadata(legajoA, empleadoA.id, "dni_frente", admin2.id))
+        .select("id, revisado_por, revisado_en")
+        .single();
+      expect(original.data?.revisado_por).toBe(admin2.id);
+
+      const replacement = docMetadata(legajoA, empleadoA.id, "dni_frente", admin.id);
+      const { data, error } = await admin.client
+        .from("legajo_documentos")
+        .update({
+          storage_path: replacement.storage_path,
+          file_name: "dni-frente-reemplazo.pdf",
+          size_bytes: 20,
+          uploaded_by: admin.id,
+        })
+        .eq("id", original.data?.id ?? "")
+        .select("estado, revisado_por, revisado_en")
+        .single();
+      expect(error).toBeNull();
+      expect(data?.estado).toBe("aprobado");
+      expect(data?.revisado_por).toBe(admin.id);
+      expect(new Date(data?.revisado_en ?? 0).getTime()).toBeGreaterThan(
+        new Date(original.data?.revisado_en ?? 0).getTime(),
+      );
+    });
+
+    it("an Admin replacing a pending document in place leaves it unreviewed", async () => {
+      const pending = await empleadoA.client
+        .from("legajo_documentos")
+        .insert(docMetadata(legajoA, empleadoA.id, "dni_frente", empleadoA.id))
+        .select("id")
+        .single();
+      const replacement = docMetadata(legajoA, empleadoA.id, "dni_frente", admin.id);
+      const { data, error } = await admin.client
+        .from("legajo_documentos")
+        .update({ storage_path: replacement.storage_path, uploaded_by: admin.id })
+        .eq("id", pending.data?.id ?? "")
+        .select("estado, revisado_por, revisado_en")
+        .single();
+      expect(error).toBeNull();
+      expect(data).toEqual({ estado: "pendiente", revisado_por: null, revisado_en: null });
     });
 
     it("allows at most one pending and one approved document per type", async () => {
@@ -815,6 +923,7 @@ describe("change requests and document approval", () => {
       const anon = anonClient();
       const id = randomUUID();
       const calls = [
+        anon.rpc("crear_solicitud", { p_legajo_id: legajoA, p_items: [{ campo: "nombres", valor_propuesto: "x" }] }),
         anon.rpc("aprobar_solicitud", { p_solicitud_id: id }),
         anon.rpc("rechazar_solicitud", { p_solicitud_id: id, p_motivo: "x" }),
         anon.rpc("aprobar_documento", { p_documento_id: id }),

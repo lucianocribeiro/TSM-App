@@ -534,6 +534,127 @@ describe("legajo_documentos and legajo-docs storage RLS", () => {
     });
   });
 
+  // F1-06B: the file behind a decided document is not the employee's to
+  // change. The employee may overwrite or delete an object in their own folder
+  // only while its document is pending, or when no document row points to it.
+  describe("objects behind decided documents", () => {
+    type Estado = "pendiente" | "aprobado" | "rechazado" | "reemplazado";
+    const DECIDED: Estado[] = ["aprobado", "rechazado", "reemplazado"];
+
+    // Object and row for Empleado A, set up with the service role in the given state.
+    async function documentoEnEstado(estado: Estado, tipo: DocumentoTipo = "licencia_conducir") {
+      const path = newPath(empleadoA.id, tipo);
+      const content = fakePdf(`A ${tipo} ${estado}`);
+      const uploaded = await upload(service, path, content);
+      if (uploaded.error) throw new Error(`object setup failed: ${uploaded.error.message}`);
+      const review =
+        estado === "pendiente"
+          ? {}
+          : {
+              revisado_por: admin.id,
+              revisado_en: new Date().toISOString(),
+              ...(estado === "rechazado" ? { motivo_rechazo: "Rechazado (prueba)" } : {}),
+            };
+      const { data, error } = await service
+        .from("legajo_documentos")
+        .insert({ ...metadata(legajoA, tipo, path, empleadoA.id, content.length), estado, ...review })
+        .select("id")
+        .single();
+      if (error || !data) throw new Error(`metadata setup failed: ${error?.message}`);
+      return { id: data.id, path, content };
+    }
+
+    async function cleanUp(path: string) {
+      await service.from("legajo_documentos").delete().eq("storage_path", path);
+      await bucket(service).remove([path]);
+    }
+
+    it.each(DECIDED)("an Empleado cannot overwrite, move or delete the object of an own %s document", async (estado) => {
+      const { path, content } = await documentoEnEstado(estado);
+
+      const overwrite = await bucket(empleadoA.client).update(path, fakePdf("A overwrites"), {
+        contentType: "application/pdf",
+      });
+      expect(overwrite.error).not.toBeNull();
+
+      const moved = await bucket(empleadoA.client).move(path, newPath(empleadoA.id, "licencia_conducir"));
+      expect(moved.error).not.toBeNull();
+
+      const removed = await bucket(empleadoA.client).remove([path]);
+      expect(removed.data ?? []).toEqual([]);
+
+      expect(await storedObject(path)).toBe(content.toString());
+      await cleanUp(path);
+    });
+
+    it("an Empleado can overwrite and delete the object of an own pending document", async () => {
+      const path = newPath(empleadoA.id, "licencia_conducir");
+      expect((await upload(empleadoA.client, path, fakePdf("A pending v1"))).error).toBeNull();
+      const row = await empleadoA.client
+        .from("legajo_documentos")
+        .insert(metadata(legajoA, "licencia_conducir", path, empleadoA.id, 10))
+        .select("estado")
+        .single();
+      expect(row.data?.estado).toBe("pendiente");
+
+      const v2 = fakePdf("A pending v2");
+      const overwrite = await bucket(empleadoA.client).update(path, v2, { contentType: "application/pdf" });
+      expect(overwrite.error).toBeNull();
+      expect(await storedObject(path)).toBe(v2.toString());
+
+      const removed = await bucket(empleadoA.client).remove([path]);
+      expect(removed.data?.map((object) => object.name)).toEqual([path]);
+      expect(await storedObject(path)).toBeNull();
+      await cleanUp(path);
+    });
+
+    it("an Empleado can overwrite and delete an orphan object in the own folder", async () => {
+      const path = newPath(empleadoA.id, "dni_dorso");
+      expect((await upload(empleadoA.client, path, fakePdf("A orphan v1"))).error).toBeNull();
+
+      const v2 = fakePdf("A orphan v2");
+      const overwrite = await bucket(empleadoA.client).update(path, v2, { contentType: "application/pdf" });
+      expect(overwrite.error).toBeNull();
+      expect(await storedObject(path)).toBe(v2.toString());
+
+      const removed = await bucket(empleadoA.client).remove([path]);
+      expect(removed.data?.map((object) => object.name)).toEqual([path]);
+      expect(await storedObject(path)).toBeNull();
+    });
+
+    it("an Empleado still cannot touch an orphan object in another employee's folder", async () => {
+      const path = newPath(empleadoB.id, "dni_dorso");
+      const content = fakePdf("B orphan");
+      expect((await upload(service, path, content)).error).toBeNull();
+
+      const removed = await bucket(empleadoA.client).remove([path]);
+      expect(removed.data ?? []).toEqual([]);
+      const overwrite = await bucket(empleadoA.client).update(path, fakePdf("A overwrites B"), {
+        contentType: "application/pdf",
+      });
+      expect(overwrite.error).not.toBeNull();
+      expect(await storedObject(path)).toBe(content.toString());
+      await cleanUp(path);
+    });
+
+    it.each(["pendiente", ...DECIDED] as Estado[])(
+      "an Admin can overwrite and delete the object of any %s document",
+      async (estado) => {
+        const { path } = await documentoEnEstado(estado);
+
+        const v2 = fakePdf(`Admin overwrites ${estado}`);
+        const overwrite = await bucket(admin.client).update(path, v2, { contentType: "application/pdf" });
+        expect(overwrite.error).toBeNull();
+        expect(await storedObject(path)).toBe(v2.toString());
+
+        const removed = await bucket(admin.client).remove([path]);
+        expect(removed.data?.map((object) => object.name)).toEqual([path]);
+        expect(await storedObject(path)).toBeNull();
+        await cleanUp(path);
+      },
+    );
+  });
+
   describe("signed URLs", () => {
     it("works for the own object and not for another employee's object", async () => {
       const path = newPath(empleadoA.id, "dni_frente");
