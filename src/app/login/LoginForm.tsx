@@ -6,8 +6,14 @@ import { Field } from "@/components/ui/Field";
 import { login } from "@/lib/auth/actions";
 import { copy } from "@/lib/copy/es-AR";
 
-export function LoginForm() {
+type LoginFormProps = {
+  // Shown until the form is submitted (for example, an inactive account).
+  initialError?: string;
+};
+
+export function LoginForm({ initialError }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(login, null);
+  const error = state ? (state.ok ? undefined : state.error) : initialError;
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-4">
@@ -25,9 +31,9 @@ export function LoginForm() {
         autoComplete="current-password"
         required
       />
-      {state && !state.ok ? (
+      {error ? (
         <p role="alert" className="text-[12.5px] italic text-accent-deep">
-          {state.error}
+          {error}
         </p>
       ) : null}
       <Button type="submit" disabled={pending} className="mt-2 w-full">
