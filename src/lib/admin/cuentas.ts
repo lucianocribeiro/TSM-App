@@ -148,6 +148,8 @@ async function rollbackCreation(service: ServiceClient, profileId: string) {
 // ---------------------------------------------------------------------------
 // Setting a password through the Admin API ends every session of the user;
 // marcar_password_temporal flags the forced change and ends them as well.
+// Never on the caller's own account: an Admin changes their own password at
+// /cambiar-password.
 export async function resetPasswordTemporal(input: {
   profileId: string;
   passwordTemporal: string;
@@ -156,6 +158,7 @@ export async function resetPasswordTemporal(input: {
   if (!admin) return failed(errors.noAutorizado);
 
   if (!uuidSchema.safeParse(input.profileId).success) return failed(errors.cuentaNoEncontrada);
+  if (input.profileId === admin.id) return failed(errors.cuentaPropia);
   const password = passwordSchema.safeParse(input.passwordTemporal);
   if (!password.success) return failed(password.error.issues[0]?.message ?? errors.accionFallo);
 
@@ -174,6 +177,11 @@ export async function resetPasswordTemporal(input: {
 // ---------------------------------------------------------------------------
 // desactivar_cuenta records the state and the event and ends the sessions;
 // the ban then makes signing in impossible.
+//
+// Safe to retry: when a previous run deactivated the account but the ban
+// failed, desactivar_cuenta refuses the already-inactive account (and records
+// nothing); the missing ban is then applied and the retry succeeds. An account
+// that is already inactive and banned still gets "ya inactiva".
 export async function desactivarCuenta(input: {
   profileId: string;
   motivo: string;
@@ -189,15 +197,25 @@ export async function desactivarCuenta(input: {
     p_profile_id: input.profileId,
     p_motivo: input.motivo,
   });
-  if (deactivated.error) return failed(cuentaErrorMessage(deactivated.error));
-
   const service = createAdminClient();
+
+  if (deactivated.error) {
+    if (deactivated.error.hint !== "ya_inactiva") return failed(cuentaErrorMessage(deactivated.error));
+    const target = await service.auth.admin.getUserById(input.profileId);
+    if (target.error || !target.data.user) return failed(errors.accionFallo);
+    if (isBanned(target.data.user.banned_until)) return failed(errors.yaInactiva);
+  }
+
   const banned = await service.auth.admin.updateUserById(input.profileId, {
     ban_duration: BAN_UNTIL_REACTIVATED,
   });
   if (banned.error) return failed(errors.accionFallo);
 
   return { ok: true };
+}
+
+function isBanned(bannedUntil: string | undefined): boolean {
+  return Boolean(bannedUntil) && new Date(bannedUntil ?? 0).getTime() > Date.now();
 }
 
 export async function reactivarCuenta(input: { profileId: string }): Promise<ActionResult> {
@@ -232,6 +250,11 @@ export type PurgaResumen = {
 // follow by cascade. Refused for the caller's own account, the last active
 // Admin, and an account named in other accounts' history (uploads, reviews or
 // account events), which the history must keep.
+//
+// Safe to retry after a partial failure: the objects are listed at the time
+// of the run, so files a previous run already removed are simply not there,
+// and the purge continues with what is left. The counts report what this run
+// removed.
 export async function purgarCuenta(input: {
   profileId: string;
   emailConfirmacion: string;
@@ -277,15 +300,17 @@ export async function purgarCuenta(input: {
 
   const paths = await listObjects(service, profileId);
   if (!paths) return failed(errors.accionFallo);
+  let objetos = 0;
   for (let start = 0; start < paths.length; start += 100) {
     const removed = await service.storage.from(DOCUMENTOS_BUCKET).remove(paths.slice(start, start + 100));
     if (removed.error) return failed(errors.accionFallo);
+    objetos += removed.data?.length ?? 0;
   }
 
   const deleted = await service.auth.admin.deleteUser(profileId);
   if (deleted.error) return failed(errors.accionFallo);
 
-  return { ok: true, data: { ...resumen, objetos: paths.length } };
+  return { ok: true, data: { ...resumen, objetos } };
 }
 
 // Rows of other accounts that name this profile. Null when a count fails.

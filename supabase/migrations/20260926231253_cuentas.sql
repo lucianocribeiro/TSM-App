@@ -188,7 +188,8 @@ end;
 $$;
 
 -- After an Admin sets a temporary password: the user must change it at the
--- next login, and their current sessions end.
+-- next login, and their current sessions end. Never on the caller's own
+-- account: an Admin changes their own password at /cambiar-password.
 create function public.marcar_password_temporal(p_profile_id uuid)
 returns void
 language plpgsql
@@ -198,6 +199,10 @@ as $$
 begin
   if not public.is_admin() then
     raise exception 'Only an admin can set a temporary password' using errcode = '42501';
+  end if;
+  if p_profile_id = auth.uid() then
+    raise exception 'A temporary password cannot be set on the own account'
+      using errcode = '55000', hint = 'cuenta_propia';
   end if;
 
   update public.profiles set debe_cambiar_password = true where id = p_profile_id;
