@@ -239,7 +239,10 @@ describe("legajo_documentos and legajo-docs storage RLS", () => {
       }
     });
 
-    it("replaces the own document: new object, updated row, old object removed", async () => {
+    // F1-06B: an Empleado no longer replaces a document in place; a new upload
+    // is a new pending document that an Admin approves. While pending, the
+    // Empleado can still withdraw it (row and object).
+    it("cannot replace an own document in place; withdraws it while pending", async () => {
       const oldPath = newPath(empleadoA.id, "dni_dorso");
       const oldContent = fakePdf("A dni_dorso v1");
       expect((await upload(empleadoA.client, oldPath, oldContent)).error).toBeNull();
@@ -252,42 +255,33 @@ describe("legajo_documentos and legajo-docs storage RLS", () => {
       const id = inserted.data?.id ?? "";
 
       const newPathA = newPath(empleadoA.id, "dni_dorso", "image/png");
-      const newContent = Buffer.from("FAKE TEST PNG - A dni_dorso v2");
-      expect((await upload(empleadoA.client, newPathA, newContent, "image/png")).error).toBeNull();
-
       const updated = await empleadoA.client
         .from("legajo_documentos")
         .update({
           storage_path: newPathA,
           file_name: "dni-dorso-v2.png",
           mime_type: "image/png",
-          size_bytes: newContent.length,
+          size_bytes: 10,
           uploaded_by: empleadoA.id,
         })
         .eq("id", id)
-        .select()
-        .single();
+        .select();
       expect(updated.error).toBeNull();
-      expect(updated.data?.storage_path).toBe(newPathA);
+      expect(updated.data).toEqual([]);
+      expect((await storedRows(legajoA)).map((row) => row.storage_path)).toEqual([oldPath]);
 
+      // Withdraw: object and row.
       const removed = await bucket(empleadoA.client).remove([oldPath]);
-      expect(removed.error).toBeNull();
       expect(removed.data?.map((object) => object.name)).toEqual([oldPath]);
-      expect(await storedObject(oldPath)).toBeNull();
-      expect(await storedObject(newPathA)).toBe(newContent.toString());
-
-      // Delete: object and row.
-      const removedNew = await bucket(empleadoA.client).remove([newPathA]);
-      expect(removedNew.data?.map((object) => object.name)).toEqual([newPathA]);
       const deleted = await empleadoA.client.from("legajo_documentos").delete().eq("id", id).select();
       expect(deleted.error).toBeNull();
       expect(deleted.data).toHaveLength(1);
 
-      expect(await storedObject(newPathA)).toBeNull();
+      expect(await storedObject(oldPath)).toBeNull();
       expect(await storedRows(legajoA)).toEqual([]);
     });
 
-    it("allows only one current document per type", async () => {
+    it("allows only one pending document per type", async () => {
       const first = newPath(empleadoA.id, "licencia_conducir");
       const second = newPath(empleadoA.id, "licencia_conducir");
       const insertFirst = await empleadoA.client
@@ -401,12 +395,14 @@ describe("legajo_documentos and legajo-docs storage RLS", () => {
         .single();
       expect(own.error).toBeNull();
 
+      // F1-06B: updates are Admin only, so the own row is not reachable.
       const update = await empleadoA.client
         .from("legajo_documentos")
         .update({ uploaded_by: empleadoB.id })
         .eq("id", own.data?.id ?? "")
         .select();
-      expect(update.error?.code).toBe(PERMISSION_DENIED);
+      expect(update.error).toBeNull();
+      expect(update.data).toEqual([]);
 
       const rows = await storedRows(legajoA);
       expect(rows.map((row) => row.uploaded_by)).toEqual([empleadoA.id]);
@@ -428,13 +424,14 @@ describe("legajo_documentos and legajo-docs storage RLS", () => {
         .select();
       expect(moved.error?.code).toBe(PERMISSION_DENIED);
 
-      // Nor with a path in B's folder.
+      // Nor with a path in B's folder (F1-06B: no own row is reachable for update).
       const pathMoved = await empleadoA.client
         .from("legajo_documentos")
         .update({ storage_path: newPath(empleadoB.id, "dni_dorso") })
         .eq("id", own.data?.id ?? "")
         .select();
-      expect(pathMoved.error?.code).toBe(PERMISSION_DENIED);
+      expect(pathMoved.error).toBeNull();
+      expect(pathMoved.data).toEqual([]);
 
       expect(await storedRows(legajoA)).toHaveLength(1);
       expect(await storedRows(legajoB)).toHaveLength(1);
