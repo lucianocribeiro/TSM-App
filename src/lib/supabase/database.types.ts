@@ -12,10 +12,14 @@ export type Database = {
       legajo_documentos: {
         Row: {
           created_at: string
+          estado: Database["public"]["Enums"]["documento_estado"]
           file_name: string
           id: string
           legajo_id: string
           mime_type: string
+          motivo_rechazo: string | null
+          revisado_en: string | null
+          revisado_por: string | null
           size_bytes: number
           storage_path: string
           tipo: Database["public"]["Enums"]["documento_tipo"]
@@ -24,10 +28,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          estado?: Database["public"]["Enums"]["documento_estado"]
           file_name: string
           id?: string
           legajo_id: string
           mime_type: string
+          motivo_rechazo?: string | null
+          revisado_en?: string | null
+          revisado_por?: string | null
           size_bytes: number
           storage_path: string
           tipo: Database["public"]["Enums"]["documento_tipo"]
@@ -36,10 +44,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          estado?: Database["public"]["Enums"]["documento_estado"]
           file_name?: string
           id?: string
           legajo_id?: string
           mime_type?: string
+          motivo_rechazo?: string | null
+          revisado_en?: string | null
+          revisado_por?: string | null
           size_bytes?: number
           storage_path?: string
           tipo?: Database["public"]["Enums"]["documento_tipo"]
@@ -52,6 +64,13 @@ export type Database = {
             columns: ["legajo_id"]
             isOneToOne: false
             referencedRelation: "legajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legajo_documentos_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -250,20 +269,143 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitudes_cambio: {
+        Row: {
+          created_at: string
+          estado: Database["public"]["Enums"]["solicitud_estado"]
+          id: string
+          legajo_id: string
+          motivo_rechazo: string | null
+          revisado_en: string | null
+          revisado_por: string | null
+          solicitado_por: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          estado?: Database["public"]["Enums"]["solicitud_estado"]
+          id?: string
+          legajo_id: string
+          motivo_rechazo?: string | null
+          revisado_en?: string | null
+          revisado_por?: string | null
+          solicitado_por?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          estado?: Database["public"]["Enums"]["solicitud_estado"]
+          id?: string
+          legajo_id?: string
+          motivo_rechazo?: string | null
+          revisado_en?: string | null
+          revisado_por?: string | null
+          solicitado_por?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitudes_cambio_legajo_id_fkey"
+            columns: ["legajo_id"]
+            isOneToOne: false
+            referencedRelation: "legajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitudes_cambio_revisado_por_fkey"
+            columns: ["revisado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitudes_cambio_solicitado_por_fkey"
+            columns: ["solicitado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      solicitudes_cambio_items: {
+        Row: {
+          campo: string
+          created_at: string
+          id: string
+          solicitud_id: string
+          valor_anterior: string | null
+          valor_propuesto: string | null
+        }
+        Insert: {
+          campo: string
+          created_at?: string
+          id?: string
+          solicitud_id: string
+          valor_anterior?: string | null
+          valor_propuesto?: string | null
+        }
+        Update: {
+          campo?: string
+          created_at?: string
+          id?: string
+          solicitud_id?: string
+          valor_anterior?: string | null
+          valor_propuesto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitudes_cambio_items_solicitud_id_fkey"
+            columns: ["solicitud_id"]
+            isOneToOne: false
+            referencedRelation: "solicitudes_cambio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      aprobar_documento: {
+        Args: { p_documento_id: string }
+        Returns: undefined
+      }
+      aprobar_solicitud: {
+        Args: { p_solicitud_id: string }
+        Returns: undefined
+      }
+      campos_solicitud_permitidos: { Args: never; Returns: string[] }
       current_app_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
       is_admin: { Args: never; Returns: boolean }
+      is_valid_hijos_json: { Args: { valor: string }; Returns: boolean }
       is_valid_legajo_doc_path: { Args: { path: string }; Returns: boolean }
+      is_valid_solicitud_valor: {
+        Args: { campo: string; valor: string }
+        Returns: boolean
+      }
+      pendientes_admin: {
+        Args: never
+        Returns: {
+          documentos: number
+          solicitudes: number
+        }[]
+      }
+      rechazar_documento: {
+        Args: { p_documento_id: string; p_motivo: string }
+        Returns: undefined
+      }
+      rechazar_solicitud: {
+        Args: { p_motivo: string; p_solicitud_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "empleado" | "admin"
+      documento_estado: "pendiente" | "aprobado" | "rechazado" | "reemplazado"
       documento_tipo: "dni_frente" | "dni_dorso" | "licencia_conducir"
       estado_civil:
         | "soltero"
@@ -272,6 +414,7 @@ export type Database = {
         | "viudo"
         | "union_convivencial"
       estado_laboral: "activo" | "en_prueba"
+      solicitud_estado: "pendiente" | "aprobada" | "rechazada" | "cancelada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -400,6 +543,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["empleado", "admin"],
+      documento_estado: ["pendiente", "aprobado", "rechazado", "reemplazado"],
       documento_tipo: ["dni_frente", "dni_dorso", "licencia_conducir"],
       estado_civil: [
         "soltero",
@@ -409,6 +553,7 @@ export const Constants = {
         "union_convivencial",
       ],
       estado_laboral: ["activo", "en_prueba"],
+      solicitud_estado: ["pendiente", "aprobada", "rechazada", "cancelada"],
     },
   },
 } as const
