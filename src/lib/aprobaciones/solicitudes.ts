@@ -10,9 +10,10 @@ import {
 } from "./campos";
 
 // Pure helpers to build a change request (PRD US-7) from a validated form
-// value set. Values are stored as text in the same format the database uses
-// when it fills valor_anterior: dates YYYY-MM-DD, booleans "true" / "false",
-// and the children set as a JSON array.
+// value set: the p_items payload of public.crear_solicitud. Values are sent as
+// text in the same format the database uses when it fills valor_anterior:
+// dates YYYY-MM-DD, booleans "true" / "false", and the children set as a JSON
+// array.
 
 type LegajoRow = Database["public"]["Tables"]["legajos"]["Row"];
 
@@ -23,10 +24,10 @@ export type LegajoActual = Pick<LegajoRow, CampoSolicitudColumna> & {
   hijos: HijoValor[];
 };
 
-export type SolicitudItemPayload = {
+// One element of crear_solicitud's p_items. The database fills valor_anterior.
+export type CrearSolicitudItem = {
   campo: CampoSolicitud;
   valor_propuesto: string | null;
-  valor_anterior: string | null;
 };
 
 // Same shape as public.is_valid_hijos_json: an array of objects with exactly
@@ -71,28 +72,30 @@ export function serializeValor(value: string | boolean | number | null | undefin
   return String(value);
 }
 
-// One item per allowed field whose proposed value differs from the current
-// one. Unchanged fields are skipped. An empty result means nothing to submit.
+// The p_items payload: one item per allowed field whose proposed value
+// differs from the current one. Unchanged fields are skipped. An empty result
+// means there is nothing to submit; crear_solicitud rejects an empty list, so
+// check it before calling (copy.aprobaciones.errors.sinCambios).
 export function buildSolicitudItems(
   propuesto: LegajoPersonal,
   actual: LegajoActual,
-): SolicitudItemPayload[] {
-  const items: SolicitudItemPayload[] = [];
+): CrearSolicitudItem[] {
+  const items: CrearSolicitudItem[] = [];
 
   for (const { campo } of CAMPOS_SOLICITUD) {
     let valorPropuesto: string | null;
-    let valorAnterior: string | null;
+    let valorActual: string | null;
 
     if (campo === CAMPO_HIJOS) {
       valorPropuesto = serializeHijos(propuesto.hijos);
-      valorAnterior = serializeHijos(actual.hijos);
+      valorActual = serializeHijos(actual.hijos);
     } else {
       valorPropuesto = serializeValor(propuesto[campo]);
-      valorAnterior = serializeValor(actual[campo]);
+      valorActual = serializeValor(actual[campo]);
     }
 
-    if (valorPropuesto !== valorAnterior) {
-      items.push({ campo, valor_propuesto: valorPropuesto, valor_anterior: valorAnterior });
+    if (valorPropuesto !== valorActual) {
+      items.push({ campo, valor_propuesto: valorPropuesto });
     }
   }
 
@@ -110,16 +113,28 @@ const NOT_PENDING = "55000";
 
 type DbError = { code?: string; message?: string } | null | undefined;
 
-// es-AR message for a failed submission or decision. Never exposes the
-// database message.
-export function aprobacionErrorMessage(error: DbError): string {
-  const messages = copy.aprobaciones.errors;
-  if (error?.code === UNIQUE_VIOLATION && error.message?.includes(SOLICITUD_PENDIENTE_INDEX)) {
-    return messages.solicitudPendiente;
-  }
-  if (error?.code === UNIQUE_VIOLATION && error.message?.includes(DOCUMENTO_PENDIENTE_INDEX)) {
-    return messages.documentoPendiente;
-  }
+// es-AR messages for failed database calls. They never expose the database
+// message; anything unexpected gets the generic message.
+const messages = copy.aprobaciones.errors;
+
+function isUniqueViolationOn(error: DbError, index: string): boolean {
+  return error?.code === UNIQUE_VIOLATION && Boolean(error.message?.includes(index));
+}
+
+// crear_solicitud.
+export function solicitudErrorMessage(error: DbError): string {
+  if (isUniqueViolationOn(error, SOLICITUD_PENDIENTE_INDEX)) return messages.solicitudPendiente;
+  return messages.guardarFallo;
+}
+
+// Document upload (legajo_documentos insert).
+export function documentoErrorMessage(error: DbError): string {
+  if (isUniqueViolationOn(error, DOCUMENTO_PENDIENTE_INDEX)) return messages.documentoPendiente;
+  return messages.guardarFallo;
+}
+
+// aprobar_* and rechazar_* functions.
+export function decisionErrorMessage(error: DbError): string {
   if (error?.code === INVALID_PARAMETER) return messages.motivoRequerido;
   if (error?.code === NOT_PENDING) return messages.noPendiente;
   return messages.guardarFallo;

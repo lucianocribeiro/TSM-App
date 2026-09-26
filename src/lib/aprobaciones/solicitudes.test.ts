@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
 import { legajoPersonalSchema, type LegajoPersonal } from "@/lib/legajo/validation";
 import {
-  aprobacionErrorMessage,
   buildSolicitudItems,
+  decisionErrorMessage,
   DOCUMENTO_PENDIENTE_INDEX,
+  documentoErrorMessage,
   parseHijosValor,
   serializeHijos,
   serializeValor,
   SOLICITUD_PENDIENTE_INDEX,
+  solicitudErrorMessage,
   type LegajoActual,
 } from "./solicitudes";
 
@@ -59,26 +61,29 @@ describe("buildSolicitudItems", () => {
     expect(buildSolicitudItems(form, actual)).toEqual([]);
   });
 
-  it("skips unchanged fields and records the current value as valor_anterior", () => {
+  it("builds the crear_solicitud p_items payload, skipping unchanged fields", () => {
     const form = { ...unchangedForm(), telefono_celular: "1100000022", alergias: "Polen" };
-    expect(buildSolicitudItems(form, actual)).toEqual([
-      { campo: "telefono_celular", valor_propuesto: "1100000022", valor_anterior: "1100000002" },
-      { campo: "alergias", valor_propuesto: "Polen", valor_anterior: "Ninguna" },
+    const items = buildSolicitudItems(form, actual);
+    expect(items).toEqual([
+      { campo: "telefono_celular", valor_propuesto: "1100000022" },
+      { campo: "alergias", valor_propuesto: "Polen" },
     ]);
+    // Exactly the two keys crear_solicitud accepts; the database fills valor_anterior.
+    for (const item of items) {
+      expect(Object.keys(item).sort()).toEqual(["campo", "valor_propuesto"]);
+    }
   });
 
   it("proposes null to clear an optional field", () => {
     const form = { ...unchangedForm(), piso_depto: null };
-    expect(buildSolicitudItems(form, actual)).toEqual([
-      { campo: "piso_depto", valor_propuesto: null, valor_anterior: "3° B" },
-    ]);
+    expect(buildSolicitudItems(form, actual)).toEqual([{ campo: "piso_depto", valor_propuesto: null }]);
   });
 
-  it("uses null as valor_anterior when the current value is empty", () => {
+  it("detects a change when the current value is empty", () => {
     const form = unchangedForm();
     const empty: LegajoActual = { ...actual, nombre_conyuge: null };
     expect(buildSolicitudItems(form, empty)).toEqual([
-      { campo: "nombre_conyuge", valor_propuesto: "Cónyuge Ficticio", valor_anterior: null },
+      { campo: "nombre_conyuge", valor_propuesto: "Cónyuge Ficticio" },
     ]);
   });
 
@@ -92,14 +97,10 @@ describe("buildSolicitudItems", () => {
     };
     const items = buildSolicitudItems(form, actual);
     expect(items).toEqual([
-      { campo: "fecha_nacimiento", valor_propuesto: "1991-02-03", valor_anterior: "1990-07-01" },
-      { campo: "estado_civil", valor_propuesto: "soltero", valor_anterior: "casado" },
-      { campo: "tiene_hijos", valor_propuesto: "false", valor_anterior: "true" },
-      {
-        campo: "hijos",
-        valor_propuesto: "[]",
-        valor_anterior: serializeHijos(actual.hijos),
-      },
+      { campo: "fecha_nacimiento", valor_propuesto: "1991-02-03" },
+      { campo: "estado_civil", valor_propuesto: "soltero" },
+      { campo: "tiene_hijos", valor_propuesto: "false" },
+      { campo: "hijos", valor_propuesto: "[]" },
     ]);
   });
 
@@ -166,30 +167,28 @@ describe("serializeValor", () => {
   });
 });
 
-describe("aprobacionErrorMessage", () => {
+describe("error messages", () => {
   const messages = copy.aprobaciones.errors;
+  const duplicate = (index: string) => ({
+    code: "23505",
+    message: `duplicate key value violates unique constraint "${index}"`,
+  });
 
-  it("explains a second pending request or document", () => {
-    expect(
-      aprobacionErrorMessage({
-        code: "23505",
-        message: `duplicate key value violates unique constraint "${SOLICITUD_PENDIENTE_INDEX}"`,
-      }),
-    ).toBe(messages.solicitudPendiente);
-    expect(
-      aprobacionErrorMessage({
-        code: "23505",
-        message: `duplicate key value violates unique constraint "${DOCUMENTO_PENDIENTE_INDEX}"`,
-      }),
-    ).toBe(messages.documentoPendiente);
+  it("explains a second pending request", () => {
+    expect(solicitudErrorMessage(duplicate(SOLICITUD_PENDIENTE_INDEX))).toBe(messages.solicitudPendiente);
+    expect(solicitudErrorMessage({ code: "22023" })).toBe(messages.guardarFallo);
+    expect(solicitudErrorMessage({ code: "42501", message: "permission denied" })).toBe(messages.guardarFallo);
+  });
+
+  it("explains a second pending document", () => {
+    expect(documentoErrorMessage(duplicate(DOCUMENTO_PENDIENTE_INDEX))).toBe(messages.documentoPendiente);
+    expect(documentoErrorMessage(duplicate(SOLICITUD_PENDIENTE_INDEX))).toBe(messages.guardarFallo);
   });
 
   it("maps decision errors and falls back to a generic message", () => {
-    expect(aprobacionErrorMessage({ code: "22023" })).toBe(messages.motivoRequerido);
-    expect(aprobacionErrorMessage({ code: "55000" })).toBe(messages.noPendiente);
-    expect(aprobacionErrorMessage({ code: "42501", message: "permission denied" })).toBe(
-      messages.guardarFallo,
-    );
-    expect(aprobacionErrorMessage(null)).toBe(messages.guardarFallo);
+    expect(decisionErrorMessage({ code: "22023" })).toBe(messages.motivoRequerido);
+    expect(decisionErrorMessage({ code: "55000" })).toBe(messages.noPendiente);
+    expect(decisionErrorMessage({ code: "42501", message: "permission denied" })).toBe(messages.guardarFallo);
+    expect(decisionErrorMessage(null)).toBe(messages.guardarFallo);
   });
 });
