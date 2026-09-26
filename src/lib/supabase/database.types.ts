@@ -9,6 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      legajo_documentos: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          legajo_id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          tipo: Database["public"]["Enums"]["documento_tipo"]
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          legajo_id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+          tipo: Database["public"]["Enums"]["documento_tipo"]
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          legajo_id?: string
+          mime_type?: string
+          size_bytes?: number
+          storage_path?: string
+          tipo?: Database["public"]["Enums"]["documento_tipo"]
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legajo_documentos_legajo_id_fkey"
+            columns: ["legajo_id"]
+            isOneToOne: false
+            referencedRelation: "legajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legajo_documentos_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       legajo_hijos: {
         Row: {
           created_at: string
@@ -206,9 +260,11 @@ export type Database = {
         Returns: Database["public"]["Enums"]["app_role"]
       }
       is_admin: { Args: never; Returns: boolean }
+      is_valid_legajo_doc_path: { Args: { path: string }; Returns: boolean }
     }
     Enums: {
       app_role: "empleado" | "admin"
+      documento_tipo: "dni_frente" | "dni_dorso" | "licencia_conducir"
       estado_civil:
         | "soltero"
         | "casado"
@@ -344,6 +400,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["empleado", "admin"],
+      documento_tipo: ["dni_frente", "dni_dorso", "licencia_conducir"],
       estado_civil: [
         "soltero",
         "casado",
