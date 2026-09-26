@@ -3,7 +3,6 @@ import { copy } from "../src/lib/copy/es-AR";
 import {
   ADMIN,
   EMPLEADO_A,
-  EMPLEADO_B,
   expectNavLinks,
   fillLogin,
   loginError,
@@ -12,6 +11,7 @@ import {
   SCREENSHOT_DIR,
   setThemeCookie,
 } from "./helpers";
+import { createE2EUser, deleteE2EUser } from "./service";
 
 test.describe("login page", () => {
   test("renders in light and dark", async ({ page }) => {
@@ -151,13 +151,19 @@ test.describe("theme and logout", () => {
   });
 
   test("logout returns to /login and /mi-legajo is no longer reachable", async ({ page }) => {
-    // Dedicated user: signing out ends this user's sessions, so no other test uses it.
-    await loginAs(page, EMPLEADO_B);
-    await page.getByRole("button", { name: copy.auth.logout }).click();
-    await expect(page).toHaveURL(/\/login$/);
+    // Dedicated user: signing out ends this user's sessions, so no other test
+    // uses it. (It was seed Empleado B until F1-07A gave B a temporary password.)
+    const user = await createE2EUser("logout");
+    try {
+      await loginAs(page, user);
+      await page.getByRole("button", { name: copy.auth.logout }).click();
+      await expect(page).toHaveURL(/\/login$/);
 
-    await page.goto("/mi-legajo");
-    await expect(page).toHaveURL(/\/login$/);
+      await page.goto("/mi-legajo");
+      await expect(page).toHaveURL(/\/login$/);
+    } finally {
+      await deleteE2EUser(user.id);
+    }
   });
 
   test("/ and /login redirect to /mi-legajo when a session exists", async ({ page }) => {

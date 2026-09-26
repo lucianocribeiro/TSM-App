@@ -30,6 +30,61 @@ describe("local seed users", () => {
   }
 });
 
+describe("local seed accounts", () => {
+  it("empleado.inactivo@mitsm.test cannot sign in: the account is banned", async () => {
+    const client = anonClient();
+    const { data, error } = await client.auth.signInWithPassword({
+      email: "empleado.inactivo@mitsm.test",
+      password: SEED_PASSWORD,
+    });
+    expect(data.session).toBeNull();
+    expect(error?.code).toBe("user_banned");
+  });
+
+  it("the inactive account is inactive, with a deactivation event and its reason", async () => {
+    const client = anonClient();
+    await client.auth.signInWithPassword({ email: "admin@mitsm.test", password: SEED_PASSWORD });
+    const { data: profile } = await client
+      .from("profiles")
+      .select("estado_cuenta, debe_cambiar_password")
+      .eq("id", "00000000-0000-4000-a000-000000000004")
+      .single();
+    expect(profile).toEqual({ estado_cuenta: "inactiva", debe_cambiar_password: false });
+
+    const { data: events } = await client
+      .from("cuenta_eventos")
+      .select("tipo, motivo, actor_id")
+      .eq("profile_id", "00000000-0000-4000-a000-000000000004");
+    expect(events).toEqual([
+      {
+        tipo: "desactivacion",
+        motivo: expect.stringMatching(/\S/),
+        actor_id: "00000000-0000-4000-a000-000000000001",
+      },
+    ]);
+    await client.auth.signOut();
+  });
+
+  it("Empleado B must change the password; Admin and Empleado A need not", async () => {
+    const expected = [
+      ["admin@mitsm.test", false],
+      ["empleado.a@mitsm.test", false],
+      ["empleado.b@mitsm.test", true],
+    ] as const;
+    for (const [email, debe] of expected) {
+      const client = anonClient();
+      const { data: auth } = await client.auth.signInWithPassword({ email, password: SEED_PASSWORD });
+      const { data } = await client
+        .from("profiles")
+        .select("estado_cuenta, debe_cambiar_password")
+        .eq("id", auth.user?.id ?? "")
+        .single();
+      expect(data, email).toEqual({ estado_cuenta: "activa", debe_cambiar_password: debe });
+      await client.auth.signOut();
+    }
+  });
+});
+
 describe("local seed documents", () => {
   async function signIn(email: string) {
     const client = anonClient();
