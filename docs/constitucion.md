@@ -1,5 +1,5 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.3 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Version: 0.4 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -18,7 +18,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Repo: https://github.com/lucianocribeiro/TSM-App
 
 ## 3. Roles
-- **Empleado**: reads own legajo and own documents; edits own personal data (groups A to D); reads own work data (group E, including Bruto mensual) without editing it. Never sees any other employee's data, rows or files.
+- **Empleado**: reads own legajo and own documents; submits changes to own personal data (groups A to D) and uploads own documents, both of which take effect only after Admin approval; reads own work data (group E, including Bruto mensual) without editing it. Never sees any other employee's data, rows or files.
 - **Admin**: sees and manages all data; manages users and roles; edits all legajo data of any employee; uploads documents.
 - No other roles exist. Adding one requires a Constitution change.
 
@@ -54,3 +54,18 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Claude Code applies remote changes (migrations with `supabase db push`, remote Supabase settings) only through a versioned runbook prompt (`TSM-Fx-PUSH-NN`), after the related PR is merged, using credentials from `.env.local`. It never prints, logs or copies secret values, and never runs seeds or destructive commands against the remote project.
 - Codex audits against this Constitution and the phase PRD. It writes no code.
 - Every instruction to Claude Code or Codex is a versioned prompt relayed by Luciano. Prompts and audit reports are not stored in the repo.
+
+## 9. Approval of employee changes
+- Changes an Empleado makes to groups A to D, and documents an Empleado uploads, are stored as pending and do not replace the current value until an Admin approves them.
+- While pending, the Empleado sees the current value plus their submitted value marked as pending.
+- An Admin approves or rejects. A rejection carries a reason, which the Empleado sees.
+- Admin changes apply directly, with no approval step.
+- Pending items are surfaced to Admin by an in-app indicator. No email notifications in Fase 1.
+- Every approval and rejection records who did it and when, and is kept as history.
+
+## 10. Accounts: status and history
+- Accounts are never deleted as part of normal operation. They are deactivated, with a reason recorded (free text for now).
+- A deactivated user cannot log in.
+- History keeps naming who uploaded, changed, approved or rejected each item, including deactivated users.
+- Purge (permanent removal of the account, its legajo, documents and approval history) is an Admin action intended for test data. It requires typing the account's email to confirm.
+- No user can deactivate or purge their own account.
