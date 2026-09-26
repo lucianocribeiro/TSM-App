@@ -21,6 +21,9 @@ export default defineConfig({
           environment: "node",
           include: ["tests/integration/**/*.test.ts"],
           testTimeout: 30_000,
+          // One shared local database: files run one at a time so global
+          // counts (pendientes_admin) are not affected by other files' rows.
+          fileParallelism: false,
         },
       },
     ],

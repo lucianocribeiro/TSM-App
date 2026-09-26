@@ -82,6 +82,58 @@ export type Copy = {
       downloadFailed: string;
     };
   };
+  aprobaciones: {
+    campos: {
+      nombres: string;
+      apellido: string;
+      dni: string;
+      nacionalidad: string;
+      cuil: string;
+      fecha_nacimiento: string;
+      calle_altura: string;
+      piso_depto: string;
+      localidad: string;
+      partido: string;
+      partido_otro: string;
+      telefono_celular: string;
+      email_personal: string;
+      estado_civil: string;
+      nombre_conyuge: string;
+      tiene_hijos: string;
+      hijos: string;
+      grupo_sanguineo: string;
+      alergias: string;
+      medicacion_habitual: string;
+      obra_social: string;
+      numero_afiliado: string;
+      emergencia_nombre: string;
+      emergencia_parentesco: string;
+      emergencia_domicilio: string;
+      emergencia_telefono: string;
+    };
+    solicitudEstados: {
+      pendiente: string;
+      aprobada: string;
+      rechazada: string;
+      cancelada: string;
+    };
+    documentoEstados: {
+      pendiente: string;
+      aprobado: string;
+      rechazado: string;
+      reemplazado: string;
+    };
+    pendienteHint: string;
+    motivoRechazoLabel: string;
+    errors: {
+      solicitudPendiente: string;
+      documentoPendiente: string;
+      sinCambios: string;
+      motivoRequerido: string;
+      noPendiente: string;
+      guardarFallo: string;
+    };
+  };
 };
 
 export const copy = {
@@ -167,6 +219,60 @@ export const copy = {
     },
     errors: {
       downloadFailed: "No pudimos abrir el documento. Intentá de nuevo.",
+    },
+  },
+  aprobaciones: {
+    campos: {
+      nombres: "Nombres",
+      apellido: "Apellido",
+      dni: "DNI",
+      nacionalidad: "Nacionalidad",
+      cuil: "CUIL",
+      fecha_nacimiento: "Fecha de nacimiento",
+      calle_altura: "Calle y altura",
+      piso_depto: "Piso y departamento",
+      localidad: "Localidad",
+      partido: "Partido",
+      partido_otro: "Partido (otro)",
+      telefono_celular: "Teléfono celular personal",
+      email_personal: "Correo electrónico personal",
+      estado_civil: "Estado civil",
+      nombre_conyuge: "Nombre completo cónyuge / concubino",
+      tiene_hijos: "Tiene hijos",
+      hijos: "Hijos",
+      grupo_sanguineo: "Grupo sanguíneo",
+      alergias: "Alergias",
+      medicacion_habitual: "Medicación habitual",
+      obra_social: "Obra social / prepaga",
+      numero_afiliado: "Número de afiliado",
+      emergencia_nombre: "Nombre completo de contacto de emergencia",
+      emergencia_parentesco: "Relación de parentesco contacto de emergencia",
+      emergencia_domicilio: "Domicilio completo contacto de emergencia",
+      emergencia_telefono: "Teléfono de contacto de emergencia",
+    },
+    solicitudEstados: {
+      pendiente: "Pendiente de aprobación",
+      aprobada: "Aprobada",
+      rechazada: "Rechazada",
+      cancelada: "Cancelada",
+    },
+    documentoEstados: {
+      pendiente: "Pendiente de aprobación",
+      aprobado: "Aprobado",
+      rechazado: "Rechazado",
+      reemplazado: "Reemplazado",
+    },
+    pendienteHint: "Enviaste un cambio. Se va a aplicar cuando lo apruebe un administrador.",
+    motivoRechazoLabel: "Motivo del rechazo",
+    errors: {
+      solicitudPendiente:
+        "Ya tenés una solicitud pendiente. Esperá a que la revisen o cancelala antes de enviar otra.",
+      documentoPendiente:
+        "Ya hay un documento de este tipo pendiente de aprobación. Esperá a que lo revisen o eliminalo antes de subir otro.",
+      sinCambios: "No hay cambios para enviar.",
+      motivoRequerido: "Indicá el motivo del rechazo.",
+      noPendiente: "Esta solicitud ya fue revisada o cancelada.",
+      guardarFallo: "No pudimos guardar los cambios. Intentá de nuevo.",
     },
   },
 } as const satisfies Copy;

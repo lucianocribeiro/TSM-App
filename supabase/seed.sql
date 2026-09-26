@@ -199,12 +199,13 @@ cross join (
 ) as h (nombre_completo, fecha_nacimiento)
 where l.profile_id = '00000000-0000-4000-a000-000000000002';
 
--- Legajo documents for Empleado A only (Empleado B and Admin have none).
--- The files are tiny fake PDFs in supabase/seed/legajo-docs, uploaded to the
--- local legajo-docs bucket by the CLI (config.toml, storage.buckets.legajo-docs).
--- size_bytes matches each file.
+-- Legajo documents. The files are tiny fake PDFs in supabase/seed/legajo-docs,
+-- uploaded to the local legajo-docs bucket by the CLI (config.toml,
+-- storage.buckets.legajo-docs). size_bytes matches each file.
+-- Empleado A: DNI frente and dorso, approved by the Admin.
 insert into public.legajo_documentos (
-  legajo_id, tipo, storage_path, file_name, mime_type, size_bytes, uploaded_by
+  legajo_id, tipo, storage_path, file_name, mime_type, size_bytes, uploaded_by,
+  estado, revisado_por, revisado_en
 )
 select
   l.id,
@@ -213,7 +214,10 @@ select
   d.file_name,
   'application/pdf',
   d.size_bytes,
-  l.profile_id
+  l.profile_id,
+  'aprobado',
+  '00000000-0000-4000-a000-000000000001',
+  now()
 from public.legajos as l
 cross join (
   values
@@ -231,3 +235,55 @@ cross join (
     )
 ) as d (tipo, storage_path, file_name, size_bytes)
 where l.profile_id = '00000000-0000-4000-a000-000000000002';
+
+-- Empleado B: one pending licencia de conducir, waiting for Admin review.
+insert into public.legajo_documentos (
+  legajo_id, tipo, storage_path, file_name, mime_type, size_bytes, uploaded_by, estado
+)
+select
+  l.id,
+  'licencia_conducir',
+  '00000000-0000-4000-a000-000000000003/licencia_conducir/00000000-0000-4000-b000-000000000003.pdf',
+  'licencia-prueba.pdf',
+  'application/pdf',
+  75,
+  l.profile_id,
+  'pendiente'
+from public.legajos as l
+where l.profile_id = '00000000-0000-4000-a000-000000000003';
+
+-- Change requests for Empleado A. valor_anterior is filled by the
+-- solicitudes_cambio_items trigger from the current legajo.
+-- 1. Rejected by the Admin, with a reason (history).
+insert into public.solicitudes_cambio (
+  id, legajo_id, solicitado_por, estado, motivo_rechazo, revisado_por, revisado_en, created_at
+)
+select
+  '00000000-0000-4000-c000-000000000001',
+  l.id,
+  l.profile_id,
+  'rechazada',
+  'El apellido no coincide con el DNI (dato de prueba).',
+  '00000000-0000-4000-a000-000000000001',
+  now() - interval '1 day',
+  now() - interval '2 days'
+from public.legajos as l
+where l.profile_id = '00000000-0000-4000-a000-000000000002';
+
+insert into public.solicitudes_cambio_items (solicitud_id, campo, valor_propuesto)
+values ('00000000-0000-4000-c000-000000000001', 'apellido', 'Ficticio Rechazado');
+
+-- 2. Pending, with two fields.
+insert into public.solicitudes_cambio (id, legajo_id, solicitado_por, estado)
+select
+  '00000000-0000-4000-c000-000000000002',
+  l.id,
+  l.profile_id,
+  'pendiente'
+from public.legajos as l
+where l.profile_id = '00000000-0000-4000-a000-000000000002';
+
+insert into public.solicitudes_cambio_items (solicitud_id, campo, valor_propuesto)
+values
+  ('00000000-0000-4000-c000-000000000002', 'telefono_celular', '1100000022'),
+  ('00000000-0000-4000-c000-000000000002', 'alergias', 'Polen y ácaros (dato de prueba)');

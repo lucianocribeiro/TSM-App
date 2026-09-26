@@ -27,7 +27,8 @@ const DATA_COLUMNS = [
   "numero_legajo", "area", "puesto", "fecha_ingreso", "estado_laboral", "sede", "modalidad", "convenio", "bruto_mensual",
 ] as const;
 
-// Group A to D values an Empleado may write on their own legajo.
+// Group A to D values. Since F1-06B only Admin writes them directly; an
+// Empleado submits them as a change request (aprobaciones-rls.test.ts).
 const PERSONAL_UPDATE: LegajoUpdate = {
   nombres: "Prueba RLS",
   apellido: "Ficticio",
@@ -201,16 +202,21 @@ describe("legajos and legajo_hijos RLS", () => {
   });
 
   describe("empleado writes on legajos", () => {
-    it("updates own groups A to D", async () => {
-      const { data, error } = await empleadoA.client
-        .from("legajos")
-        .update(PERSONAL_UPDATE)
-        .eq("id", legajoA)
-        .select();
-      expect(error).toBeNull();
-      expect(data).toHaveLength(1);
-      expect(await storedLegajo(legajoA)).toMatchObject(PERSONAL_UPDATE);
-    });
+    // F1-06B: the update policy is Admin only, so no own row is reachable.
+    it.each(Object.entries(PERSONAL_UPDATE))(
+      "cannot update group A to D column %s on own legajo directly",
+      async (column, value) => {
+        const before = await storedLegajo(legajoA);
+        const { data, error } = await empleadoA.client
+          .from("legajos")
+          .update({ [column]: value } as LegajoUpdate)
+          .eq("id", legajoA)
+          .select();
+        expect(error).toBeNull();
+        expect(data).toEqual([]);
+        expect(await storedLegajo(legajoA)).toEqual(before);
+      },
+    );
 
     it.each(Object.entries(LABORAL_VALUES))("cannot change group E column %s on own legajo", async (column, value) => {
       const before = await storedLegajo(legajoA);
@@ -219,8 +225,8 @@ describe("legajos and legajo_hijos RLS", () => {
         .update({ [column]: value } as LegajoUpdate)
         .eq("id", legajoA)
         .select();
-      expect(data).toBeNull();
-      expect(error?.code).toBe(PERMISSION_DENIED);
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
       const after = await storedLegajo(legajoA);
       expect(after?.[column as keyof typeof after]).toEqual(before?.[column as keyof typeof before]);
     });
@@ -267,11 +273,23 @@ describe("legajos and legajo_hijos RLS", () => {
   });
 
   describe("empleado children", () => {
-    it("adds, edits and deletes own children", async () => {
-      const added = await addChild(empleadoA.client, legajoA, "Hijo Propio (prueba)");
-      expect(added.error).toBeNull();
-      expect(added.data).toHaveLength(1);
-      const childId = added.data?.[0]?.id as string;
+    // F1-06B: the children set is approved as one field ("hijos"); direct
+    // writes are Admin only. Reading own children is unchanged.
+    it("reads own children but cannot add, edit or delete them directly", async () => {
+      const { data: own, error: setupError } = await service
+        .from("legajo_hijos")
+        .insert({ legajo_id: legajoA, nombre_completo: "Hijo Propio (prueba)", fecha_nacimiento: "2018-05-05" })
+        .select("id")
+        .single();
+      if (setupError || !own) throw new Error(`child setup failed: ${setupError?.message}`);
+      const childId = own.id;
+
+      const listed = await empleadoA.client.from("legajo_hijos").select("id").eq("legajo_id", legajoA);
+      expect(listed.data?.map((row) => row.id)).toContain(childId);
+
+      const added = await addChild(empleadoA.client, legajoA, "Hijo Nuevo (prueba)");
+      expect(added.data).toBeNull();
+      expect(added.error?.code).toBe(PERMISSION_DENIED);
 
       const edited = await empleadoA.client
         .from("legajo_hijos")
@@ -279,17 +297,16 @@ describe("legajos and legajo_hijos RLS", () => {
         .eq("id", childId)
         .select();
       expect(edited.error).toBeNull();
-      expect(edited.data?.[0]).toMatchObject({ nombre_completo: "Hijo Propio Editado (prueba)", fecha_nacimiento: "2018-06-06" });
-
-      const listed = await empleadoA.client.from("legajo_hijos").select("id").eq("legajo_id", legajoA);
-      expect(listed.data?.map((row) => row.id)).toContain(childId);
+      expect(edited.data).toEqual([]);
 
       const deleted = await empleadoA.client.from("legajo_hijos").delete().eq("id", childId).select();
       expect(deleted.error).toBeNull();
-      expect(deleted.data).toHaveLength(1);
+      expect(deleted.data).toEqual([]);
 
-      const { count } = await service.from("legajo_hijos").select("id", { count: "exact", head: true }).eq("id", childId);
-      expect(count).toBe(0);
+      const { data: stored } = await service.from("legajo_hijos").select("nombre_completo, fecha_nacimiento").eq("legajo_id", legajoA);
+      expect(stored).toEqual([{ nombre_completo: "Hijo Propio (prueba)", fecha_nacimiento: "2018-05-05" }]);
+
+      await service.from("legajo_hijos").delete().eq("id", childId);
     });
 
     it("cannot add a child to another empleado's legajo", async () => {
@@ -316,20 +333,22 @@ describe("legajos and legajo_hijos RLS", () => {
     });
 
     it("cannot move own child to another empleado's legajo", async () => {
-      const added = await addChild(empleadoA.client, legajoA, "Hijo a mover (prueba)");
+      const added = await addChild(service, legajoA, "Hijo a mover (prueba)");
       const childId = added.data?.[0]?.id as string;
       expect(childId).toBeDefined();
 
+      // F1-06B: no own child is reachable for update, so nothing moves.
       const { data, error } = await empleadoA.client
         .from("legajo_hijos")
         .update({ legajo_id: legajoB })
         .eq("id", childId)
         .select();
-      expect(data).toBeNull();
-      expect(error?.code).toBe(PERMISSION_DENIED);
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
 
       const stored = await service.from("legajo_hijos").select("legajo_id").eq("id", childId).single();
       expect(stored.data?.legajo_id).toBe(legajoA);
+      await service.from("legajo_hijos").delete().eq("id", childId);
     });
   });
 
@@ -371,8 +390,10 @@ describe("legajos and legajo_hijos RLS", () => {
   });
 
   describe("check constraints", () => {
+    // Through the Admin session, the only role that updates legajos directly
+    // since F1-06B (it was the Empleado session before).
     async function expectCheckViolation(update: LegajoUpdate) {
-      const { data, error } = await empleadoA.client.from("legajos").update(update).eq("id", legajoA).select();
+      const { data, error } = await admin.client.from("legajos").update(update).eq("id", legajoA).select();
       expect(data).toBeNull();
       expect(error?.code).toBe(CHECK_VIOLATION);
     }
