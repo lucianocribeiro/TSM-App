@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      cuenta_eventos: {
+        Row: {
+          actor_id: string
+          created_at: string
+          id: string
+          motivo: string | null
+          profile_id: string
+          tipo: Database["public"]["Enums"]["cuenta_evento_tipo"]
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          profile_id: string
+          tipo: Database["public"]["Enums"]["cuenta_evento_tipo"]
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          profile_id?: string
+          tipo?: Database["public"]["Enums"]["cuenta_evento_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuenta_eventos_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuenta_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       legajo_documentos: {
         Row: {
           created_at: string
@@ -251,18 +293,24 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          debe_cambiar_password: boolean
+          estado_cuenta: Database["public"]["Enums"]["cuenta_estado"]
           id: string
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
         }
         Insert: {
           created_at?: string
+          debe_cambiar_password?: boolean
+          estado_cuenta?: Database["public"]["Enums"]["cuenta_estado"]
           id: string
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
         Update: {
           created_at?: string
+          debe_cambiar_password?: boolean
+          estado_cuenta?: Database["public"]["Enums"]["cuenta_estado"]
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -376,6 +424,11 @@ export type Database = {
         Returns: undefined
       }
       campos_solicitud_permitidos: { Args: never; Returns: string[] }
+      cerrar_sesiones_cuenta: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
+      confirmar_cambio_password: { Args: never; Returns: undefined }
       crear_solicitud: {
         Args: { p_items: Json; p_legajo_id: string }
         Returns: string
@@ -384,12 +437,20 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      desactivar_cuenta: {
+        Args: { p_motivo: string; p_profile_id: string }
+        Returns: undefined
+      }
       is_admin: { Args: never; Returns: boolean }
       is_valid_hijos_json: { Args: { valor: string }; Returns: boolean }
       is_valid_legajo_doc_path: { Args: { path: string }; Returns: boolean }
       is_valid_solicitud_valor: {
         Args: { campo: string; valor: string }
         Returns: boolean
+      }
+      marcar_password_temporal: {
+        Args: { p_profile_id: string }
+        Returns: undefined
       }
       pendientes_admin: {
         Args: never
@@ -398,6 +459,7 @@ export type Database = {
           solicitudes: number
         }[]
       }
+      reactivar_cuenta: { Args: { p_profile_id: string }; Returns: undefined }
       rechazar_documento: {
         Args: { p_documento_id: string; p_motivo: string }
         Returns: undefined
@@ -406,9 +468,20 @@ export type Database = {
         Args: { p_motivo: string; p_solicitud_id: string }
         Returns: undefined
       }
+      registrar_creacion_cuenta: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "empleado" | "admin"
+      cuenta_estado: "activa" | "inactiva"
+      cuenta_evento_tipo:
+        | "creacion"
+        | "desactivacion"
+        | "reactivacion"
+        | "password_temporal"
+        | "password_cambiada"
       documento_estado: "pendiente" | "aprobado" | "rechazado" | "reemplazado"
       documento_tipo: "dni_frente" | "dni_dorso" | "licencia_conducir"
       estado_civil:
@@ -547,6 +620,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["empleado", "admin"],
+      cuenta_estado: ["activa", "inactiva"],
+      cuenta_evento_tipo: [
+        "creacion",
+        "desactivacion",
+        "reactivacion",
+        "password_temporal",
+        "password_cambiada",
+      ],
       documento_estado: ["pendiente", "aprobado", "rechazado", "reemplazado"],
       documento_tipo: ["dni_frente", "dni_dorso", "licencia_conducir"],
       estado_civil: [
