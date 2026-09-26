@@ -19,6 +19,7 @@ export type Copy = {
     errors: {
       invalidCredentials: string;
       logoutFailed: string;
+      cuentaInactiva: string;
     };
     logout: string;
     roles: {
@@ -134,6 +135,51 @@ export type Copy = {
       guardarFallo: string;
     };
   };
+  password: {
+    kicker: string;
+    title: string;
+    intro: string;
+    nuevaLabel: string;
+    confirmacionLabel: string;
+    hint: string;
+    submit: string;
+    submitting: string;
+    errors: {
+      demasiadoCorta: string;
+      demasiadoLarga: string;
+      noCoinciden: string;
+      igualActual: string;
+      guardarFallo: string;
+    };
+  };
+  cuentas: {
+    estados: {
+      activa: string;
+      inactiva: string;
+    };
+    eventos: {
+      creacion: string;
+      desactivacion: string;
+      reactivacion: string;
+      password_temporal: string;
+      password_cambiada: string;
+    };
+    errors: {
+      noAutorizado: string;
+      emailInvalido: string;
+      emailExistente: string;
+      rolInvalido: string;
+      cuentaNoEncontrada: string;
+      cuentaPropia: string;
+      ultimoAdmin: string;
+      yaInactiva: string;
+      yaActiva: string;
+      motivoRequerido: string;
+      emailConfirmacionNoCoincide: string;
+      historialEnOtrasCuentas: string;
+      accionFallo: string;
+    };
+  };
 };
 
 export const copy = {
@@ -157,6 +203,7 @@ export const copy = {
     errors: {
       invalidCredentials: "Email o contraseña incorrectos.",
       logoutFailed: "No pudimos cerrar la sesión. Intentá de nuevo.",
+      cuentaInactiva: "Tu cuenta está inactiva. Contactá a Recursos Humanos.",
     },
     logout: "Cerrar sesión",
     roles: {
@@ -273,6 +320,54 @@ export const copy = {
       motivoRequerido: "Indicá el motivo del rechazo.",
       noPendiente: "Esta solicitud ya fue revisada o cancelada.",
       guardarFallo: "No pudimos guardar los cambios. Intentá de nuevo.",
+    },
+  },
+  password: {
+    kicker: "Tu cuenta",
+    title: "Cambiá tu contraseña",
+    intro:
+      "Estás usando una contraseña temporal. Elegí una nueva para seguir usando Mi TSM.",
+    nuevaLabel: "Nueva contraseña",
+    confirmacionLabel: "Repetí la nueva contraseña",
+    hint: "Usá al menos 8 caracteres.",
+    submit: "Guardar contraseña",
+    submitting: "Guardando…",
+    errors: {
+      demasiadoCorta: "La contraseña tiene que tener al menos 8 caracteres.",
+      demasiadoLarga: "La contraseña puede tener hasta 72 caracteres.",
+      noCoinciden: "Las contraseñas no coinciden. Revisalas y volvé a intentar.",
+      igualActual: "La nueva contraseña tiene que ser distinta de la actual.",
+      guardarFallo: "No pudimos cambiar la contraseña. Intentá de nuevo.",
+    },
+  },
+  cuentas: {
+    estados: {
+      activa: "Activa",
+      inactiva: "Inactiva",
+    },
+    eventos: {
+      creacion: "Cuenta creada",
+      desactivacion: "Cuenta desactivada",
+      reactivacion: "Cuenta reactivada",
+      password_temporal: "Contraseña temporal asignada",
+      password_cambiada: "Contraseña cambiada",
+    },
+    errors: {
+      noAutorizado: "No tenés permiso para realizar esta acción.",
+      emailInvalido: "Ingresá un email válido.",
+      emailExistente: "Ya existe una cuenta con ese email.",
+      rolInvalido: "Elegí un rol válido.",
+      cuentaNoEncontrada: "No encontramos la cuenta. Actualizá la página y volvé a intentar.",
+      cuentaPropia: "No podés realizar esta acción sobre tu propia cuenta.",
+      ultimoAdmin: "No podés desactivar ni purgar al último administrador activo.",
+      yaInactiva: "La cuenta ya está inactiva.",
+      yaActiva: "La cuenta ya está activa.",
+      motivoRequerido: "Indicá el motivo de la desactivación.",
+      emailConfirmacionNoCoincide:
+        "El email no coincide con el de la cuenta. Revisalo y volvé a intentar.",
+      historialEnOtrasCuentas:
+        "Esta cuenta figura en el historial de otras cuentas y no se puede purgar. Desactivala en su lugar.",
+      accionFallo: "No pudimos completar la acción. Intentá de nuevo.",
     },
   },
 } as const satisfies Copy;
