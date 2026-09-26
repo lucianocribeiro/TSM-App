@@ -15,7 +15,7 @@ Deliver the Legajo module plus the auth, roles and data-isolation foundation tha
 8. Production deploy on Vercel with the real domain.
 9. E2E, role-boundary and RLS tests.
 10. Approval flow: personal data changes (groups A to D) and document uploads made by an Empleado require Admin approval before they take effect. Rejections carry a reason.
-11. Account status: Admin deactivates an account with a reason instead of deleting it; deactivated users cannot log in and remain visible in history. Purge is a separate Admin action for test data.
+11. Estado de la cuenta (Activa / Inactiva): Admin deactivates an account with a reason instead of deleting it; deactivated users cannot log in and remain visible in history. Purge is a separate Admin action for test data.
 12. First password: Admin sets a temporary password; the user must change it at first login. Password resets by Admin are always temporary passwords.
 
 ## 3. User stories and acceptance criteria
@@ -32,19 +32,24 @@ As the system, I restrict every view and every row by role.
 - RLS tests prove an Empleado cannot read or write another employee's rows or files.
 
 ### US-3 Mi Legajo
-As an Empleado, I see my legajo and edit my personal data (groups A to D in section 5).
+As an Empleado, I see my legajo and submit changes to my personal data (groups A to D in section 5).
+- My changes to groups A to D and the documents I upload stay pending until an Admin approves them (detail in US-7).
+- While a change is pending, I see the current value plus my submitted value marked as pending; if it is rejected, I see the reason.
 - Work data (group E) is read-only for Empleado, enforced in RLS and in the Server Action.
 - Required fields and validation rules from section 5 are enforced.
 - I can view and download my own documents.
 
 ### US-4 Legajos (Admin)
 As Admin, I see the list of employees and open any legajo.
-- I can edit all legajo data (groups A to E).
+- I can edit all legajo data (groups A to E); my changes apply directly, with no approval step.
+- I review pending changes and document uploads from employees and approve or reject them (detail in US-7).
 - I can upload documents to any employee's legajo; files go to a private bucket.
 - The Legajos list shows a KPI strip with legajo-based numbers only (no licencias or recibos metrics in Fase 1).
 
 ### US-5 User management
 As Admin, I create an employee account and assign a role.
+- Account creation includes a temporary password that the user must change at first login (detail in US-9).
+- Accounts are deactivated, not deleted (detail in US-8).
 - The new user can log in and sees only their own legajo.
 
 ### US-6 Branding, theme and copy
@@ -61,6 +66,7 @@ As Admin, I create an employee account and assign a role.
 - Every decision records who and when.
 
 ### US-8 Estado de la cuenta
+- Estado de la cuenta is Activa or Inactiva. Deactivating sets it to Inactiva.
 - An Admin deactivates an account with a reason; the user can no longer log in.
 - Deactivated employees are hidden from the Legajos list by default, with a filter to show them.
 - History keeps showing deactivated users by name.
@@ -125,7 +131,8 @@ Source: TSM validated employee update form ("Formulario de actualización - Tecn
 - Puesto*
 - Fecha de ingreso*
 - Antigüedad — calculated from Fecha de ingreso, not stored
-- Estado* — options: Activo, En prueba ("En licencia" is added with the Licencias module in Fase 3)
+- Estado laboral* — options: Activo, En prueba ("En licencia" is added with the Licencias module in Fase 3)
+  Estado laboral describes the employment situation and is independent of Estado de la cuenta (US-8), which controls access to the portal.
 - Sede*
 - Modalidad*
 - Convenio*
