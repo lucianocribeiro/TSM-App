@@ -64,8 +64,9 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Every approval and rejection records who did it and when, and is kept as history.
 
 ## 10. Accounts: status and history
-- Accounts are never deleted as part of normal operation. They are deactivated, with a reason recorded (free text for now).
-- A deactivated user cannot log in.
-- History keeps naming who uploaded, changed, approved or rejected each item, including deactivated users.
+- Every account has an Estado de la cuenta: Activa or Inactiva.
+- Accounts are never deleted as part of normal operation. They are deactivated, with a reason recorded (free text for now). Deactivating sets Estado de la cuenta to Inactiva.
+- A user whose account is Inactiva cannot log in.
+- History keeps naming who uploaded, changed, approved or rejected each item, including users whose account is Inactiva.
 - Purge (permanent removal of the account, its legajo, documents and approval history) is an Admin action intended for test data. It requires typing the account's email to confirm.
 - No user can deactivate or purge their own account.

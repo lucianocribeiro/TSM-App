@@ -43,7 +43,7 @@ As an Empleado, I see my legajo and submit changes to my personal data (groups A
 As Admin, I see the list of employees and open any legajo.
 - I can edit all legajo data (groups A to E); my changes apply directly, with no approval step.
 - I review pending changes and document uploads from employees and approve or reject them (detail in US-7).
-- I can upload documents to any employee's legajo; files go to a private bucket.
+- I can upload, replace, delete and download documents for any employee; files go to a private bucket.
 - The Legajos list shows a KPI strip with legajo-based numbers only (no licencias or recibos metrics in Fase 1).
 
 ### US-5 User management
