@@ -40,39 +40,77 @@ describe("passwordSchema", () => {
 });
 
 describe("parseCambioPassword", () => {
+  const forced = { requiereActual: false };
+  const voluntary = { requiereActual: true };
+
   it("returns the new password when both fields match and are valid", () => {
-    expect(parseCambioPassword(form({ password: "NuevaClave-1", confirmacion: "NuevaClave-1" }))).toEqual({
+    expect(parseCambioPassword(form({ password: "NuevaClave-1", confirmacion: "NuevaClave-1" }), forced)).toEqual({
       ok: true,
-      data: { password: "NuevaClave-1" },
+      data: { actual: null, password: "NuevaClave-1" },
     });
   });
 
   it("does not trim the password", () => {
-    expect(parseCambioPassword(form({ password: " clave12 ", confirmacion: " clave12 " }))).toEqual({
+    expect(parseCambioPassword(form({ password: " clave12 ", confirmacion: " clave12 " }), forced)).toEqual({
       ok: true,
-      data: { password: " clave12 " },
+      data: { actual: null, password: " clave12 " },
     });
   });
 
   it("reports a short password before a mismatch", () => {
-    expect(parseCambioPassword(form({ password: "corta", confirmacion: "otra" }))).toEqual({
+    expect(parseCambioPassword(form({ password: "corta", confirmacion: "otra" }), forced)).toEqual({
       ok: false,
       error: messages.demasiadoCorta,
     });
   });
 
   it("reports a mismatch", () => {
-    expect(parseCambioPassword(form({ password: "NuevaClave-1", confirmacion: "NuevaClave-2" }))).toEqual({
+    expect(
+      parseCambioPassword(form({ password: "NuevaClave-1", confirmacion: "NuevaClave-2" }), forced),
+    ).toEqual({ ok: false, error: messages.noCoinciden });
+  });
+
+  it("reports missing fields", () => {
+    expect(parseCambioPassword(new FormData(), forced)).toEqual({ ok: false, error: messages.demasiadoCorta });
+    expect(parseCambioPassword(form({ password: "NuevaClave-1" }), forced)).toEqual({
       ok: false,
       error: messages.noCoinciden,
     });
   });
 
-  it("reports missing fields", () => {
-    expect(parseCambioPassword(new FormData())).toEqual({ ok: false, error: messages.demasiadoCorta });
-    expect(parseCambioPassword(form({ password: "NuevaClave-1" }))).toEqual({
-      ok: false,
-      error: messages.noCoinciden,
+  describe("current password", () => {
+    const nueva = { password: "NuevaClave-1", confirmacion: "NuevaClave-1" };
+
+    it("is required in a voluntary change", () => {
+      for (const actual of [undefined, ""]) {
+        const fields = actual === undefined ? nueva : { ...nueva, actual };
+        expect(parseCambioPassword(form(fields), voluntary), JSON.stringify(actual)).toEqual({
+          ok: false,
+          error: messages.actualRequerida,
+        });
+      }
+      expect(parseCambioPassword(form({ ...nueva, actual: "ClaveActual-1" }), voluntary)).toEqual({
+        ok: true,
+        data: { actual: "ClaveActual-1", password: "NuevaClave-1" },
+      });
+    });
+
+    it("is reported before the new-password rules in a voluntary change", () => {
+      expect(parseCambioPassword(form({ password: "corta", confirmacion: "otra" }), voluntary)).toEqual({
+        ok: false,
+        error: messages.actualRequerida,
+      });
+    });
+
+    it("is not required, and ignored if sent, in a forced change", () => {
+      expect(parseCambioPassword(form(nueva), forced)).toEqual({
+        ok: true,
+        data: { actual: null, password: "NuevaClave-1" },
+      });
+      expect(parseCambioPassword(form({ ...nueva, actual: "cualquiera" }), forced)).toEqual({
+        ok: true,
+        data: { actual: null, password: "NuevaClave-1" },
+      });
     });
   });
 });

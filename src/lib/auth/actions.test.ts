@@ -3,6 +3,7 @@ import { copy } from "@/lib/copy/es-AR";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  verifyCurrentPassword: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("./verify-password", () => ({ verifyCurrentPassword: mocks.verifyCurrentPassword }));
 
 const { cambiarPassword, login, logout } = await import("./actions");
 
@@ -43,6 +45,7 @@ function signedInClient(profile: Profile, profileError: unknown = null) {
 
 beforeEach(() => {
   mocks.createClient.mockReset();
+  mocks.verifyCurrentPassword.mockReset();
   mocks.redirect.mockClear();
 });
 
@@ -121,51 +124,108 @@ describe("login", () => {
 });
 
 describe("cambiarPassword", () => {
-  function passwordClient(updateError: unknown = null, confirmError: unknown = null) {
+  // A signed-in user whose profile says whether the change is forced.
+  function passwordClient({
+    debe,
+    updateError = null,
+    confirmError = null,
+  }: {
+    debe: boolean;
+    updateError?: unknown;
+    confirmError?: unknown;
+  }) {
+    const getUser = vi.fn().mockResolvedValue({ data: { user: { id: "user-1", email: "ana@mitsm.test" } }, error: null });
     const updateUser = vi.fn().mockResolvedValue({ data: {}, error: updateError });
     const rpc = vi.fn().mockResolvedValue({ data: null, error: confirmError });
-    mocks.createClient.mockResolvedValue({ auth: { updateUser }, rpc });
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { debe_cambiar_password: debe }, error: null });
+    const from = vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) }));
+    mocks.createClient.mockResolvedValue({ auth: { getUser, updateUser }, rpc, from });
     return { updateUser, rpc };
   }
 
-  const valid = { password: "NuevaClave-1", confirmacion: "NuevaClave-1" };
+  const nueva = { password: "NuevaClave-1", confirmacion: "NuevaClave-1" };
+  const generic = { ok: false, error: passwordErrors.guardarFallo };
 
-  it("validates before calling Supabase", async () => {
-    await expect(cambiarPassword(null, form({ password: "corta", confirmacion: "corta" }))).resolves.toEqual({
-      ok: false,
-      error: passwordErrors.demasiadoCorta,
+  describe("forced change", () => {
+    it("validates the two fields and does not ask for the current password", async () => {
+      const { updateUser } = passwordClient({ debe: true });
+      await expect(cambiarPassword(null, form({ password: "corta", confirmacion: "corta" }))).resolves.toEqual({
+        ok: false,
+        error: passwordErrors.demasiadoCorta,
+      });
+      await expect(
+        cambiarPassword(null, form({ password: "NuevaClave-1", confirmacion: "OtraClave-1" })),
+      ).resolves.toEqual({ ok: false, error: passwordErrors.noCoinciden });
+      expect(updateUser).not.toHaveBeenCalled();
+      expect(mocks.verifyCurrentPassword).not.toHaveBeenCalled();
     });
-    await expect(
-      cambiarPassword(null, form({ password: "NuevaClave-1", confirmacion: "OtraClave-1" })),
-    ).resolves.toEqual({ ok: false, error: passwordErrors.noCoinciden });
-    expect(mocks.createClient).not.toHaveBeenCalled();
-  });
 
-  it("updates the password, confirms the change and redirects to /mi-legajo", async () => {
-    const { updateUser, rpc } = passwordClient();
-    await expect(cambiarPassword(null, form(valid))).rejects.toThrow("NEXT_REDIRECT:/mi-legajo");
-    expect(updateUser).toHaveBeenCalledWith({ password: "NuevaClave-1" });
-    expect(rpc).toHaveBeenCalledWith("confirmar_cambio_password");
-  });
-
-  it("asks for a different password when it equals the current one", async () => {
-    const { rpc } = passwordClient({ code: "same_password" });
-    await expect(cambiarPassword(null, form(valid))).resolves.toEqual({
-      ok: false,
-      error: passwordErrors.igualActual,
+    it("updates the password, confirms the change and redirects to /mi-legajo", async () => {
+      const { updateUser, rpc } = passwordClient({ debe: true });
+      await expect(cambiarPassword(null, form(nueva))).rejects.toThrow("NEXT_REDIRECT:/mi-legajo");
+      expect(mocks.verifyCurrentPassword).not.toHaveBeenCalled();
+      expect(updateUser).toHaveBeenCalledWith({ password: "NuevaClave-1" });
+      expect(rpc).toHaveBeenCalledWith("confirmar_cambio_password");
     });
-    expect(rpc).not.toHaveBeenCalled();
-    expect(mocks.redirect).not.toHaveBeenCalled();
+
+    it("asks for a different password when it equals the current one", async () => {
+      const { rpc } = passwordClient({ debe: true, updateError: { code: "same_password" } });
+      await expect(cambiarPassword(null, form(nueva))).resolves.toEqual({
+        ok: false,
+        error: passwordErrors.igualActual,
+      });
+      expect(rpc).not.toHaveBeenCalled();
+      expect(mocks.redirect).not.toHaveBeenCalled();
+    });
   });
 
-  it("returns the generic error when the update or the confirmation fails, or anything throws", async () => {
-    const generic = { ok: false, error: passwordErrors.guardarFallo };
-    passwordClient({ code: "unexpected" });
-    await expect(cambiarPassword(null, form(valid))).resolves.toEqual(generic);
-    passwordClient(null, { code: "P0002" });
-    await expect(cambiarPassword(null, form(valid))).resolves.toEqual(generic);
+  describe("voluntary change", () => {
+    it("requires the current password before anything else", async () => {
+      const { updateUser } = passwordClient({ debe: false });
+      await expect(cambiarPassword(null, form(nueva))).resolves.toEqual({
+        ok: false,
+        error: passwordErrors.actualRequerida,
+      });
+      expect(mocks.verifyCurrentPassword).not.toHaveBeenCalled();
+      expect(updateUser).not.toHaveBeenCalled();
+    });
+
+    it("changes nothing when the current password is wrong", async () => {
+      const { updateUser, rpc } = passwordClient({ debe: false });
+      mocks.verifyCurrentPassword.mockResolvedValue(false);
+      await expect(cambiarPassword(null, form({ ...nueva, actual: "Equivocada-1" }))).resolves.toEqual({
+        ok: false,
+        error: passwordErrors.actualIncorrecta,
+      });
+      expect(mocks.verifyCurrentPassword).toHaveBeenCalledWith("ana@mitsm.test", "Equivocada-1");
+      expect(updateUser).not.toHaveBeenCalled();
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("updates the password after verifying the current one", async () => {
+      const { updateUser, rpc } = passwordClient({ debe: false });
+      mocks.verifyCurrentPassword.mockResolvedValue(true);
+      await expect(cambiarPassword(null, form({ ...nueva, actual: "ClaveActual-1" }))).rejects.toThrow(
+        "NEXT_REDIRECT:/mi-legajo",
+      );
+      expect(mocks.verifyCurrentPassword).toHaveBeenCalledWith("ana@mitsm.test", "ClaveActual-1");
+      expect(updateUser).toHaveBeenCalledWith({ password: "NuevaClave-1" });
+      expect(rpc).toHaveBeenCalledWith("confirmar_cambio_password");
+    });
+  });
+
+  it("returns the generic error when the session, profile, update or confirmation fails, or anything throws", async () => {
+    passwordClient({ debe: true, updateError: { code: "unexpected" } });
+    await expect(cambiarPassword(null, form(nueva))).resolves.toEqual(generic);
+    passwordClient({ debe: true, confirmError: { code: "P0002" } });
+    await expect(cambiarPassword(null, form(nueva))).resolves.toEqual(generic);
+
+    const noUser = vi.fn().mockResolvedValue({ data: { user: null }, error: { code: "x" } });
+    mocks.createClient.mockResolvedValue({ auth: { getUser: noUser } });
+    await expect(cambiarPassword(null, form(nueva))).resolves.toEqual(generic);
+
     mocks.createClient.mockRejectedValue(new Error("boom"));
-    await expect(cambiarPassword(null, form(valid))).resolves.toEqual(generic);
+    await expect(cambiarPassword(null, form(nueva))).resolves.toEqual(generic);
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });

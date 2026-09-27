@@ -5,6 +5,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { CAMBIAR_PASSWORD_PATH, HOME_PATH } from "@/lib/auth/gate";
 import { parseLoginInput } from "@/lib/auth/login-input";
 import { parseCambioPassword } from "@/lib/auth/password";
+import { verifyCurrentPassword } from "@/lib/auth/verify-password";
 import { copy } from "@/lib/copy/es-AR";
 import { createClient } from "@/lib/supabase/server";
 
@@ -87,21 +88,44 @@ export async function logout(): Promise<ActionResult> {
   redirect("/login");
 }
 
-// Forced password change (PRD US-9). The Auth server keeps this session and
-// ends the user's other sessions; confirmar_cambio_password clears the flag
-// and records the event.
+// Password change: forced (PRD US-9, temporary password) or voluntary.
+// A voluntary change also needs the current password, checked without
+// touching this session (verifyCurrentPassword). Whether the change is forced
+// comes from the profile, never from the form. The Auth server keeps this
+// session and ends the user's other sessions; confirmar_cambio_password clears
+// the flag and records the event.
 export async function cambiarPassword(
   _previous: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   const messages = copy.password.errors;
-  const parsed = parseCambioPassword(formData);
-  if (!parsed.ok) return parsed;
-  const password = parsed.data?.password ?? "";
+  const generic: ActionResult = { ok: false, error: messages.guardarFallo };
 
-  let result: ActionResult = { ok: false, error: messages.guardarFallo };
+  let result: ActionResult = generic;
   try {
     const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user?.email) return generic;
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("debe_cambiar_password")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profileError || !profile) return generic;
+    const requiereActual = !profile.debe_cambiar_password;
+
+    const parsed = parseCambioPassword(formData, { requiereActual });
+    if (!parsed.ok) return parsed;
+    const { actual, password } = parsed.data ?? { actual: null, password: "" };
+
+    if (requiereActual && !(await verifyCurrentPassword(user.email, actual ?? ""))) {
+      return { ok: false, error: messages.actualIncorrecta };
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
       result = {
@@ -115,11 +139,11 @@ export async function cambiarPassword(
       };
     } else {
       const { error: confirmError } = await supabase.rpc("confirmar_cambio_password");
-      result = confirmError ? { ok: false, error: messages.guardarFallo } : { ok: true };
+      result = confirmError ? generic : { ok: true };
     }
   } catch {
     // Nothing is logged: the error may carry the request body.
-    result = { ok: false, error: messages.guardarFallo };
+    result = generic;
   }
 
   if (!result.ok) return result;

@@ -21,7 +21,7 @@ export default async function CambiarPasswordPage() {
           <p className="text-ink-soft">
             {forced ? copy.password.intro : copy.password.introVoluntaria}
           </p>
-          <CambiarPasswordForm />
+          <CambiarPasswordForm pedirActual={!forced} />
         </Panel>
       </div>
     </>

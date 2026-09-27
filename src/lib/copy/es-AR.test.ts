@@ -82,6 +82,7 @@ describe("es-AR copy", () => {
       copy.password.title,
       copy.password.intro,
       copy.password.introVoluntaria,
+      copy.password.actualLabel,
       copy.password.nuevaLabel,
       copy.password.confirmacionLabel,
       copy.password.hint,

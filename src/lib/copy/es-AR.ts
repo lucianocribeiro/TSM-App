@@ -140,12 +140,15 @@ export type Copy = {
     title: string;
     intro: string;
     introVoluntaria: string;
+    actualLabel: string;
     nuevaLabel: string;
     confirmacionLabel: string;
     hint: string;
     submit: string;
     submitting: string;
     errors: {
+      actualRequerida: string;
+      actualIncorrecta: string;
       demasiadoCorta: string;
       demasiadoLarga: string;
       noCoinciden: string;
@@ -329,12 +332,15 @@ export const copy = {
     intro:
       "Estás usando una contraseña temporal. Elegí una nueva para seguir usando Mi TSM.",
     introVoluntaria: "Elegí una nueva contraseña para tu cuenta.",
+    actualLabel: "Contraseña actual",
     nuevaLabel: "Nueva contraseña",
     confirmacionLabel: "Repetí la nueva contraseña",
     hint: "Usá al menos 8 caracteres.",
     submit: "Guardar contraseña",
     submitting: "Guardando…",
     errors: {
+      actualRequerida: "Ingresá tu contraseña actual.",
+      actualIncorrecta: "La contraseña actual no es correcta. Revisala y volvé a intentar.",
       demasiadoCorta: "La contraseña tiene que tener al menos 8 caracteres.",
       demasiadoLarga: "La contraseña puede tener hasta 72 caracteres.",
       noCoinciden: "Las contraseñas no coinciden. Revisalas y volvé a intentar.",
