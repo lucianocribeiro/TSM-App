@@ -459,6 +459,10 @@ export type Database = {
           solicitudes: number
         }[]
       }
+      purgar_cuenta: {
+        Args: { p_email_confirmacion: string; p_profile_id: string }
+        Returns: Json
+      }
       reactivar_cuenta: { Args: { p_profile_id: string }; Returns: undefined }
       rechazar_documento: {
         Args: { p_documento_id: string; p_motivo: string }

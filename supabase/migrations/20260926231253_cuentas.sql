@@ -87,7 +87,15 @@ create policy cuenta_eventos_select_own_or_admin
 -- SECURITY DEFINER: they write columns and rows the API roles cannot.
 -- Error codes: 42501 not allowed; 22023 blank reason; P0002 account not found;
 -- 55000 business rule, with a stable HINT the application maps to its copy:
--- cuenta_propia, ultimo_admin, ya_inactiva, ya_activa.
+-- cuenta_propia, ultimo_admin, ya_inactiva, ya_activa, email_no_coincide,
+-- historial_otras_cuentas.
+--
+-- Last active Admin: desactivar_cuenta and purgar_cuenta lock every active
+-- Admin row (FOR UPDATE, in id order so two callers never deadlock) before
+-- deciding, so they run one at a time against the same Admin set. After the
+-- lock each re-checks the caller, whose own row may have been deactivated or
+-- removed by the transaction it waited for, and then counts active Admins with
+-- a fresh snapshot (plpgsql statements in READ COMMITTED each take a new one).
 
 -- Ends every session of a user: the refresh tokens go with their sessions,
 -- as in the Auth server's own logout. Access tokens already issued expire on
@@ -125,12 +133,18 @@ begin
       using errcode = '55000', hint = 'cuenta_propia';
   end if;
 
-  -- Locks every active Admin, so two deactivations cannot race past the
-  -- last-admin rule.
+  -- Locks every active Admin, so two deactivations (or a deactivation and a
+  -- purge) cannot race past the last-admin rule.
   perform 1
   from public.profiles as p
   where p.role = 'admin' and p.estado_cuenta = 'activa'
+  order by p.id
   for update;
+
+  -- The caller may have lost Admin rights while waiting for the lock.
+  if not public.is_admin() then
+    raise exception 'Only an admin can deactivate accounts' using errcode = '42501';
+  end if;
 
   select * into cuenta from public.profiles where id = p_profile_id for update;
   if not found then
@@ -262,6 +276,105 @@ begin
   values (p_profile_id, 'creacion', auth.uid());
 end;
 $$;
+
+-- Purge (test data), the database part. In one transaction: every guard,
+-- under the same Admin lock as desactivar_cuenta, then the profile row, whose
+-- delete cascades to the legajo, children, documents, requests, items and
+-- account events. Returns what it removed (counts). The Admin account module
+-- removes the storage objects and the Auth user afterwards; a profile that is
+-- already gone (a previous run stopped after this step) raises P0002, and the
+-- module then finishes those two steps.
+create function public.purgar_cuenta(p_profile_id uuid, p_email_confirmacion text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cuenta public.profiles%rowtype;
+  email_cuenta text;
+  target_legajo uuid;
+  admins_activos integer;
+  resumen jsonb;
+begin
+  if not public.is_admin() then
+    raise exception 'Only an admin can purge accounts' using errcode = '42501';
+  end if;
+  if p_profile_id = auth.uid() then
+    raise exception 'An account cannot be purged by itself'
+      using errcode = '55000', hint = 'cuenta_propia';
+  end if;
+
+  perform 1
+  from public.profiles as p
+  where p.role = 'admin' and p.estado_cuenta = 'activa'
+  order by p.id
+  for update;
+
+  -- The caller may have lost Admin rights, or been purged, while waiting.
+  if not public.is_admin() then
+    raise exception 'Only an admin can purge accounts' using errcode = '42501';
+  end if;
+
+  select * into cuenta from public.profiles where id = p_profile_id for update;
+  if not found then
+    raise exception 'Account not found' using errcode = 'P0002';
+  end if;
+
+  -- Exact match: no trimming, no case folding.
+  select u.email into email_cuenta from auth.users as u where u.id = p_profile_id;
+  if email_cuenta is null or email_cuenta is distinct from p_email_confirmacion then
+    raise exception 'The confirmation email does not match'
+      using errcode = '55000', hint = 'email_no_coincide';
+  end if;
+
+  if cuenta.role = 'admin' and cuenta.estado_cuenta = 'activa' then
+    select pg_catalog.count(*) into admins_activos
+    from public.profiles as p
+    where p.role = 'admin' and p.estado_cuenta = 'activa';
+    if admins_activos <= 1 then
+      raise exception 'The last active admin cannot be purged'
+        using errcode = '55000', hint = 'ultimo_admin';
+    end if;
+  end if;
+
+  select l.id into target_legajo from public.legajos as l where l.profile_id = p_profile_id;
+
+  -- Other accounts' history names this account: it must stay.
+  if exists (
+      select 1 from public.legajo_documentos as d
+      where (d.uploaded_by = p_profile_id or d.revisado_por = p_profile_id)
+        and d.legajo_id is distinct from target_legajo
+    )
+    or exists (
+      select 1 from public.solicitudes_cambio as s
+      where (s.revisado_por = p_profile_id or s.solicitado_por = p_profile_id)
+        and s.legajo_id is distinct from target_legajo
+    )
+    or exists (
+      select 1 from public.cuenta_eventos as e
+      where e.actor_id = p_profile_id and e.profile_id <> p_profile_id
+    )
+  then
+    raise exception 'The account is named in other accounts'' history'
+      using errcode = '55000', hint = 'historial_otras_cuentas';
+  end if;
+
+  resumen := pg_catalog.jsonb_build_object(
+    'documentos', (select pg_catalog.count(*) from public.legajo_documentos as d where d.legajo_id = target_legajo),
+    'hijos', (select pg_catalog.count(*) from public.legajo_hijos as h where h.legajo_id = target_legajo),
+    'solicitudes', (select pg_catalog.count(*) from public.solicitudes_cambio as s where s.legajo_id = target_legajo),
+    'eventos', (select pg_catalog.count(*) from public.cuenta_eventos as e where e.profile_id = p_profile_id)
+  );
+
+  delete from public.profiles where id = p_profile_id;
+
+  return resumen;
+end;
+$$;
+
+revoke execute on function public.purgar_cuenta(uuid, text) from public, anon;
+grant execute on function public.purgar_cuenta(uuid, text) to authenticated;
 
 revoke execute on function public.desactivar_cuenta(uuid, text) from public, anon;
 revoke execute on function public.reactivar_cuenta(uuid) from public, anon;

@@ -71,6 +71,10 @@ export function cuentaErrorMessage(error: DbError): string {
       return errors.yaInactiva;
     case "ya_activa":
       return errors.yaActiva;
+    case "email_no_coincide":
+      return errors.emailConfirmacionNoCoincide;
+    case "historial_otras_cuentas":
+      return errors.historialEnOtrasCuentas;
   }
   switch (error?.code) {
     case "42501":
@@ -256,16 +260,29 @@ export type PurgaResumen = {
   eventos: number;
 };
 
-// Permanently removes an account: its storage objects, then the auth user.
-// The database rows (profile, legajo, children, documents, requests, events)
-// follow by cascade. Refused for the caller's own account, the last active
-// Admin, and an account named in other accounts' history (uploads, reviews or
-// account events), which the history must keep.
+// Permanently removes an account, in three steps:
+// 1. public.purgar_cuenta, in one database transaction: every guard (active
+//    Admin caller, not the caller's own account, exact confirmation email,
+//    not the last active Admin, not named in other accounts' history) under
+//    the Admin row lock, then the profile row with its cascade (legajo,
+//    children, documents, requests, items, account events);
+// 2. the storage objects under the account's folder;
+// 3. the Auth user.
+// Nothing is removed before the database has checked every guard, so two
+// concurrent purges cannot both pass the last-Admin rule.
 //
-// Safe to retry after a partial failure: the objects are listed at the time
-// of the run, so files a previous run already removed are simply not there,
-// and the purge continues with what is left. The counts report what this run
-// removed.
+// Safe to retry after a partial failure: when step 1 already ran, the
+// profile is gone and purgar_cuenta answers P0002; the Auth user still exists,
+// its email is checked again, and steps 2 and 3 run. Objects are listed at the
+// time of the run, so files a previous run removed are simply not there. The
+// counts report what this run removed.
+const resumenSchema = z.object({
+  documentos: z.number(),
+  hijos: z.number(),
+  solicitudes: z.number(),
+  eventos: z.number(),
+});
+
 export async function purgarCuenta(input: {
   profileId: string;
   emailConfirmacion: string;
@@ -284,30 +301,20 @@ export async function purgarCuenta(input: {
     return failed(errors.emailConfirmacionNoCoincide);
   }
 
-  const profile = await service
-    .from("profiles")
-    .select("role, estado_cuenta, legajos (id)")
-    .eq("id", profileId)
-    .maybeSingle();
-  if (profile.error || !profile.data) return failed(errors.cuentaNoEncontrada);
-
-  if (profile.data.role === "admin" && profile.data.estado_cuenta === "activa") {
-    const activeAdmins = await service
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "admin")
-      .eq("estado_cuenta", "activa");
-    if (activeAdmins.error) return failed(errors.accionFallo);
-    if ((activeAdmins.count ?? 0) <= 1) return failed(errors.ultimoAdmin);
+  let resumen: Omit<PurgaResumen, "objetos">;
+  const purged = await admin.session.rpc("purgar_cuenta", {
+    p_profile_id: profileId,
+    p_email_confirmacion: input.emailConfirmacion,
+  });
+  if (purged.error) {
+    // P0002: a previous run already removed the profile; finish the rest.
+    if (purged.error.code !== "P0002") return failed(cuentaErrorMessage(purged.error));
+    resumen = { documentos: 0, hijos: 0, solicitudes: 0, eventos: 0 };
+  } else {
+    const parsed = resumenSchema.safeParse(purged.data);
+    if (!parsed.success) return failed(errors.accionFallo);
+    resumen = parsed.data;
   }
-
-  const legajoId = profile.data.legajos?.id ?? null;
-  const inOthersHistory = await countOthersHistory(service, profileId, legajoId);
-  if (inOthersHistory === null) return failed(errors.accionFallo);
-  if (inOthersHistory > 0) return failed(errors.historialEnOtrasCuentas);
-
-  const resumen = await countOwnRows(service, profileId, legajoId);
-  if (!resumen) return failed(errors.accionFallo);
 
   const paths = await listObjects(service, profileId);
   if (!paths) return failed(errors.accionFallo);
@@ -322,56 +329,6 @@ export async function purgarCuenta(input: {
   if (deleted.error) return failed(errors.accionFallo);
 
   return { ok: true, data: { ...resumen, objetos } };
-}
-
-// Rows of other accounts that name this profile. Null when a count fails.
-async function countOthersHistory(
-  service: ServiceClient,
-  profileId: string,
-  legajoId: string | null,
-): Promise<number | null> {
-  const otherLegajo = legajoId ?? "00000000-0000-0000-0000-000000000000";
-  const results = await Promise.all([
-    service
-      .from("legajo_documentos")
-      .select("id", { count: "exact", head: true })
-      .or(`uploaded_by.eq.${profileId},revisado_por.eq.${profileId}`)
-      .neq("legajo_id", otherLegajo),
-    service
-      .from("solicitudes_cambio")
-      .select("id", { count: "exact", head: true })
-      .eq("revisado_por", profileId)
-      .neq("legajo_id", otherLegajo),
-    service
-      .from("cuenta_eventos")
-      .select("id", { count: "exact", head: true })
-      .eq("actor_id", profileId)
-      .neq("profile_id", profileId),
-  ]);
-  if (results.some((result) => result.error)) return null;
-  return results.reduce((total, result) => total + (result.count ?? 0), 0);
-}
-
-async function countOwnRows(
-  service: ServiceClient,
-  profileId: string,
-  legajoId: string | null,
-): Promise<Omit<PurgaResumen, "objetos"> | null> {
-  const count = async (
-    query: PromiseLike<{ count: number | null; error: unknown }>,
-  ): Promise<number | null> => {
-    const { count: value, error } = await query;
-    return error ? null : (value ?? 0);
-  };
-  const byLegajo = legajoId ?? "00000000-0000-0000-0000-000000000000";
-  const [documentos, hijos, solicitudes, eventos] = await Promise.all([
-    count(service.from("legajo_documentos").select("id", { count: "exact", head: true }).eq("legajo_id", byLegajo)),
-    count(service.from("legajo_hijos").select("id", { count: "exact", head: true }).eq("legajo_id", byLegajo)),
-    count(service.from("solicitudes_cambio").select("id", { count: "exact", head: true }).eq("legajo_id", byLegajo)),
-    count(service.from("cuenta_eventos").select("id", { count: "exact", head: true }).eq("profile_id", profileId)),
-  ]);
-  if (documentos === null || hijos === null || solicitudes === null || eventos === null) return null;
-  return { documentos, hijos, solicitudes, eventos };
 }
 
 // Every object under <profileId>/ in the documents bucket, any depth.
