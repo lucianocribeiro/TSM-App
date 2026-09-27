@@ -2,11 +2,23 @@ import { randomUUID } from "node:crypto";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
 import { ADMIN, EMPLEADO_A, fillLogin, loginAs, loginError, SCREENSHOT_DIR } from "./helpers";
+import { assertNoSecretOnPage, maskSecretsOnPage, pageShows, registerSecret } from "./secrets";
 import { createE2EUser, deleteE2EUser, deleteE2EUserByEmail, localServiceClient } from "./service";
 
 // F1-07B: the Usuarios screen (PRD US-5, US-8, US-9). The steps run in order
 // on one throwaway account, so its history can be checked at the end. The
 // Admin acting is the seed Admin; other accounts are created and removed here.
+//
+// Generated temporary passwords never reach an artifact or a log (AUD07B-01):
+// - every generated value is registered (e2e/secrets.ts) as soon as it is read;
+// - screenshots that would show one are masked first, and every screenshot
+//   fails if a registered value is still on the page;
+// - assertions about them compare booleans, so no failure message prints one;
+// - traces and videos are off here: a trace records typed values and DOM
+//   snapshots;
+// - CI scans every uploaded file for the registered values
+//   (e2e/scan-artifacts.mjs) before uploading anything.
+test.use({ trace: "off", video: "off" });
 
 const t = copy.usuarios;
 const SUFFIX = randomUUID().slice(0, 8);
@@ -36,7 +48,9 @@ async function showAll(page: Page) {
 // Switches the theme in place, as the theme toggle does, so page state (an
 // open dialog, the password shown once) survives for the dark screenshot.
 // Transitions are turned off first so no element is captured mid-fade.
+// Refuses to capture while a generated password is visible.
 async function screenshotBoth(page: Page, name: string) {
+  await assertNoSecretOnPage(page);
   await page.addStyleTag({ content: "*, *::before, *::after, *::backdrop { transition: none !important; }" });
   const html = page.locator("html");
   await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
@@ -127,17 +141,23 @@ test.describe("Usuarios (Admin)", () => {
     await form.getByLabel(t.crear.emailLabel, { exact: true }).fill(email);
     await form.getByRole("button", { name: t.crear.generar }).click();
     const passwordField = form.getByLabel(t.crear.passwordLabel, { exact: true });
-    const password = await passwordField.inputValue();
+    const password = registerSecret(await passwordField.inputValue());
     expect(password.length).toBeGreaterThanOrEqual(8);
+    await maskSecretsOnPage(page);
     await screenshotBoth(page, "usuarios-crear");
+    // The form submits the generated value (React state), not the masked field.
     await form.getByRole("button", { name: t.crear.submit }).click();
 
     const shown = page.getByRole("dialog", { name: t.passwordUnaVez.title });
-    await expect(shown.getByTestId("password-una-vez")).toHaveText(password);
+    const display = shown.getByTestId("password-una-vez");
+    await expect(display).toBeVisible();
+    expect(await display.textContent() === password, "the dialog shows the generated password").toBe(true);
     await expect(shown.getByText(t.passwordUnaVez.note)).toBeVisible();
+    await maskSecretsOnPage(page);
     await screenshotBoth(page, "usuarios-password-una-vez");
     await shown.getByRole("button", { name: t.passwordUnaVez.listo }).click();
-    await expect(page.getByText(password)).toHaveCount(0);
+    await expect(shown).toHaveCount(0);
+    expect(await pageShows(page, password), "the password is gone after closing").toBe(false);
 
     await search(page, email);
     const row = rowFor(page, email);
@@ -151,7 +171,7 @@ test.describe("Usuarios (Admin)", () => {
     // Shown once: gone after a reload too (checked once the list has loaded).
     await page.reload();
     await expect(page.getByTestId("cuenta-row").first()).toBeVisible();
-    await expect(page.getByText(password)).toHaveCount(0);
+    expect(await pageShows(page, password), "the password is gone after a reload").toBe(false);
   });
 
   test("the Admin resets a temporary password; the user must change it at next login", async ({ page, browser }) => {
@@ -163,12 +183,15 @@ test.describe("Usuarios (Admin)", () => {
     const dialog = page.getByRole("dialog", { name: t.restablecer.title });
     await expect(dialog.getByText(target.email)).toBeVisible();
     await dialog.getByRole("button", { name: t.crear.generar }).click();
-    resetPassword = await dialog.getByLabel(t.crear.passwordLabel, { exact: true }).inputValue();
+    resetPassword = registerSecret(await dialog.getByLabel(t.crear.passwordLabel, { exact: true }).inputValue());
     await dialog.getByRole("button", { name: t.restablecer.confirm }).click();
 
     const shown = page.getByRole("dialog", { name: t.passwordUnaVez.title });
-    await expect(shown.getByTestId("password-una-vez")).toHaveText(resetPassword);
+    const display = shown.getByTestId("password-una-vez");
+    await expect(display).toBeVisible();
+    expect(await display.textContent() === resetPassword, "the dialog shows the new password").toBe(true);
     await shown.getByRole("button", { name: t.passwordUnaVez.listo }).click();
+    await expect(shown).toHaveCount(0);
     await expect(rowFor(page, target.email).getByText(t.passwordPendiente)).toBeVisible();
 
     const old = await loginElsewhere(browser, target.email, target.password);

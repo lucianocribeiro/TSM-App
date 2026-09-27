@@ -44,3 +44,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# e2e: generated passwords, for the artifact scan only (never uploaded)
+/.e2e-secrets/
