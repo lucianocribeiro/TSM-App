@@ -173,6 +173,34 @@ test.describe("inactive accounts", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
+  // AUD07A-02: the gate fails closed. The profile row is removed under a
+  // signed-in user who also has a pending password change: neither the change
+  // page nor any other page is reachable, and the session ends.
+  test("a signed-in user whose account cannot be verified is signed out", async ({ page }) => {
+    const user = await createE2EUser("sin-perfil");
+    try {
+      await loginAs(page, user);
+
+      const service = localServiceClient();
+      const flagged = await service.from("profiles").update({ debe_cambiar_password: true }).eq("id", user.id);
+      expect(flagged.error).toBeNull();
+      const removed = await service.from("profiles").delete().eq("id", user.id).select("id");
+      expect(removed.data).toHaveLength(1);
+
+      await page.goto("/cambiar-password");
+      await expect(page).toHaveURL(/\/login\?cuenta=no-verificada$/);
+      await expect(loginError(page)).toHaveText(copy.auth.errors.cuentaNoVerificada);
+
+      // The session is gone.
+      for (const path of ["/mi-legajo", "/cambiar-password"]) {
+        await page.goto(path);
+        await expect(page, path).toHaveURL(/\/login$/);
+      }
+    } finally {
+      await deleteE2EUser(user.id);
+    }
+  });
+
   test("a signed-in user who is deactivated is signed out on the next navigation", async ({ page }) => {
     const user = await createE2EUser("baja-en-sesion");
     try {

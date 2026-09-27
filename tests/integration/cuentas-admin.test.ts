@@ -399,6 +399,40 @@ describe("Admin account module", () => {
       });
     });
 
+    it("is safe to retry after the database step already ran", async () => {
+      const { user, legajoId, solicitudId, paths } = await cuentaCompleta("modulo-purga-tras-db");
+      // A previous run completed purgar_cuenta and stopped before the files
+      // and the Auth user.
+      const first = await admin.client.rpc("purgar_cuenta", { p_profile_id: user.id, p_email_confirmacion: user.email });
+      expect(first.error).toBeNull();
+      expect((await service.auth.admin.getUserById(user.id)).data.user?.id).toBe(user.id);
+
+      as(admin);
+      // The email is still checked against the Auth user.
+      expect(await cuentas.purgarCuenta({ profileId: user.id, emailConfirmacion: "otro@mitsm.test" })).toEqual({
+        ok: false,
+        error: errors.emailConfirmacionNoCoincide,
+      });
+      expect(await cuentas.purgarCuenta({ profileId: user.id, emailConfirmacion: user.email })).toEqual({
+        ok: true,
+        data: { objetos: 2, documentos: 0, hijos: 0, solicitudes: 0, eventos: 0 },
+      });
+      expect((await service.auth.admin.getUserById(user.id)).data.user).toBeNull();
+      expect(await remaining(service, user.id, legajoId, solicitudId)).toEqual({
+        profiles: 0,
+        legajos: 0,
+        hijos: 0,
+        documentos: 0,
+        solicitudes: 0,
+        items: 0,
+        eventos: 0,
+        objetos: 0,
+      });
+      for (const path of paths) {
+        expect((await service.storage.from(DOCUMENTOS_BUCKET).download(path)).data).toBeNull();
+      }
+    });
+
     it("continues from a partial file removal", async () => {
       const { user, paths } = await cuentaCompleta("modulo-purga-parcial");
       await service.storage.from(DOCUMENTOS_BUCKET).remove([paths[0]]);

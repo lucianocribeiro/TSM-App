@@ -176,6 +176,121 @@ describe("account functions, profile columns and cuenta_eventos", () => {
     });
   });
 
+  describe("purgar_cuenta", () => {
+    async function profileExists(id: string) {
+      const { count } = await service.from("profiles").select("id", { count: "exact", head: true }).eq("id", id);
+      return count === 1;
+    }
+
+    it("is Admin only and refuses the caller's own account", async () => {
+      const target = await newEmpleado("cuentas-purga-guardas");
+      const byEmpleado = await empleado.client.rpc("purgar_cuenta", { p_profile_id: target.id, p_email_confirmacion: target.email });
+      expect(byEmpleado.error?.code).toBe(PERMISSION_DENIED);
+      const self = await admin.client.rpc("purgar_cuenta", { p_profile_id: admin.id, p_email_confirmacion: admin.email });
+      expect(self.error?.hint).toBe("cuenta_propia");
+      expect(await profileExists(target.id)).toBe(true);
+      expect(await profileExists(admin.id)).toBe(true);
+    });
+
+    it("requires the exact confirmation email", async () => {
+      const target = await newEmpleado("cuentas-purga-email");
+      for (const email of [target.email.toUpperCase(), ` ${target.email}`, "otro@mitsm.test", ""]) {
+        const { error } = await admin.client.rpc("purgar_cuenta", { p_profile_id: target.id, p_email_confirmacion: email });
+        expect(error?.code, email).toBe(BUSINESS_RULE);
+        expect(error?.hint, email).toBe("email_no_coincide");
+      }
+      expect(await profileExists(target.id)).toBe(true);
+    });
+
+    it("refuses an account named in other accounts' history", async () => {
+      const actor = await newAdmin("cuentas-purga-actor");
+      const acted = await newEmpleado("cuentas-purga-afectado");
+      await actor.client.rpc("marcar_password_temporal", { p_profile_id: acted.id });
+      const { error } = await admin.client.rpc("purgar_cuenta", { p_profile_id: actor.id, p_email_confirmacion: actor.email });
+      expect(error?.hint).toBe("historial_otras_cuentas");
+      expect(await profileExists(actor.id)).toBe(true);
+    });
+
+    it("removes the profile with its rows in one step and reports the counts", async () => {
+      const target = await newEmpleado("cuentas-purga-ok");
+      await admin.client.rpc("registrar_creacion_cuenta", { p_profile_id: target.id });
+      const { data, error } = await admin.client.rpc("purgar_cuenta", { p_profile_id: target.id, p_email_confirmacion: target.email });
+      expect(error).toBeNull();
+      expect(data).toEqual({ documentos: 0, hijos: 0, solicitudes: 0, eventos: 1 });
+      expect(await profileExists(target.id)).toBe(false);
+      expect(await eventsOf(target.id)).toEqual([]);
+
+      const again = await admin.client.rpc("purgar_cuenta", { p_profile_id: target.id, p_email_confirmacion: target.email });
+      expect(again.error?.code).toBe(NOT_FOUND);
+    });
+  });
+
+  // AUD07A-01: the last-Admin rule under concurrency. Every other active
+  // Admin is set inactive for the test, so the two Admins in each round are
+  // the last two; they act on each other at the same time. Exactly one call
+  // succeeds and an active Admin always remains. Restored afterwards.
+  describe("last active Admin under concurrency", () => {
+    async function withOnlyTheseActive(ids: string[], run: () => Promise<void>) {
+      const { data } = await service.from("profiles").select("id").eq("role", "admin").eq("estado_cuenta", "activa");
+      const others = (data ?? []).map((row) => row.id).filter((id) => !ids.includes(id));
+      if (others.length > 0) {
+        const off = await service.from("profiles").update({ estado_cuenta: "inactiva" }).in("id", others);
+        if (off.error) throw new Error(`isolation failed: ${off.error.message}`);
+      }
+      try {
+        await run();
+      } finally {
+        if (others.length > 0) {
+          await service.from("profiles").update({ estado_cuenta: "activa" }).in("id", others);
+        }
+      }
+    }
+
+    async function activeAdmins(ids: string[]) {
+      const { data } = await service
+        .from("profiles")
+        .select("id")
+        .in("id", ids)
+        .eq("role", "admin")
+        .eq("estado_cuenta", "activa");
+      return (data ?? []).map((row) => row.id);
+    }
+
+    type Call = (actor: TestUser, target: TestUser) => PromiseLike<{ error: { code?: string; hint?: string | null } | null }>;
+    const purge: Call = (actor, target) =>
+      actor.client.rpc("purgar_cuenta", { p_profile_id: target.id, p_email_confirmacion: target.email });
+    const deactivate: Call = (actor, target) =>
+      actor.client.rpc("desactivar_cuenta", { p_profile_id: target.id, p_motivo: "Carrera (prueba)" });
+
+    const rounds: [string, Call, Call][] = [
+      ["two purges", purge, purge],
+      ["two deactivations", deactivate, deactivate],
+      ["a purge and a deactivation", purge, deactivate],
+    ];
+
+    it.each(rounds)("%s: exactly one succeeds and an active Admin remains", async (_label, first, second) => {
+      for (let round = 0; round < 5; round += 1) {
+        const adminA = await newAdmin(`cuentas-carrera-a-${round}`);
+        const adminB = await newAdmin(`cuentas-carrera-b-${round}`);
+        await withOnlyTheseActive([adminA.id, adminB.id], async () => {
+          const [ab, ba] = await Promise.all([first(adminA, adminB), second(adminB, adminA)]);
+          const outcomes = [ab.error, ba.error];
+          expect(outcomes.filter((error) => error === null), `round ${round}`).toHaveLength(1);
+          const refused = outcomes.find((error) => error !== null);
+          // Refused either because the caller lost Admin rights while waiting
+          // for the lock, or by the last-Admin rule.
+          expect(
+            refused?.code === PERMISSION_DENIED || refused?.hint === "ultimo_admin",
+            `round ${round}: ${JSON.stringify(refused)}`,
+          ).toBe(true);
+          expect(await activeAdmins([adminA.id, adminB.id]), `round ${round}`).toHaveLength(1);
+        });
+        // The two acted on each other: their events go first, so either can be deleted.
+        await service.from("cuenta_eventos").delete().in("profile_id", [adminA.id, adminB.id]);
+      }
+    });
+  });
+
   describe("reactivar_cuenta", () => {
     it("is Admin only, reactivates, logs the event, and fails for an active account", async () => {
       const target = await newEmpleado("cuentas-reactivar");
