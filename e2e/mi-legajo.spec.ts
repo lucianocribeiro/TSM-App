@@ -211,7 +211,8 @@ test("documents: upload, download and delete while pending; oversized and wrong 
   const popupPromise = page.waitForEvent("popup");
   await fila.getByRole("button", { name: t.documentos.descargarPendiente }).click();
   const popup = await popupPromise;
-  expect(popup.url()).toContain("/storage/v1/object/sign/legajo-docs/");
+  // The new tab opens blank (noopener) and then loads the signed link.
+  await popup.waitForURL(/\/storage\/v1\/object\/sign\/legajo-docs\//);
   const download = await page.request.get(popup.url());
   expect(download.status()).toBe(200);
   expect(await download.text()).toContain("FAKE TEST FILE - e2e");

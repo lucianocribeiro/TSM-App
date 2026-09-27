@@ -213,13 +213,15 @@ describe("/mi-legajo Server Actions", () => {
   });
 
   describe("documents", () => {
-    async function uploadAs(user: TestUser, tipo: "dni_frente" | "dni_dorso" | "licencia_conducir", body: Buffer, mimeType = "application/pdf", fileName = "doc.pdf") {
+    // Declares a PDF to prepararSubidaDocumento, then stores the body with
+    // storedType (normally the same; different to test the stored-object check).
+    async function uploadAs(user: TestUser, tipo: "dni_frente" | "dni_dorso" | "licencia_conducir", body: Buffer, storedType = "application/pdf") {
       as(user);
-      const prepared = await actions.prepararSubidaDocumento({ tipo, fileName, mimeType, sizeBytes: body.length });
+      const prepared = await actions.prepararSubidaDocumento({ tipo, fileName: "doc.pdf", mimeType: "application/pdf", sizeBytes: body.length });
       expect(prepared.ok).toBe(true);
       const path = prepared.ok ? prepared.data!.path : "";
       paths.push(path);
-      const uploaded = await user.client.storage.from(DOCUMENTOS_BUCKET).upload(path, body, { contentType: mimeType });
+      const uploaded = await user.client.storage.from(DOCUMENTOS_BUCKET).upload(path, body, { contentType: storedType });
       expect(uploaded.error).toBeNull();
       return path;
     }
