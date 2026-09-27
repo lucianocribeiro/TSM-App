@@ -1,5 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.4 (draft) | Governed by: `docs/constitucion.md`
+Version: 0.5 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7).
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -148,7 +149,7 @@ Source: TSM validated employee update form ("Formulario de actualización - Tecn
 Validation (required fields, DNI digits only, Partido otro, children rule) is enforced on the server, not only in the form.
 
 ### 5.7 Field validations
-- CUIL: 11 digits in `XX-XXXXXXXX-X` format, with the check digit validated.
+- CUIL: 11 digits in `XX-XXXXXXXX-X` format, prefix 20, 23, 24 or 27, with the check digit validated (modulo 11; a DNI whose check digit would be 10 takes prefix 23).
 - DNI: digits only.
 - Email personal: valid email format.
 - Teléfonos (celular and emergency): 8 to 20 characters, digits plus optional spaces, hyphens, parentheses and a leading `+`. No country-specific format enforced.

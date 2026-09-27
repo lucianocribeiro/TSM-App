@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { copy } from "@/lib/copy/es-AR";
+import { validarCuil } from "./cuil";
+import { esFechaFutura } from "./fechas";
 import {
   ESTADOS_CIVILES,
   ESTADOS_LABORALES,
@@ -42,6 +44,36 @@ const optionalText = () =>
 const requiredDate = () =>
   requiredText().refine(isValidIsoDate, { error: messages.dateInvalid });
 
+// Required ISO date that is not after today in Argentina (PRD 5.7).
+const requiredPastDate = () =>
+  requiredDate().refine((value) => !esFechaFutura(value), { error: messages.fechaFutura });
+
+// CUIL (PRD 5.7): XX-XXXXXXXX-X or 11 digits, prefix 20, 23, 24 or 27, and a
+// valid check digit. Stored in the canonical XX-XXXXXXXX-X form. Each reason
+// has its own message.
+const CUIL_MESSAGES = {
+  formato: messages.cuilInvalid,
+  prefijo: messages.cuilPrefijo,
+  digito: messages.cuilDigito,
+} as const;
+const cuil = () =>
+  requiredText().transform((value, ctx) => {
+    const result = validarCuil(value);
+    if (!result.ok) {
+      ctx.addIssue({ code: "custom", message: CUIL_MESSAGES[result.motivo] });
+      return z.NEVER;
+    }
+    return result.cuil;
+  });
+
+// Phones (PRD 5.7): 8 to 20 characters; digits plus optional spaces, hyphens
+// and parentheses, and a leading +. At least one digit. No country format.
+const TELEFONO = /^\+?[0-9 ()-]+$/;
+export function isValidTelefono(value: string): boolean {
+  return value.length >= 8 && value.length <= 20 && TELEFONO.test(value) && /\d/.test(value);
+}
+const telefono = () => requiredText().refine(isValidTelefono, { error: messages.telefonoInvalid });
+
 const option = <const T extends readonly [string, ...string[]]>(values: T) =>
   z.enum(values, {
     error: (issue) =>
@@ -58,8 +90,8 @@ export const datosPersonalesShape = {
   apellido: requiredText(),
   dni: requiredText().regex(/^\d+$/, { error: messages.dniDigits }),
   nacionalidad: requiredText(),
-  cuil: requiredText(),
-  fecha_nacimiento: requiredDate(),
+  cuil: cuil(),
+  fecha_nacimiento: requiredPastDate(),
 };
 
 // ---------------------------------------------------------------------------
@@ -71,7 +103,7 @@ export const domicilioContactoShape = {
   localidad: requiredText(),
   partido: option(PARTIDOS),
   partido_otro: optionalText(),
-  telefono_celular: requiredText(),
+  telefono_celular: telefono(),
   email_personal: requiredText().pipe(z.email({ error: messages.emailInvalid })),
 };
 
@@ -80,7 +112,7 @@ export const domicilioContactoShape = {
 // ---------------------------------------------------------------------------
 export const hijoSchema = z.object({
   nombre_completo: requiredText(),
-  fecha_nacimiento: requiredDate(),
+  fecha_nacimiento: requiredPastDate(),
 });
 
 export const datosFamiliaresShape = {
@@ -102,7 +134,7 @@ export const datosEmergenciaShape = {
   emergencia_nombre: requiredText(),
   emergencia_parentesco: requiredText(),
   emergencia_domicilio: requiredText(),
-  emergencia_telefono: requiredText(),
+  emergencia_telefono: telefono(),
 };
 
 type PartidoInput = { partido: string; partido_otro: string | null };
@@ -155,7 +187,7 @@ export const datosLaboralesSchema = z.object({
   numero_legajo: requiredText(),
   area: requiredText(),
   puesto: requiredText(),
-  fecha_ingreso: requiredDate(),
+  fecha_ingreso: requiredPastDate(),
   estado_laboral: option(ESTADOS_LABORALES),
   sede: requiredText(),
   modalidad: requiredText(),
@@ -170,3 +202,14 @@ export type LegajoPersonalInput = z.input<typeof legajoPersonalSchema>;
 export type LegajoPersonal = z.output<typeof legajoPersonalSchema>;
 export type DatosLaboralesInput = z.input<typeof datosLaboralesSchema>;
 export type DatosLaborales = z.output<typeof datosLaboralesSchema>;
+
+// Field errors for a form: the first message per field path, keyed as
+// "campo" or, inside the children list, "hijos.0.nombre_completo".
+export function fieldErrors(error: z.ZodError): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const key = issue.path.map(String).join(".") || "_";
+    if (!(key in errors)) errors[key] = issue.message;
+  }
+  return errors;
+}

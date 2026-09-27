@@ -34,7 +34,7 @@ const PERSONAL_UPDATE: LegajoUpdate = {
   apellido: "Ficticio",
   dni: "91000001",
   nacionalidad: "Argentina",
-  cuil: "20910000011",
+  cuil: "20-91000001-3",
   fecha_nacimiento: "1991-01-01",
   calle_altura: "Calle de Prueba 1",
   piso_depto: "PB",

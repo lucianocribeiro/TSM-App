@@ -48,3 +48,36 @@ export async function deleteE2EUserByEmail(email: string) {
   const user = data?.users.find((candidate) => candidate.email === email);
   if (user) await service.auth.admin.deleteUser(user.id);
 }
+
+// Fills a throwaway user's legajo (local stack only).
+export async function fillLegajo(profileId: string, values: Database["public"]["Tables"]["legajos"]["Update"]) {
+  const { error } = await localServiceClient().from("legajos").update(values).eq("profile_id", profileId);
+  if (error) throw new Error(`legajo setup failed: ${error.message}`);
+}
+
+// The seed Admin's session (local stack only), to decide requests the way an
+// Admin does: the decision functions check auth.uid(), not the service role.
+export async function seedAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  if (!LOCAL_HOSTS.has(new URL(url).hostname)) {
+    throw new Error("e2e service setup runs against the local Supabase stack only.");
+  }
+  const client = createClient<Database>(url, anon, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { error } = await client.auth.signInWithPassword({ email: "admin@mitsm.test", password: "TestPass123!" });
+  if (error) throw new Error(`seed admin sign-in failed: ${error.message}`);
+  return client;
+}
+
+// The id of the latest change request of a user's legajo.
+export async function ultimaSolicitud(profileId: string) {
+  const service = localServiceClient();
+  const { data } = await service
+    .from("solicitudes_cambio")
+    .select("id, estado, legajos!inner(profile_id)")
+    .eq("legajos.profile_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+  return data;
+}

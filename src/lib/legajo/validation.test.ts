@@ -5,6 +5,8 @@ import {
   datosFamiliaresSchema,
   datosLaboralesSchema,
   domicilioContactoSchema,
+  fieldErrors,
+  isValidTelefono,
   legajoPersonalSchema,
 } from "./validation";
 
@@ -16,7 +18,7 @@ function validPersonal() {
     apellido: "Ficticio",
     dni: "90000002",
     nacionalidad: "Argentina",
-    cuil: "27900000022",
+    cuil: "27-90000002-8",
     fecha_nacimiento: "1990-07-01",
     calle_altura: "Avenida Inventada 456",
     piso_depto: "3° B",
@@ -163,6 +165,74 @@ describe("legajoPersonalSchema (groups A to D)", () => {
     const messages = (result.error?.issues ?? []).filter((i) => i.path[0] === "hijos").map((i) => i.message);
     expect(messages).toContain(m.required);
     expect(messages).toContain(m.dateInvalid);
+  });
+});
+
+describe("PRD 5.7 rules added in F1-08", () => {
+  it("accepts a CUIL with a valid check digit, with or without hyphens, and stores XX-XXXXXXXX-X", () => {
+    for (const value of ["27-90000002-8", "27900000028", " 27-90000002-8 "]) {
+      const result = legajoPersonalSchema.safeParse({ ...validPersonal(), cuil: value });
+      expect(result.success, value).toBe(true);
+      expect(result.data?.cuil).toBe("27-90000002-8");
+    }
+  });
+
+  it("rejects a CUIL with its own message for format, prefix and check digit", () => {
+    const cases: [string, string][] = [
+      ["27-9000000-28", m.cuilInvalid],
+      ["2790000002", m.cuilInvalid],
+      ["CUIL", m.cuilInvalid],
+      ["30-90000002-6", m.cuilPrefijo],
+      ["27-90000002-9", m.cuilDigito],
+      ["27900000022", m.cuilDigito],
+    ];
+    for (const [value, message] of cases) {
+      const result = legajoPersonalSchema.safeParse({ ...validPersonal(), cuil: value });
+      expect(result.success, value).toBe(false);
+      expect(fieldErrors(result.error!).cuil, value).toBe(message);
+    }
+  });
+
+  it("accepts phones of 8 to 20 characters with digits, spaces, hyphens, parentheses and a leading +", () => {
+    for (const value of ["11 4444-5555", "+54 9 11 4444-5555", "(011) 4444-5555", "12345678", "+5491144445555"]) {
+      expect(isValidTelefono(value), value).toBe(true);
+    }
+  });
+
+  it("rejects phones that are too short, too long, or have other characters", () => {
+    for (const value of ["1234567", "123456789012345678901", "11-4444-555x", "11 4444+5555", "++5411444455", "(   ) - -  ", "tel 11444455"]) {
+      expect(isValidTelefono(value), value).toBe(false);
+    }
+    for (const campo of ["telefono_celular", "emergencia_telefono"] as const) {
+      const result = legajoPersonalSchema.safeParse({ ...validPersonal(), [campo]: "123" });
+      expect(fieldErrors(result.error!)[campo], campo).toBe(m.telefonoInvalid);
+    }
+  });
+
+  it("rejects future dates: birth, children's birth and ingreso", () => {
+    const future = `${new Date().getUTCFullYear() + 1}-01-01`;
+    const birth = legajoPersonalSchema.safeParse({ ...validPersonal(), fecha_nacimiento: future });
+    expect(fieldErrors(birth.error!).fecha_nacimiento).toBe(m.fechaFutura);
+
+    const child = legajoPersonalSchema.safeParse({
+      ...validPersonal(),
+      hijos: [{ nombre_completo: "Hijo", fecha_nacimiento: future }],
+    });
+    expect(fieldErrors(child.error!)["hijos.0.fecha_nacimiento"]).toBe(m.fechaFutura);
+
+    const ingreso = datosLaboralesSchema.safeParse({
+      numero_legajo: "1", area: "A", puesto: "P", fecha_ingreso: future, estado_laboral: "activo",
+      sede: "S", modalidad: "M", convenio: "C", bruto_mensual: 1,
+    });
+    expect(fieldErrors(ingreso.error!).fecha_ingreso).toBe(m.fechaFutura);
+  });
+
+  it("fieldErrors keeps the first message per field and uses dotted paths", () => {
+    const result = legajoPersonalSchema.safeParse({ ...validPersonal(), dni: "12a", hijos: [{ nombre_completo: "", fecha_nacimiento: "x" }] });
+    const errors = fieldErrors(result.error!);
+    expect(errors.dni).toBe(m.dniDigits);
+    expect(errors["hijos.0.nombre_completo"]).toBe(m.required);
+    expect(errors["hijos.0.fecha_nacimiento"]).toBe(m.dateInvalid);
   });
 });
 

@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
-import { ADMIN, EMPLEADO_A, fillLogin, loginAs, loginError, SCREENSHOT_DIR } from "./helpers";
-import { assertNoSecretOnPage, maskSecretsOnPage, pageShows, registerSecret } from "./secrets";
+import { ADMIN, EMPLEADO_A, fillLogin, loginAs, loginError } from "./helpers";
+import { screenshotBoth } from "./screens";
+import { maskSecretsOnPage, pageShows, registerSecret } from "./secrets";
 import { createE2EUser, deleteE2EUser, deleteE2EUserByEmail, localServiceClient } from "./service";
 
 // F1-07B: the Usuarios screen (PRD US-5, US-8, US-9). The steps run in order
@@ -43,23 +44,6 @@ async function search(page: Page, text: string) {
 
 async function showAll(page: Page) {
   await page.getByRole("group", { name: t.filtro.label }).getByRole("button", { name: t.filtro.todas }).click();
-}
-
-// Switches the theme in place, as the theme toggle does, so page state (an
-// open dialog, the password shown once) survives for the dark screenshot.
-// Transitions are turned off first so no element is captured mid-fade.
-// Refuses to capture while a generated password is visible.
-async function screenshotBoth(page: Page, name: string) {
-  await assertNoSecretOnPage(page);
-  await page.addStyleTag({ content: "*, *::before, *::after, *::backdrop { transition: none !important; }" });
-  const html = page.locator("html");
-  await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
-  await expect(html).toHaveAttribute("data-theme", "light");
-  await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}-light.png`, fullPage: true });
-  await page.evaluate(() => (document.documentElement.dataset.theme = "dark"));
-  await expect(html).toHaveAttribute("data-theme", "dark");
-  await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}-dark.png`, fullPage: true });
-  await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
 }
 
 // Signs in as another user in a separate browser context; returns where it lands.

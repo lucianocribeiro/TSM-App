@@ -72,7 +72,7 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 - **Status badge:** inline-flex, gap 7px, padding `3px 9px`, 1px `--line` border, radius `--radius-md`, 11.5px, with a 6px dot (`--accent` for active; `--ink-soft` for secondary states).
 - Numbers use `font-variant-numeric: tabular-nums`. Secondary text uses `--ink-soft`; helper text may be italic 12.5px.
 
-### Component specs (Table and Segmented filter are built; KPI strip and Label/value grid not yet)
+### Component specs (Table, Segmented filter and Label/value grid are built; KPI strip not yet)
 - **KPI strip:** grid `repeat(auto-fit, minmax(148px,1fr))`, one bordered `--surface` container, cells padding `18px 20px` separated by `--line-soft`; label 10.5px uppercase letter-spacing .18em `--ink-soft`; value heading font 36px tabular.
 - **Table:** bordered `--surface` container with horizontal scroll; header row 10.5px uppercase letter-spacing .16em `--ink-soft`, padding `11px 18px`, bottom border `--line`; rows padding `14px 18px`, bottom border `--line-soft`, 14px, hover `--accent-soft`, pointer when clickable; secondary columns `--ink-soft`.
 - **Label/value grid:** `repeat(auto-fit, minmax(150px,1fr))`, gap `18px 26px`; label as input label style; value 15px.
@@ -92,6 +92,8 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 | `Table`, `Th`, `Td`, `rowClassName` | Bordered surface table with horizontal scroll; header and body cells; row hover (pointer when clickable) | native table props; `rowClassName(clickable)` |
 | `SegmentedFilter` | Mutually exclusive filter buttons (`aria-pressed`) | `label`, `options`, `value`, `onChange` |
 | `Dialog` | Modal on the native `<dialog>` (focus trap, Escape, backdrop click close) | `open`, `onClose`, `title`, `children`, `footer?` |
-| `Select` | Label + native select, styled like `Field` | `label`, `options`, select props |
+| `Select` | Label + native select, styled like `Field` | `label`, `options`, `placeholder?`, `error?`, select props |
+| `LabelValueGrid` | Label/value grid (auto-fit, min 150px), with an optional note line per item | `items: { key, label, value, note? }[]` |
+| `Banner` | Page-level notice (role=status); `attention` uses accent border and tint | `tone?: "info" \| "attention"`, `actions?` |
 
 Helpers: `cx` joins class names; `buttonClassName(variant)` gives the `Button` look to a link.
