@@ -312,7 +312,7 @@ async function documentoPropio(documentoId: unknown, userId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("legajo_documentos")
-    .select("id, estado, storage_path, legajos!inner(profile_id)")
+    .select("id, estado, storage_path, file_name, legajos!inner(profile_id)")
     .eq("id", parsed.data)
     .eq("legajos.profile_id", userId)
     .maybeSingle();
@@ -341,5 +341,6 @@ export async function obtenerUrlDocumento(input: unknown): Promise<ActionResult<
   if (!user) return noAutorizado;
   const found = await documentoPropio((input as { documentoId?: unknown } | null)?.documentoId, user.id);
   if (!found) return { ok: false, error: copy.documentos.errors.downloadFailed };
-  return createDocumentoSignedUrl(found.documento.storage_path);
+  // Served as an attachment with the original file name.
+  return createDocumentoSignedUrl(found.documento.storage_path, { download: found.documento.file_name });
 }

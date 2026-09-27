@@ -86,7 +86,9 @@ function DocumentoRow({
         setError(result.ok ? copy.documentos.errors.downloadFailed : result.error);
         return;
       }
-      window.open(result.data.url, "_blank", "noopener");
+      // The link is an attachment: the browser downloads the file and the page
+      // stays. (A new window opened after this await would be blocked as a popup.)
+      window.location.assign(result.data.url);
     });
   }
 

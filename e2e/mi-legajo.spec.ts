@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
 import { formatCopy } from "../src/lib/copy/format";
@@ -208,15 +209,13 @@ test("documents: upload, download and delete while pending; oversized and wrong 
   await expect(page.getByRole("status").filter({ hasText: t.documentos.exito.subido })).toBeVisible();
   await screenshotBoth(page, "mi-legajo-documentos");
 
-  const popupPromise = page.waitForEvent("popup");
+  const downloadPromise = page.waitForEvent("download");
   await fila.getByRole("button", { name: t.documentos.descargarPendiente }).click();
-  const popup = await popupPromise;
-  // The new tab opens blank (noopener) and then loads the signed link.
-  await popup.waitForURL(/\/storage\/v1\/object\/sign\/legajo-docs\//);
-  const download = await page.request.get(popup.url());
-  expect(download.status()).toBe(200);
-  expect(await download.text()).toContain("FAKE TEST FILE - e2e");
-  await popup.close();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("dni.pdf");
+  expect(download.url()).toContain("/storage/v1/object/sign/legajo-docs/");
+  expect(readFileSync(await download.path(), "utf8")).toContain("FAKE TEST FILE - e2e");
+  await expect(page).toHaveURL(/\/mi-legajo$/);
 
   await fila.getByRole("button", { name: t.documentos.eliminar }).click();
   await page.getByRole("dialog", { name: t.documentos.eliminarTitle }).getByRole("button", { name: t.documentos.eliminar }).click();

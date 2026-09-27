@@ -11,8 +11,11 @@ import { DOCUMENTOS_BUCKET } from "./tipos";
 
 export const SIGNED_URL_TTL_SECONDS = 5 * 60;
 
+// With `download`, the link serves the file as an attachment with that name,
+// so opening it downloads the file instead of leaving the page.
 export async function createDocumentoSignedUrl(
   storagePath: string,
+  options: { download?: string } = {},
 ): Promise<ActionResult<{ url: string }>> {
   if (!parseDocumentoPath(storagePath)) {
     return { ok: false, error: copy.documentos.errors.downloadFailed };
@@ -21,7 +24,11 @@ export async function createDocumentoSignedUrl(
   const supabase = await createClient();
   const { data, error } = await supabase.storage
     .from(DOCUMENTOS_BUCKET)
-    .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
+    .createSignedUrl(
+      storagePath,
+      SIGNED_URL_TTL_SECONDS,
+      options.download ? { download: options.download } : undefined,
+    );
 
   if (error || !data?.signedUrl) {
     return { ok: false, error: copy.documentos.errors.downloadFailed };
