@@ -22,8 +22,8 @@ Both are variable fonts (`wght` axis): Lora 400–700 (normal and italic), Cormo
 
 | File | Bytes | SHA-256 |
 |---|---|---|
-| `lora/Lora.woff2` | 84,884 | `8a90e10f20e05c612cd125d2db9f9e5322f2ffdea059e4f1fd1ac9d7002e3117` |
-| `lora/Lora-Italic.woff2` | 91,520 | `7e902610277314557ff22a7be1c44166142585c28033c0c8fdd095c1a5657df4` |
+| `lora/Lora.woff2` | 85,096 | `7c514f026f03de1b0fc344c0c0f0df141fcf16b6f9ab672db191908ba740dab6` |
+| `lora/Lora-Italic.woff2` | 91,636 | `6cda7d220aebc862d9de3cdbd6e5068b64477aca6f284dbb1ca6e00114744faf` |
 | `cormorant-garamond/CormorantGaramond-latin-latinext.woff2` | 105,840 | `a1b9b3e84458a82d6ae61bfce53456c575d830dca7bc52589032a70ef38738ee` |
 
 ## Tools
@@ -32,14 +32,16 @@ Python 3.14.0, fontTools 4.66.0, brotli 1.2.0 (`pip install fonttools==4.66.0 br
 
 ## Commands used
 
-Lora: conversion to woff2 only, with no subsetting and no renaming. For each of `Lora[wght].ttf` and `Lora-Italic[wght].ttf`:
+Lora: conversion to woff2 only, with no subsetting and no renaming. The upstream timestamp is kept (`recalcTimestamp=False`). For each of `Lora[wght].ttf` and `Lora-Italic[wght].ttf`:
 
 ```python
 from fontTools.ttLib import TTFont
-t = TTFont("Lora[wght].ttf")          # or "Lora-Italic[wght].ttf"
+t = TTFont("Lora[wght].ttf", recalcTimestamp=False)   # or "Lora-Italic[wght].ttf"
 t.flavor = "woff2"
-t.save("lora/Lora.woff2")             # or "lora/Lora-Italic.woff2"
+t.save("lora/Lora.woff2")                             # or "lora/Lora-Italic.woff2"
 ```
+
+The output is byte-reproducible: running the command twice gives the SHA-256 values in the table above.
 
 Cormorant Garamond: subset to the latin and latin-ext ranges Google Fonts uses (taken from its CSS for this family), keeping every layout feature:
 
@@ -56,28 +58,29 @@ Result: 546 mapped characters, `wght` 300–700, 34 GSUB features kept (includin
 ## Licence position
 
 - **Cormorant Garamond** reserves no font name, so subsetting it is allowed under the OFL. The name is unchanged.
-- **Lora** reserves the name "Lora" (see `lora/OFL.txt`). A Modified Version may not use that name without permission. The intent is that Lora is only converted to woff2, which the OFL FAQ allows under the same name when the original font data is unchanged except for WOFF compression.
-- **Open item:** the verification below found one change beyond compression in the committed Lora files: the `head.modified` timestamp. Until that is resolved (re-conversion or renaming, pending a decision), the "only converted" claim does not strictly hold for the committed files.
+- **Lora** reserves the name "Lora" (see `lora/OFL.txt`). A Modified Version may not use that name without permission. Lora is only converted to woff2, which the OFL FAQ allows under the same name when the original font data is unchanged except for WOFF compression. The verification below shows exactly that: the decoded font is identical to upstream apart from the two `head` fields the WOFF2 format itself sets. **The Reserved Font Name claim holds.**
+- The earlier open item is closed. The first conversion (2026-09-27) had rewritten `head.modified` to the conversion time. The files were re-converted from the same upstream blobs with `recalcTimestamp=False`, and `head.modified` now equals upstream.
 
 ## Verification of the Lora files
 
-Method: decode each committed woff2 with fontTools and compare it with the upstream TTF: tables present, raw table bytes after decoding, glyph count and names, character map, `fvar` axes, and every `name` record.
+Method: decode each committed woff2 with fontTools and compare it with the upstream TTF: tables present, raw table bytes after decoding, every `head` field, glyph count and names, character map, `fvar` axes, and every `name` record.
 
 Result for both `Lora.woff2` and `Lora-Italic.woff2`:
 
 | Check | Result |
 |---|---|
-| Tables present | Same set; none dropped or added |
-| Raw table bytes | Identical for every table except `head` |
+| Tables present | Same 19 tables (`GDEF GPOS GSUB HVAR OS/2 STAT cmap fvar gasp glyf gvar head hhea hmtx loca maxp name post prep`); none dropped or added |
+| Raw table bytes after decoding | Identical for all 18 tables other than `head` |
+| `head.modified` | Identical to upstream (3785327317 upright, 3785327319 italic) |
+| `head.flags` | 3 → 2051: only bit 11 set. The WOFF2 format requires it for transformed/compressed data. |
+| `head.checkSumAdjustment` | Recomputed (2785491919 → 785211443 upright; 1091437551 → 1435097187 italic), because bit 11 changes the `head` bytes |
+| Every other `head` field | Identical |
 | Glyph count / names | 892 / 889, identical order and names |
 | Character map | Identical (778 characters) |
 | `fvar` axes | Identical (`wght` 400, 400, 700) |
-| `name` table | Identical, all records: family "Lora", "Version 3.008", copyright with Reserved Font Name "Lora" |
-| `head.flags` | 3 → 2051: bit 11 set. The WOFF2 format requires it when a font is transformed/compressed; fontTools sets it for every woff2 output. |
-| `head.checkSumAdjustment` | Recomputed, because the `head` bytes changed |
-| `head.modified` | Changed to the conversion time (3785327317 → 3873368739 in `Lora.woff2`; 3785327319 → 3873368739 in the italic). fontTools rewrites it by default (`recalcTimestamp=True`). **Not required by WOFF2: a change beyond compression.** |
+| `name` table | Identical, all records (29 upright, 33 italic): family "Lora", "Version 3.008", copyright with Reserved Font Name "Lora" |
 
-Consequence: re-running the Lora command yields a different `head.modified`, so those files are not byte-reproducible. A conversion with `TTFont(path, recalcTimestamp=False)` leaves only the two WOFF2-mandated `head` changes (`flags` bit 11 and `checkSumAdjustment`). This was checked but not applied, pending the decision above.
+Conclusion: the only differences are the two `head` fields the WOFF2 format sets. The font data is otherwise unchanged from upstream.
 
 Cormorant Garamond reproduces exactly: running the command above on the upstream file gives the committed file's SHA-256, and `head.modified` equals upstream.
 
@@ -85,5 +88,5 @@ Cormorant Garamond reproduces exactly: running the command above on the upstream
 
 1. Download the upstream files at the commits listed above, for example `https://raw.githubusercontent.com/google/fonts/<commit>/ofl/lora/Lora%5Bwght%5D.ttf`, and check `git hash-object <file>` against the blob column.
 2. In a throwaway virtualenv, install the tools above and run the commands.
-3. Cormorant Garamond: `shasum -a 256` must match the committed file.
-4. Lora: decode both files with fontTools and compare tables and `name` records as described above. Every table matches except the `head` fields listed (and `head.modified` will be the new conversion time).
+3. `shasum -a 256` must match the committed files, for Lora and Cormorant Garamond.
+4. Lora: decode both files with fontTools and compare them with upstream as described above. Every table matches except `head.flags` (bit 11) and `head.checkSumAdjustment`.
