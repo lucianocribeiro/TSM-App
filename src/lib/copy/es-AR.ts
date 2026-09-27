@@ -62,6 +62,7 @@ export type Copy = {
       placeholder: string;
     };
     columnas: {
+      cuenta: string;
       nombre: string;
       email: string;
       rol: string;
@@ -349,6 +350,7 @@ export const copy = {
       placeholder: "Email o nombre",
     },
     columnas: {
+      cuenta: "Cuenta",
       nombre: "Nombre",
       email: "Email",
       rol: "Rol",

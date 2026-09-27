@@ -99,11 +99,10 @@ export function UsuariosScreen({ cuentas, listaFallo, propiaId }: UsuariosScreen
           <Table>
             <thead>
               <tr>
-                <Th>{t.columnas.nombre}</Th>
-                <Th>{t.columnas.email}</Th>
+                <Th>{t.columnas.cuenta}</Th>
                 <Th>{t.columnas.rol}</Th>
                 <Th>{t.columnas.estado}</Th>
-                <Th>{t.columnas.acciones}</Th>
+                <Th className="min-w-[340px]">{t.columnas.acciones}</Th>
               </tr>
             </thead>
             <tbody>
@@ -117,17 +116,15 @@ export function UsuariosScreen({ cuentas, listaFallo, propiaId }: UsuariosScreen
                     className={rowClassName(true)}
                     onClick={() => router.push(detalle)}
                   >
-                    <Td>
-                      {cuenta.nombre ?? <span className="italic text-ink-soft">{t.sinNombre}</span>}
-                    </Td>
-                    <Td className="text-ink-soft">
+                    <Td className="min-w-[220px]">
+                      <div>{cuenta.nombre ?? <span className="italic text-ink-soft">{t.sinNombre}</span>}</div>
                       <Link
                         href={detalle}
                         // One prefetch per row would mean one server render per
                         // account; the detail loads on click instead.
                         prefetch={false}
                         aria-label={`${t.acciones.verHistorial}: ${cuenta.email}`}
-                        className="text-ink no-underline hover:text-accent-deep"
+                        className="break-all text-[13px] text-ink-soft no-underline hover:text-accent-deep"
                         onClick={(event) => event.stopPropagation()}
                       >
                         {cuenta.email}
@@ -141,9 +138,7 @@ export function UsuariosScreen({ cuentas, listaFallo, propiaId }: UsuariosScreen
                           tone={cuenta.estado === "activa" ? "active" : "secondary"}
                         />
                         {cuenta.debeCambiarPassword ? (
-                          <span className="whitespace-nowrap text-[12.5px] italic text-ink-soft">
-                            {t.passwordPendiente}
-                          </span>
+                          <span className="text-[12.5px] italic text-ink-soft">{t.passwordPendiente}</span>
                         ) : null}
                       </div>
                     </Td>
@@ -151,7 +146,7 @@ export function UsuariosScreen({ cuentas, listaFallo, propiaId }: UsuariosScreen
                       {propia ? (
                         <span className="whitespace-nowrap text-[12.5px] italic text-ink-soft">{t.tuCuenta}</span>
                       ) : (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 *:whitespace-nowrap">
                           {cuenta.estado === "activa" ? (
                             <>
                               <Button variant="secondary" onClick={() => setDialog({ kind: "restablecer", cuenta })}>

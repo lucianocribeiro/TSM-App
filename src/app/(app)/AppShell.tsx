@@ -56,7 +56,7 @@ export function AppShell({
       {menuOpen ? (
         <div
           aria-hidden="true"
-          className="fixed inset-0 z-30 bg-ink/40 nav:hidden"
+          className="fixed inset-0 z-30 bg-overlay nav:hidden"
           onClick={() => setMenuOpen(false)}
         />
       ) : null}

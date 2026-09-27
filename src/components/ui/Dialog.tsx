@@ -40,7 +40,7 @@ export function Dialog({ open, onClose, title, children, footer, className }: Di
         if (event.target === event.currentTarget) onClose();
       }}
       className={cx(
-        "m-auto w-[calc(100%-32px)] max-w-[480px] rounded-md border border-line bg-surface p-0 text-ink shadow-panel backdrop:bg-ink/40",
+        "m-auto w-[calc(100%-32px)] max-w-[480px] rounded-md border border-line bg-surface p-0 text-ink shadow-panel backdrop:bg-overlay",
         className,
       )}
     >

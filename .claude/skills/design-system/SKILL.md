@@ -40,6 +40,7 @@ Self-hosted in `src/app/fonts/` and loaded with `next/font/local` in the root la
   --rail: #fbfafa; --rail-ink: #00072e;
   --accent-deep: var(--accent-700); --accent-soft: rgba(252,100,50,.10);
   --shadow: 0 1px 2px rgba(45,43,43,.14);
+  --overlay: rgba(0,7,46,.40);
 }
 :root[data-theme="dark"] {
   --bg: #00072e; --surface: #040d38; --ink: #f3f2f2;
@@ -48,6 +49,7 @@ Self-hosted in `src/app/fonts/` and loaded with `next/font/local` in the root la
   --rail: #000418; --rail-ink: #f3f2f2;
   --accent-deep: var(--accent-300); --accent-soft: rgba(252,100,50,.16);
   --shadow: 0 1px 2px rgba(0,0,0,.5);
+  --overlay: rgba(0,2,14,.62);
 }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
 h1,h2,h3,h4 { font-family: var(--font-heading); }
@@ -57,7 +59,7 @@ a { color: var(--accent-deep); }
 ```
 In `globals.css` the element rules (`body`, headings, `a`, `:focus-visible`, `::selection`) sit inside `@layer base` so Tailwind utilities can override them.
 
-Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink`, `ink-soft`, `line`, `line-soft`, `rail`, `rail-ink`, `accent`, `accent-deep`, `accent-soft`, `accent-100` to `accent-900`; fonts `font-heading`, `font-body`; radii `rounded-sm`, `rounded-md`, `rounded-lg`; shadow `shadow-panel`. Breakpoint `nav` = 900px (sidebar collapses below it).
+Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink`, `ink-soft`, `line`, `line-soft`, `rail`, `rail-ink`, `accent`, `accent-deep`, `accent-soft`, `overlay` (behind modals and the mobile menu; darkens in both themes), `accent-100` to `accent-900`; fonts `font-heading`, `font-body`; radii `rounded-sm`, `rounded-md`, `rounded-lg`; shadow `shadow-panel`. Breakpoint `nav` = 900px (sidebar collapses below it).
 
 ## Style rules
 - **Layout:** fixed left sidebar 234px wide (`--rail` background, `--rail-ink` text, right border `--line`, vertical padding 26px, horizontal 22px). Main area: header with bottom border `--line`, padding `26px 34px 16px`; content padding `26px 34px 40px`. Below 900px the sidebar collapses behind a menu button in a top bar, with the same items and footer.

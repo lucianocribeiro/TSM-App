@@ -35,7 +35,9 @@ async function showAll(page: Page) {
 
 // Switches the theme in place, as the theme toggle does, so page state (an
 // open dialog, the password shown once) survives for the dark screenshot.
+// Transitions are turned off first so no element is captured mid-fade.
 async function screenshotBoth(page: Page, name: string) {
+  await page.addStyleTag({ content: "*, *::before, *::after, *::backdrop { transition: none !important; }" });
   const html = page.locator("html");
   await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
   await expect(html).toHaveAttribute("data-theme", "light");
