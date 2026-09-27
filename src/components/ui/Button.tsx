@@ -16,6 +16,11 @@ const variants: Record<ButtonVariant, string> = {
     "border-line text-ink enabled:hover:border-accent enabled:hover:text-accent-deep",
 };
 
+// The button look, for links that act as buttons (for example "Volver").
+export function buttonClassName(variant: ButtonVariant = "primary", className?: string): string {
+  return cx(base, variants[variant], "no-underline", className);
+}
+
 export function Button({
   variant = "primary",
   type = "button",
