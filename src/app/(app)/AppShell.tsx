@@ -9,12 +9,15 @@ import { Logo } from "@/components/ui/Logo";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { logout } from "@/lib/auth/actions";
+import { CAMBIAR_PASSWORD_PATH } from "@/lib/auth/gate";
 import { copy } from "@/lib/copy/es-AR";
 import { isActivePath, type NavItem } from "@/lib/nav/nav";
 import type { Theme } from "@/lib/theme/theme";
 
 type AppShellProps = {
   navItems: NavItem[];
+  // Hidden during the forced password change, like the navigation.
+  showCambiarPassword: boolean;
   userEmail: string;
   roleLabel: string;
   initialTheme: Theme;
@@ -25,6 +28,7 @@ const SIDEBAR_ID = "app-sidebar";
 
 export function AppShell({
   navItems,
+  showCambiarPassword,
   userEmail,
   roleLabel,
   initialTheme,
@@ -115,6 +119,15 @@ export function AppShell({
             toDarkLabel={copy.theme.toDark}
             toLightLabel={copy.theme.toLight}
           />
+          {showCambiarPassword ? (
+            <Link
+              href={CAMBIAR_PASSWORD_PATH}
+              onClick={() => setMenuOpen(false)}
+              className="text-[13px] text-accent-deep"
+            >
+              {copy.nav.cambiarPassword}
+            </Link>
+          ) : null}
           <form action={logoutAction}>
             <Button type="submit" variant="secondary" disabled={logoutPending}>
               {copy.auth.logout}

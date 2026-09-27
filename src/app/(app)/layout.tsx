@@ -43,6 +43,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <AppShell
       // No navigation until the temporary password is changed.
       navItems={cuenta.debeCambiarPassword ? [] : getNavItems(user.role)}
+      showCambiarPassword={!cuenta.debeCambiarPassword}
       userEmail={user.email}
       roleLabel={copy.auth.roles[user.role]}
       initialTheme={theme}
