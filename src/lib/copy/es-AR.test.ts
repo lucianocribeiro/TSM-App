@@ -128,6 +128,28 @@ describe("es-AR copy", () => {
     expect(copy.usuarios.passwordUnaVez.note).toMatch(/No la vamos a volver a mostrar/);
   });
 
+  it("defines the Mi Legajo texts, with the placeholders the page fills", () => {
+    function strings(value: unknown): string[] {
+      if (typeof value === "string") return [value];
+      return value && typeof value === "object" ? Object.values(value).flatMap(strings) : [];
+    }
+    for (const text of [
+      ...strings(copy.miLegajo),
+      copy.legajo.validation.cuilInvalid,
+      copy.legajo.validation.telefonoInvalid,
+      copy.legajo.validation.fechaFutura,
+      copy.aprobaciones.errors.valorInvalido,
+    ]) {
+      expect(text.trim()).not.toBe("");
+    }
+    expect(copy.miLegajo.pendiente.valor).toContain("{valor}");
+    expect(copy.miLegajo.rechazada.banner).toContain("{motivo}");
+    expect(copy.miLegajo.documentos.motivoRechazo).toContain("{motivo}");
+    expect(copy.miLegajo.documentos.archivoLabel).toContain("{documento}");
+    expect(copy.miLegajo.hijos.hijoN).toContain("{n}");
+    expect(Object.keys(copy.miLegajo.grupos)).toEqual(["A", "B", "C", "D", "E"]);
+  });
+
   it("uses the generic login error from the PRD", () => {
     expect(copy.auth.errors.invalidCredentials).toBe(
       "Email o contraseña incorrectos.",

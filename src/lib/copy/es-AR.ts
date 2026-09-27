@@ -42,6 +42,131 @@ export type Copy = {
   miLegajo: {
     kicker: string;
     title: string;
+    vacio: {
+      title: string;
+      body: string;
+    };
+    grupos: {
+      A: string;
+      B: string;
+      C: string;
+      D: string;
+      E: string;
+    };
+    laboralesNota: string;
+    camposLaborales: {
+      numero_legajo: string;
+      area: string;
+      puesto: string;
+      fecha_ingreso: string;
+      antiguedad: string;
+      estado_laboral: string;
+      sede: string;
+      modalidad: string;
+      convenio: string;
+      bruto_mensual: string;
+    };
+    estadosLaborales: {
+      activo: string;
+      en_prueba: string;
+    };
+    estadosCiviles: {
+      soltero: string;
+      casado: string;
+      divorciado: string;
+      viudo: string;
+      union_convivencial: string;
+    };
+    siNo: {
+      si: string;
+      no: string;
+    };
+    antiguedad: {
+      menosDeUnMes: string;
+      anio: string;
+      anios: string;
+      mes: string;
+      meses: string;
+      separador: string;
+    };
+    sinDato: string;
+    elegir: string;
+    cuilPlaceholder: string;
+    editar: string;
+    guardar: string;
+    guardando: string;
+    cancelar: string;
+    hijos: {
+      agregar: string;
+      quitar: string;
+      nombre: string;
+      fecha: string;
+      ninguno: string;
+      hijoN: string;
+    };
+    pendiente: {
+      banner: string;
+      valor: string;
+      cancelar: string;
+      confirmTitle: string;
+      confirmBody: string;
+      confirmar: string;
+      volver: string;
+    };
+    rechazada: {
+      banner: string;
+    };
+    admin: {
+      nota: string;
+    };
+    exito: {
+      enviada: string;
+      guardado: string;
+      cancelada: string;
+    };
+    errors: {
+      revisarCampos: string;
+      soloEmpleados: string;
+      soloAdmin: string;
+    };
+    documentos: {
+      title: string;
+      intro: string;
+      columnas: {
+        documento: string;
+        estado: string;
+        fecha: string;
+        acciones: string;
+      };
+      estados: {
+        aprobado: string;
+        pendiente: string;
+        rechazado: string;
+        faltante: string;
+      };
+      requerido: string;
+      opcional: string;
+      archivoLabel: string;
+      subir: string;
+      subirNuevo: string;
+      subiendo: string;
+      descargar: string;
+      descargarPendiente: string;
+      eliminar: string;
+      eliminarTitle: string;
+      eliminarBody: string;
+      motivoRechazo: string;
+      vigenteNota: string;
+      exito: {
+        subido: string;
+        subidoAdmin: string;
+        eliminado: string;
+      };
+      errors: {
+        subirFallo: string;
+        eliminarFallo: string;
+      };
+    };
   };
   legajos: {
     kicker: string;
@@ -161,6 +286,9 @@ export type Copy = {
       hijosNotAllowed: string;
       numberInvalid: string;
       brutoMensualNegative: string;
+      cuilInvalid: string;
+      telefonoInvalid: string;
+      fechaFutura: string;
     };
   };
   documentos: {
@@ -232,6 +360,7 @@ export type Copy = {
       motivoRequerido: string;
       noPendiente: string;
       guardarFallo: string;
+      valorInvalido: string;
     };
   };
   password: {
@@ -330,6 +459,132 @@ export const copy = {
   miLegajo: {
     kicker: "Tu información",
     title: "Mi Legajo",
+    vacio: {
+      title: "Completá tu legajo",
+      body: "Todavía no cargaste tus datos. Usá “Editar” en cada sección para completarlos.",
+    },
+    grupos: {
+      A: "Datos personales",
+      B: "Domicilio y contacto",
+      C: "Datos familiares",
+      D: "Datos de emergencia",
+      E: "Datos laborales",
+    },
+    laboralesNota: "Estos datos los administra Recursos Humanos.",
+    camposLaborales: {
+      numero_legajo: "Número de legajo",
+      area: "Área",
+      puesto: "Puesto",
+      fecha_ingreso: "Fecha de ingreso",
+      antiguedad: "Antigüedad",
+      estado_laboral: "Estado laboral",
+      sede: "Sede",
+      modalidad: "Modalidad",
+      convenio: "Convenio",
+      bruto_mensual: "Bruto mensual",
+    },
+    estadosLaborales: {
+      activo: "Activo",
+      en_prueba: "En prueba",
+    },
+    estadosCiviles: {
+      soltero: "Soltero",
+      casado: "Casado",
+      divorciado: "Divorciado",
+      viudo: "Viudo",
+      union_convivencial: "Unión Convivencial",
+    },
+    siNo: {
+      si: "Sí",
+      no: "No",
+    },
+    antiguedad: {
+      menosDeUnMes: "Menos de un mes",
+      anio: "{n} año",
+      anios: "{n} años",
+      mes: "{n} mes",
+      meses: "{n} meses",
+      separador: " y ",
+    },
+    sinDato: "Sin completar",
+    elegir: "Elegí una opción",
+    cuilPlaceholder: "XX-XXXXXXXX-X",
+    editar: "Editar",
+    guardar: "Guardar",
+    guardando: "Guardando…",
+    cancelar: "Cancelar",
+    hijos: {
+      agregar: "Agregar hijo",
+      quitar: "Quitar",
+      nombre: "Nombre completo",
+      fecha: "Fecha de nacimiento",
+      ninguno: "No hay hijos cargados.",
+      hijoN: "Hijo {n}",
+    },
+    pendiente: {
+      banner:
+        "Enviaste cambios que están pendientes de aprobación. Vas a poder editar de nuevo cuando Recursos Humanos los revise.",
+      valor: "Pendiente de aprobación: {valor}",
+      cancelar: "Cancelar solicitud",
+      confirmTitle: "Cancelar solicitud",
+      confirmBody: "Vamos a retirar los cambios que enviaste. Tus datos actuales no cambian.",
+      confirmar: "Cancelar solicitud",
+      volver: "Volver",
+    },
+    rechazada: {
+      banner: "Tu última solicitud fue rechazada. Motivo: «{motivo}». Podés corregir los datos y enviarlos de nuevo.",
+    },
+    admin: {
+      nota: "Como administrador, tus cambios se guardan directamente, sin pasar por aprobación.",
+    },
+    exito: {
+      enviada: "Enviamos tus cambios. Quedan pendientes hasta que Recursos Humanos los revise.",
+      guardado: "Guardamos los cambios.",
+      cancelada: "Cancelamos la solicitud.",
+    },
+    errors: {
+      revisarCampos: "Revisá los datos marcados.",
+      soloEmpleados: "Como administrador, guardá tus cambios directamente.",
+      soloAdmin: "No tenés permiso para guardar cambios directamente.",
+    },
+    documentos: {
+      title: "Documentos",
+      intro: "Subí archivos PDF, JPG o PNG de hasta 10 MB.",
+      columnas: {
+        documento: "Documento",
+        estado: "Estado",
+        fecha: "Fecha de carga",
+        acciones: "Acciones",
+      },
+      estados: {
+        aprobado: "Aprobado",
+        pendiente: "Pendiente de aprobación",
+        rechazado: "Rechazado",
+        faltante: "Sin cargar",
+      },
+      requerido: "Obligatorio",
+      opcional: "Opcional",
+      archivoLabel: "Archivo para {documento}",
+      subir: "Subir",
+      subirNuevo: "Subir otro",
+      subiendo: "Subiendo…",
+      descargar: "Descargar",
+      descargarPendiente: "Descargar el enviado",
+      eliminar: "Eliminar",
+      eliminarTitle: "Eliminar documento",
+      eliminarBody: "Vamos a eliminar el archivo que subiste y que todavía no fue revisado.",
+      motivoRechazo: "Motivo del rechazo: {motivo}",
+      vigenteNota: "El documento aprobado sigue vigente hasta que se apruebe el nuevo.",
+      exito: {
+        subido: "Subimos el documento. Queda pendiente de aprobación.",
+        subidoAdmin: "Subimos el documento.",
+        eliminado: "Eliminamos el documento.",
+      },
+      errors: {
+        subirFallo: "No pudimos subir el archivo. Intentá de nuevo.",
+        eliminarFallo: "No pudimos eliminar el documento. Intentá de nuevo.",
+      },
+    },
   },
   legajos: {
     kicker: "Administración",
@@ -454,6 +709,10 @@ export const copy = {
       hijosNotAllowed: "Si elegiste «No», no agregues hijos.",
       numberInvalid: "Ingresá un número válido.",
       brutoMensualNegative: "El bruto mensual no puede ser negativo.",
+      cuilInvalid: "Ingresá un CUIL válido, con el formato XX-XXXXXXXX-X.",
+      telefonoInvalid:
+        "Ingresá un teléfono de 8 a 20 caracteres: números y, si hace falta, espacios, guiones, paréntesis y un + al principio.",
+      fechaFutura: "La fecha no puede ser posterior a hoy.",
     },
   },
   documentos: {
@@ -528,6 +787,7 @@ export const copy = {
       motivoRequerido: "Indicá el motivo del rechazo.",
       noPendiente: "Esta solicitud ya fue revisada o cancelada.",
       guardarFallo: "No pudimos guardar los cambios. Intentá de nuevo.",
+      valorInvalido: "Alguno de los datos no es válido. Revisalo y volvé a intentar.",
     },
   },
   password: {

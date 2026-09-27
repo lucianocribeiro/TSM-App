@@ -80,14 +80,28 @@ export function buildSolicitudItems(
   propuesto: LegajoPersonal,
   actual: LegajoActual,
 ): CrearSolicitudItem[] {
+  return buildSolicitudItemsDe(
+    CAMPOS_SOLICITUD.map((config) => config.campo),
+    propuesto,
+    actual,
+  );
+}
+
+// The same for a partial edit (one group of the page): only the listed fields
+// are compared, and only those need a proposed value.
+export function buildSolicitudItemsDe(
+  campos: readonly CampoSolicitud[],
+  propuesto: Partial<LegajoPersonal>,
+  actual: LegajoActual,
+): CrearSolicitudItem[] {
   const items: CrearSolicitudItem[] = [];
 
-  for (const { campo } of CAMPOS_SOLICITUD) {
+  for (const campo of campos) {
     let valorPropuesto: string | null;
     let valorActual: string | null;
 
     if (campo === CAMPO_HIJOS) {
-      valorPropuesto = serializeHijos(propuesto.hijos);
+      valorPropuesto = serializeHijos(propuesto.hijos ?? []);
       valorActual = serializeHijos(actual.hijos);
     } else {
       valorPropuesto = serializeValor(propuesto[campo]);

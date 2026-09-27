@@ -3,6 +3,7 @@ import { copy } from "@/lib/copy/es-AR";
 import { legajoPersonalSchema, type LegajoPersonal } from "@/lib/legajo/validation";
 import {
   buildSolicitudItems,
+  buildSolicitudItemsDe,
   decisionErrorMessage,
   DOCUMENTO_PENDIENTE_INDEX,
   documentoErrorMessage,
@@ -19,7 +20,7 @@ const actual: LegajoActual = {
   apellido: "Ficticio",
   dni: "90000002",
   nacionalidad: "Argentina",
-  cuil: "27900000022",
+  cuil: "27-90000002-8",
   fecha_nacimiento: "1990-07-01",
   calle_altura: "Avenida Inventada 456",
   piso_depto: "3° B",
@@ -190,5 +191,34 @@ describe("error messages", () => {
     expect(decisionErrorMessage({ code: "55000" })).toBe(messages.noPendiente);
     expect(decisionErrorMessage({ code: "42501", message: "permission denied" })).toBe(messages.guardarFallo);
     expect(decisionErrorMessage(null)).toBe(messages.guardarFallo);
+  });
+});
+
+describe("buildSolicitudItemsDe (partial edit)", () => {
+  it("compares only the listed fields and needs values only for them", () => {
+    const items = buildSolicitudItemsDe(
+      ["telefono_celular", "email_personal", "partido", "partido_otro"],
+      { telefono_celular: "11 5555-0000", email_personal: actual.email_personal ?? "", partido: "Tigre", partido_otro: null },
+      actual,
+    );
+    expect(items).toEqual([
+      { campo: "telefono_celular", valor_propuesto: "11 5555-0000" },
+      { campo: "partido", valor_propuesto: "Tigre" },
+      { campo: "partido_otro", valor_propuesto: null },
+    ]);
+  });
+
+  it("sends the children set as one field", () => {
+    const items = buildSolicitudItemsDe(
+      ["tiene_hijos", "hijos"],
+      { tiene_hijos: true, hijos: [...actual.hijos, { nombre_completo: "Nueva", fecha_nacimiento: "2023-03-03" }] },
+      actual,
+    );
+    expect(items.map((item) => item.campo)).toEqual(["hijos"]);
+    expect(parseHijosValor(items[0].valor_propuesto)).toHaveLength(3);
+  });
+
+  it("returns nothing when the listed fields did not change", () => {
+    expect(buildSolicitudItemsDe(["nombres", "apellido"], { nombres: actual.nombres ?? "", apellido: actual.apellido ?? "" }, actual)).toEqual([]);
   });
 });
