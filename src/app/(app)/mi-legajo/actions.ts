@@ -16,6 +16,7 @@ import { getSessionUser, type SessionUser } from "@/lib/auth/session";
 import { copy } from "@/lib/copy/es-AR";
 import { buildDocumentoPath, parseDocumentoPath } from "@/lib/documentos/paths";
 import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
+import { barrerHuerfanos, eliminarObjeto } from "@/lib/documentos/limpieza";
 import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "@/lib/documentos/tipos";
 import { validateDocumentoUpload } from "@/lib/documentos/validation";
 import { camposDelGrupo, ESQUEMA_GRUPO, isGrupoEditable, type GrupoEditable } from "@/lib/legajo/grupos";
@@ -177,6 +178,17 @@ export async function actualizarLegajoPropio(input: unknown): Promise<ActionResu
 //    and records it; if anything fails, the object is removed.
 // This keeps files off the app server, whose request body limit is far below
 // the 10 MB the bucket allows.
+//
+// No object may stay without its row (AUD08-02): every failure after the
+// upload removes it and checks that the removal worked; the browser calls
+// descartarSubida when registration fails or never answers; and each new
+// upload first sweeps the caller's own folder for rowless objects older than
+// UMBRAL_HUERFANO_MINUTOS (src/lib/documentos/limpieza.ts).
+
+// Server-side note for a cleanup that failed. No paths, ids or credentials.
+function avisarFalloLimpieza(motivo: string) {
+  console.error(`[mi-legajo] legajo-docs cleanup failed: ${motivo}`);
+}
 
 const subidaInput = z.object({
   tipo: z.string(),
@@ -203,6 +215,11 @@ export async function prepararSubidaDocumento(input: unknown): Promise<ActionRes
     .eq("estado", "pendiente");
   if (pendientes.error) return { ok: false, error: t.documentos.errors.subirFallo };
   if ((pendientes.count ?? 0) > 0) return { ok: false, error: aprobacionErrors.documentoPendiente };
+
+  // Lazy sweep of abandoned uploads in the caller's own folder. A failure is
+  // noted and never blocks the new upload.
+  const barrido = await barrerHuerfanos(supabase, user.id);
+  if (!barrido.ok) avisarFalloLimpieza("sweep");
 
   const path = buildDocumentoPath({
     profileId: user.id,
@@ -231,15 +248,22 @@ export async function registrarDocumento(
 
   const supabase = await createClient();
   const bucket = supabase.storage.from(DOCUMENTOS_BUCKET);
+
+  // From here the object may exist: every failure removes it first. If the
+  // removal itself fails, the user gets a controlled error (and the sweep
+  // retries later).
+  const discard = async (error: string): Promise<ActionResult<never>> => {
+    if (await eliminarObjeto(supabase, path)) return { ok: false, error };
+    avisarFalloLimpieza("register");
+    return { ok: false, error: t.documentos.errors.limpiezaFallo };
+  };
+
   const objectName = path.split("/")[2];
   const listed = await bucket.list(`${user.id}/${tipo}`, { search: objectName });
+  if (listed.error) return discard(t.documentos.errors.subirFallo);
   const object = listed.data?.find((entry) => entry.name === objectName);
-  if (listed.error || !object) return { ok: false, error: t.documentos.errors.subirFallo };
-
-  const discard = async (error: string): Promise<ActionResult<never>> => {
-    await bucket.remove([path]);
-    return { ok: false, error };
-  };
+  // Not stored (or not visible): removing a missing path is harmless.
+  if (!object) return discard(t.documentos.errors.subirFallo);
 
   // What was actually stored, not what the browser declared.
   const metadata = (object.metadata ?? {}) as { size?: number; mimetype?: string };
@@ -283,7 +307,9 @@ export async function registrarDocumento(
         .select("estado")
         .single();
       if (replaced.error || !replaced.data) return discard(t.documentos.errors.subirFallo);
-      await bucket.remove([vigente.data.storage_path]);
+      // The replaced file has no row any more. If removing it fails, the
+      // upload still succeeded; the sweep removes it later.
+      if (!(await eliminarObjeto(supabase, vigente.data.storage_path))) avisarFalloLimpieza("replace");
       revalidatePath(MI_LEGAJO_PATH);
       return { ok: true, data: { estado: replaced.data.estado } };
     }
@@ -302,6 +328,29 @@ export async function registrarDocumento(
 
   revalidatePath(MI_LEGAJO_PATH);
   return { ok: true, data: { estado: inserted.data.estado } };
+}
+
+// Called by the browser when registration failed or never answered: removes
+// the uploaded object, only in the caller's own folder and only while no
+// document row points to it (a registered document is never removed here).
+export async function descartarSubida(input: unknown): Promise<ActionResult> {
+  const user = await usuarioActivo();
+  if (!user) return noAutorizado;
+  const parsed = z.object({ path: z.string() }).safeParse(input);
+  const ruta = parsed.success ? parseDocumentoPath(parsed.data.path) : null;
+  if (!parsed.success || !ruta || ruta.profileId !== user.id) return { ok: false, error: t.documentos.errors.subirFallo };
+
+  const supabase = await createClient();
+  const fila = await supabase
+    .from("legajo_documentos")
+    .select("id", { count: "exact", head: true })
+    .eq("storage_path", parsed.data.path);
+  if (fila.error) return { ok: false, error: t.documentos.errors.limpiezaFallo };
+  if ((fila.count ?? 0) > 0) return { ok: true };
+
+  if (await eliminarObjeto(supabase, parsed.data.path)) return { ok: true };
+  avisarFalloLimpieza("discard");
+  return { ok: false, error: t.documentos.errors.limpiezaFallo };
 }
 
 // A document of the caller's own legajo, found by id. An Admin's RLS reaches

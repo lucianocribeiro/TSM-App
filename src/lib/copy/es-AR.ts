@@ -165,6 +165,7 @@ export type Copy = {
       errors: {
         subirFallo: string;
         eliminarFallo: string;
+        limpiezaFallo: string;
       };
     };
   };
@@ -585,6 +586,8 @@ export const copy = {
       errors: {
         subirFallo: "No pudimos subir el archivo. Intentá de nuevo.",
         eliminarFallo: "No pudimos eliminar el documento. Intentá de nuevo.",
+        limpiezaFallo:
+          "No pudimos completar la subida. Volvé a intentar en unos minutos y, si sigue pasando, avisá a Recursos Humanos.",
       },
     },
   },

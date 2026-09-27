@@ -8,11 +8,18 @@ import { rowClassName, Table, Td, Th } from "@/components/ui/Table";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
 import type { DocumentoFila, ResumenDocumento } from "@/lib/documentos/resumen";
+import { subirDocumento } from "@/lib/documentos/subida";
 import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "@/lib/documentos/tipos";
 import { validateDocumentoUpload } from "@/lib/documentos/validation";
 import { formatearFechaHora } from "@/lib/format/fecha";
 import { createClient } from "@/lib/supabase/client";
-import { eliminarDocumentoPendiente, obtenerUrlDocumento, prepararSubidaDocumento, registrarDocumento } from "./actions";
+import {
+  descartarSubida,
+  eliminarDocumentoPendiente,
+  obtenerUrlDocumento,
+  prepararSubidaDocumento,
+  registrarDocumento,
+} from "./actions";
 
 const t = copy.miLegajo.documentos;
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
@@ -110,6 +117,7 @@ function DocumentoRow({
       return;
     }
     startUpload(async () => {
+      // subir never throws, so the transition always ends (no stuck spinner).
       const error = await subir(resumen.tipo, file);
       if (error) {
         setError(error);
@@ -185,23 +193,20 @@ function DocumentoRow({
 }
 
 // Upload: a path from the server, the file straight to Storage with the
-// user's session, then the server records it. Returns an es-AR error or null.
-async function subir(tipo: DocumentoTipo, file: File): Promise<string | null> {
-  const prepared = await prepararSubidaDocumento({
+// user's session, then the server records it; a failed registration discards
+// the object (src/lib/documentos/subida.ts). Returns an es-AR error or null.
+function subir(tipo: DocumentoTipo, file: File): Promise<string | null> {
+  return subirDocumento(
+    {
+      preparar: prepararSubidaDocumento,
+      subirArchivo: (path) =>
+        createClient().storage.from(DOCUMENTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: false }),
+      registrar: registrarDocumento,
+      descartar: descartarSubida,
+    },
     tipo,
-    fileName: file.name,
-    mimeType: file.type,
-    sizeBytes: file.size,
-  });
-  if (!prepared.ok || !prepared.data) return prepared.ok ? t.errors.subirFallo : prepared.error;
-
-  const { error } = await createClient()
-    .storage.from(DOCUMENTOS_BUCKET)
-    .upload(prepared.data.path, file, { contentType: file.type, upsert: false });
-  if (error) return t.errors.subirFallo;
-
-  const registered = await registrarDocumento({ tipo, path: prepared.data.path, fileName: file.name });
-  return registered.ok ? null : registered.error;
+    file,
+  );
 }
 
 function EliminarDialog({
