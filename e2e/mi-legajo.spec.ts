@@ -252,7 +252,7 @@ test("validation: invalid CUIL, phone, future date and DNI with letters are refu
   await a.getByLabel(campos.dni, { exact: true }).fill("94A00001");
   await a.getByLabel(campos.fecha_nacimiento, { exact: true }).fill(`${new Date().getFullYear() + 1}-01-01`);
   await guardar(page, "A");
-  await expect(a.getByText(v.cuilInvalid)).toBeVisible();
+  await expect(a.getByText(v.cuilDigito)).toBeVisible();
   await expect(a.getByText(v.dniDigits)).toBeVisible();
   await expect(a.getByText(v.fechaFutura)).toBeVisible();
   await expect(a.getByText(t.errors.revisarCampos)).toBeVisible();

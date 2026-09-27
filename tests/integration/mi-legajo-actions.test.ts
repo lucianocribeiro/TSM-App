@@ -136,7 +136,7 @@ describe("/mi-legajo Server Actions", () => {
       if (result.ok) return;
       expect(result.error).toBe(t.errors.revisarCampos);
       expect(result.fieldErrors).toMatchObject({
-        cuil: copy.legajo.validation.cuilInvalid,
+        cuil: copy.legajo.validation.cuilDigito,
         dni: copy.legajo.validation.dniDigits,
         fecha_nacimiento: copy.legajo.validation.fechaFutura,
       });

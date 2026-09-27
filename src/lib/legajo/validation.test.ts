@@ -177,11 +177,19 @@ describe("PRD 5.7 rules added in F1-08", () => {
     }
   });
 
-  it("rejects a CUIL with a wrong check digit or format", () => {
-    for (const value of ["27-90000002-9", "27900000022", "27-9000000-28", "2790000002", "CUIL"]) {
+  it("rejects a CUIL with its own message for format, prefix and check digit", () => {
+    const cases: [string, string][] = [
+      ["27-9000000-28", m.cuilInvalid],
+      ["2790000002", m.cuilInvalid],
+      ["CUIL", m.cuilInvalid],
+      ["30-90000002-6", m.cuilPrefijo],
+      ["27-90000002-9", m.cuilDigito],
+      ["27900000022", m.cuilDigito],
+    ];
+    for (const [value, message] of cases) {
       const result = legajoPersonalSchema.safeParse({ ...validPersonal(), cuil: value });
       expect(result.success, value).toBe(false);
-      expect(fieldErrors(result.error!).cuil, value).toBe(m.cuilInvalid);
+      expect(fieldErrors(result.error!).cuil, value).toBe(message);
     }
   });
 

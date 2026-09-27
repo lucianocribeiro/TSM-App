@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { copy } from "@/lib/copy/es-AR";
-import { normalizarCuil } from "./cuil";
+import { validarCuil } from "./cuil";
 import { esFechaFutura } from "./fechas";
 import {
   ESTADOS_CIVILES,
@@ -48,16 +48,22 @@ const requiredDate = () =>
 const requiredPastDate = () =>
   requiredDate().refine((value) => !esFechaFutura(value), { error: messages.fechaFutura });
 
-// CUIL (PRD 5.7): XX-XXXXXXXX-X or 11 digits, with a valid check digit.
-// Stored in the canonical XX-XXXXXXXX-X form.
+// CUIL (PRD 5.7): XX-XXXXXXXX-X or 11 digits, prefix 20, 23, 24 or 27, and a
+// valid check digit. Stored in the canonical XX-XXXXXXXX-X form. Each reason
+// has its own message.
+const CUIL_MESSAGES = {
+  formato: messages.cuilInvalid,
+  prefijo: messages.cuilPrefijo,
+  digito: messages.cuilDigito,
+} as const;
 const cuil = () =>
   requiredText().transform((value, ctx) => {
-    const normalized = normalizarCuil(value);
-    if (!normalized) {
-      ctx.addIssue({ code: "custom", message: messages.cuilInvalid });
+    const result = validarCuil(value);
+    if (!result.ok) {
+      ctx.addIssue({ code: "custom", message: CUIL_MESSAGES[result.motivo] });
       return z.NEVER;
     }
-    return normalized;
+    return result.cuil;
   });
 
 // Phones (PRD 5.7): 8 to 20 characters; digits plus optional spaces, hyphens

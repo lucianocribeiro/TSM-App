@@ -136,6 +136,8 @@ describe("es-AR copy", () => {
     for (const text of [
       ...strings(copy.miLegajo),
       copy.legajo.validation.cuilInvalid,
+      copy.legajo.validation.cuilPrefijo,
+      copy.legajo.validation.cuilDigito,
       copy.legajo.validation.telefonoInvalid,
       copy.legajo.validation.fechaFutura,
       copy.aprobaciones.errors.valorInvalido,

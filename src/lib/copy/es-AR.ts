@@ -287,6 +287,8 @@ export type Copy = {
       numberInvalid: string;
       brutoMensualNegative: string;
       cuilInvalid: string;
+      cuilPrefijo: string;
+      cuilDigito: string;
       telefonoInvalid: string;
       fechaFutura: string;
     };
@@ -710,6 +712,8 @@ export const copy = {
       numberInvalid: "Ingresá un número válido.",
       brutoMensualNegative: "El bruto mensual no puede ser negativo.",
       cuilInvalid: "Ingresá un CUIL válido, con el formato XX-XXXXXXXX-X.",
+      cuilPrefijo: "El CUIL tiene que empezar con 20, 23, 24 o 27.",
+      cuilDigito: "El dígito verificador del CUIL no es correcto. Revisalo y volvé a intentar.",
       telefonoInvalid:
         "Ingresá un teléfono de 8 a 20 caracteres: números y, si hace falta, espacios, guiones, paréntesis y un + al principio.",
       fechaFutura: "La fecha no puede ser posterior a hoy.",
