@@ -218,6 +218,11 @@ function isBanned(bannedUntil: string | undefined): boolean {
   return Boolean(bannedUntil) && new Date(bannedUntil ?? 0).getTime() > Date.now();
 }
 
+// Safe to retry, mirroring desactivarCuenta: when a previous run reactivated
+// the account but lifting the ban failed, reactivar_cuenta refuses the
+// already-active account (and records nothing); the ban is then lifted and
+// the retry succeeds. An account that is active and not banned still gets
+// "ya activa".
 export async function reactivarCuenta(input: { profileId: string }): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!admin) return failed(errors.noAutorizado);
@@ -225,9 +230,15 @@ export async function reactivarCuenta(input: { profileId: string }): Promise<Act
   if (!uuidSchema.safeParse(input.profileId).success) return failed(errors.cuentaNoEncontrada);
 
   const reactivated = await admin.session.rpc("reactivar_cuenta", { p_profile_id: input.profileId });
-  if (reactivated.error) return failed(cuentaErrorMessage(reactivated.error));
-
   const service = createAdminClient();
+
+  if (reactivated.error) {
+    if (reactivated.error.hint !== "ya_activa") return failed(cuentaErrorMessage(reactivated.error));
+    const target = await service.auth.admin.getUserById(input.profileId);
+    if (target.error || !target.data.user) return failed(errors.accionFallo);
+    if (!isBanned(target.data.user.banned_until)) return failed(errors.yaActiva);
+  }
+
   const unbanned = await service.auth.admin.updateUserById(input.profileId, { ban_duration: LIFT_BAN });
   if (unbanned.error) return failed(errors.accionFallo);
 
