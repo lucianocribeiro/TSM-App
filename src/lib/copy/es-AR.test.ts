@@ -78,6 +78,7 @@ describe("es-AR copy", () => {
   it("defines the password, account and inactive-account texts", () => {
     const keys = [
       copy.auth.errors.cuentaInactiva,
+      copy.auth.errors.cuentaNoVerificada,
       copy.password.kicker,
       copy.password.title,
       copy.password.intro,

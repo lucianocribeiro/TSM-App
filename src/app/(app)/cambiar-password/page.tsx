@@ -11,7 +11,7 @@ import { CambiarPasswordForm } from "./CambiarPasswordForm";
 // password here (an Admin cannot set a temporary password on themselves).
 export default async function CambiarPasswordPage() {
   const user = await getSessionUser();
-  const forced = user?.debeCambiarPassword ?? false;
+  const forced = user?.cuenta?.debeCambiarPassword ?? false;
 
   return (
     <>

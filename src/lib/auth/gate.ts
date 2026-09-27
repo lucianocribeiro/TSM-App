@@ -1,7 +1,10 @@
 import type { Database } from "@/lib/supabase/database.types";
 
 // Account gate (Constitution §10, PRD US-8 and US-9), decided on every request
-// for a signed-in user whose profile could be read:
+// for a signed-in user:
+// - an account that cannot be verified (the profile read failed or found no
+//   row) is signed out and sent to the login page with its own message: the
+//   gate fails closed and never assumes an active account;
 // - an inactive account is signed out and sent to the login page, which then
 //   shows the inactive-account message;
 // - a user who must change their password reaches only /cambiar-password.
@@ -15,19 +18,36 @@ type CuentaEstado = Database["public"]["Enums"]["cuenta_estado"];
 export const CAMBIAR_PASSWORD_PATH = "/cambiar-password";
 export const HOME_PATH = "/mi-legajo";
 export const LOGIN_PATH = "/login";
-// Query parameter the login page reads to show the inactive-account message.
-export const CUENTA_INACTIVA_PARAM = "cuenta";
-export const CUENTA_INACTIVA_VALUE = "inactiva";
-export const LOGIN_CUENTA_INACTIVA = `${LOGIN_PATH}?${CUENTA_INACTIVA_PARAM}=${CUENTA_INACTIVA_VALUE}`;
+// Signs the user out and sends them to the login page with the reason. Used by
+// the app layout, which cannot clear cookies itself.
+export const SALIR_PATH = "/auth/salir";
+
+// Query parameter the login page reads to show why the session ended.
+export const CUENTA_PARAM = "cuenta";
+export const CUENTA_INACTIVA = "inactiva";
+export const CUENTA_NO_VERIFICADA = "no-verificada";
+export type MotivoSalida = typeof CUENTA_INACTIVA | typeof CUENTA_NO_VERIFICADA;
+
+export function loginConMotivo(motivo: MotivoSalida): string {
+  return `${LOGIN_PATH}?${CUENTA_PARAM}=${motivo}`;
+}
+export const LOGIN_CUENTA_INACTIVA = loginConMotivo(CUENTA_INACTIVA);
+export const LOGIN_CUENTA_NO_VERIFICADA = loginConMotivo(CUENTA_NO_VERIFICADA);
+
 // Request header with the pathname, set by the proxy for the app layout.
 export const PATHNAME_HEADER = "x-tsm-pathname";
+
+// The account state read from the own profile; null when it could not be read.
+export type CuentaActual = {
+  estadoCuenta: CuentaEstado;
+  debeCambiarPassword: boolean;
+} | null;
 
 export type GateInput = {
   pathname: string;
   searchParams: URLSearchParams;
   method: string;
-  estadoCuenta: CuentaEstado;
-  debeCambiarPassword: boolean;
+  cuenta: CuentaActual;
 };
 
 export type GateDecision =
@@ -42,17 +62,27 @@ function isNavigation(method: string): boolean {
   return method === "GET" || method === "HEAD";
 }
 
+function signOutTo(input: GateInput, motivo: MotivoSalida): GateDecision {
+  const alreadyThere =
+    input.pathname === LOGIN_PATH && input.searchParams.get(CUENTA_PARAM) === motivo;
+  return { action: "signOut", to: alreadyThere ? null : loginConMotivo(motivo) };
+}
+
+// Why a session must end, or null when the account may continue.
+export function motivoSalida(cuenta: CuentaActual): MotivoSalida | null {
+  if (cuenta === null) return CUENTA_NO_VERIFICADA;
+  if (cuenta.estadoCuenta !== "activa") return CUENTA_INACTIVA;
+  return null;
+}
+
 export function decideAccountGate(input: GateInput): GateDecision {
-  if (input.estadoCuenta === "inactiva") {
-    const onInactiveLogin =
-      input.pathname === LOGIN_PATH &&
-      input.searchParams.get(CUENTA_INACTIVA_PARAM) === CUENTA_INACTIVA_VALUE;
-    return { action: "signOut", to: onInactiveLogin ? null : LOGIN_CUENTA_INACTIVA };
-  }
+  const cuenta = input.cuenta;
+  if (cuenta === null) return signOutTo(input, CUENTA_NO_VERIFICADA);
+  if (cuenta.estadoCuenta !== "activa") return signOutTo(input, CUENTA_INACTIVA);
 
   if (!isNavigation(input.method)) return { action: "continue" };
 
-  if (input.debeCambiarPassword && input.pathname !== CAMBIAR_PASSWORD_PATH) {
+  if (cuenta.debeCambiarPassword && input.pathname !== CAMBIAR_PASSWORD_PATH) {
     return { action: "redirect", to: CAMBIAR_PASSWORD_PATH };
   }
   return { action: "continue" };

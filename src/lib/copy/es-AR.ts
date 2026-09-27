@@ -20,6 +20,7 @@ export type Copy = {
       invalidCredentials: string;
       logoutFailed: string;
       cuentaInactiva: string;
+      cuentaNoVerificada: string;
     };
     logout: string;
     roles: {
@@ -208,6 +209,8 @@ export const copy = {
       invalidCredentials: "Email o contraseña incorrectos.",
       logoutFailed: "No pudimos cerrar la sesión. Intentá de nuevo.",
       cuentaInactiva: "Tu cuenta está inactiva. Contactá a Recursos Humanos.",
+      cuentaNoVerificada:
+        "No pudimos verificar tu cuenta. Ingresá de nuevo y, si el problema sigue, contactá a Recursos Humanos.",
     },
     logout: "Cerrar sesión",
     roles: {

@@ -49,21 +49,25 @@ export async function updateSession(request: NextRequest) {
   const userId = data?.claims?.sub;
   if (!userId) return response;
 
-  // Own row through RLS. On a read error the gate is skipped rather than
-  // signing the user out: the app layout and RLS still apply.
+  // Own row through RLS. A failed read or a missing row is passed on as
+  // null: the gate fails closed and ends the session.
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("estado_cuenta, debe_cambiar_password")
     .eq("id", userId)
     .maybeSingle();
-  if (error || !profile) return response;
 
   const decision = decideAccountGate({
     pathname: request.nextUrl.pathname,
     searchParams: request.nextUrl.searchParams,
     method: request.method,
-    estadoCuenta: profile.estado_cuenta,
-    debeCambiarPassword: profile.debe_cambiar_password,
+    cuenta:
+      !error && profile
+        ? {
+            estadoCuenta: profile.estado_cuenta,
+            debeCambiarPassword: profile.debe_cambiar_password,
+          }
+        : null,
   });
 
   switch (decision.action) {
