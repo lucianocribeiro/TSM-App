@@ -14,3 +14,17 @@ export function formatearFechaHora(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? "" : FECHA_HORA.format(date);
 }
+
+// A calendar date (YYYY-MM-DD, no time) as dd/mm/yyyy. No time zone is
+// involved: the date is shown as stored. Empty for anything else.
+export function formatearFecha(isoDate: string | null | undefined): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate ?? "");
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
+
+const PESOS = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
+
+// Money in pesos, es-AR: $ 1.234.567,89.
+export function formatearPesos(value: number | null | undefined): string {
+  return value === null || value === undefined || Number.isNaN(value) ? "" : PESOS.format(value);
+}
