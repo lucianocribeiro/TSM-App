@@ -18,7 +18,8 @@ The approved Claude Design prototype "Gestión de Empleados" defines style and s
 ## Fonts
 Self-hosted in `src/app/fonts/` and loaded with `next/font/local` in the root layout. Never `next/font/google`: the build must not fetch fonts. Both are variable fonts under the SIL Open Font License 1.1, with `OFL.txt` beside each family.
 - Headings: Cormorant Garamond 400, 600 → `--font-heading` (fallback `system-ui, sans-serif`). Subset to latin and latin-ext.
-- Body: Lora 400, 500, 600, italic 400 → `--font-body` (fallback `system-ui, sans-serif`). Not subset: the licence reserves the name "Lora" for unmodified versions, so the files are only converted to woff2.
+- Body: Lora 400, 500, 600, italic 400 → `--font-body` (fallback `system-ui, sans-serif`). Not subset: the licence reserves the name "Lora", so the files are converted to woff2 without subsetting.
+- The fallback stack is configured in the loader; the self-hosted files are what render (checked in the e2e screenshots). Provenance, exact commands and the Lora verification, including its open item: `src/app/fonts/README.md`.
 
 ## Tokens (`src/app/globals.css`)
 ```css

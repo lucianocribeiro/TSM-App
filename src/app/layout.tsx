@@ -7,7 +7,8 @@ import { parseTheme, THEME_COOKIE } from "@/lib/theme/theme";
 import "./globals.css";
 
 // Fonts are self-hosted (src/app/fonts, SIL Open Font License 1.1, OFL.txt
-// beside each family): the build never fetches from Google Fonts.
+// beside each family): the build never fetches from Google Fonts. Provenance
+// and verification: src/app/fonts/README.md.
 // Both families are variable fonts: one file covers the weight range.
 
 // Cormorant Garamond, subset to latin and latin-ext. Weights 400 and 600.
@@ -25,7 +26,7 @@ const headingFont = localFont({
 });
 
 // Lora, converted to woff2 without subsetting: its licence reserves the name
-// "Lora" for unmodified versions. Weights 400 to 600, and italic 400.
+// "Lora". Weights 400 to 600, and italic 400.
 const bodyFont = localFont({
   src: [
     { path: "./fonts/lora/Lora.woff2", weight: "400 600", style: "normal" },
