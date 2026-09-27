@@ -123,6 +123,9 @@ export function UsuariosScreen({ cuentas, listaFallo, propiaId }: UsuariosScreen
                     <Td className="text-ink-soft">
                       <Link
                         href={detalle}
+                        // One prefetch per row would mean one server render per
+                        // account; the detail loads on click instead.
+                        prefetch={false}
                         aria-label={`${t.acciones.verHistorial}: ${cuenta.email}`}
                         className="text-ink no-underline hover:text-accent-deep"
                         onClick={(event) => event.stopPropagation()}

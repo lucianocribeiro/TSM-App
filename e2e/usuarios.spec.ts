@@ -51,7 +51,14 @@ async function loginElsewhere(browser: Browser, email: string, password: string)
   const context = await browser.newContext();
   const page = await context.newPage();
   await fillLogin(page, email, password);
-  return { page, close: () => context.close() };
+  return {
+    page,
+    // Let in-flight requests finish so the server does not see them cut off.
+    close: async () => {
+      await page.waitForLoadState("networkidle");
+      await context.close();
+    },
+  };
 }
 
 test.describe("Usuarios (Admin)", () => {
