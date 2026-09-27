@@ -18,7 +18,15 @@ import { createE2EUser, deleteE2EUser, localServiceClient } from "./service";
 
 const NEW_PASSWORD = "NuevaClaveE2E-1";
 
-async function fillCambioPassword(page: import("@playwright/test").Page, password: string, confirmacion = password) {
+async function fillCambioPassword(
+  page: import("@playwright/test").Page,
+  password: string,
+  confirmacion = password,
+  actual?: string,
+) {
+  if (actual !== undefined) {
+    await page.getByLabel(copy.password.actualLabel, { exact: true }).fill(actual);
+  }
   await page.getByLabel(copy.password.nuevaLabel, { exact: true }).fill(password);
   await page.getByLabel(copy.password.confirmacionLabel, { exact: true }).fill(confirmacion);
   await page.getByRole("button", { name: copy.password.submit }).click();
@@ -50,6 +58,9 @@ test.describe("forced password change", () => {
     await expect(title).toBeVisible();
     await expect(page.getByLabel(copy.password.nuevaLabel, { exact: true })).toBeVisible();
     await expect(page.getByLabel(copy.password.confirmacionLabel, { exact: true })).toBeVisible();
+    // Forced change: two fields only, no current password.
+    await expect(page.getByLabel(copy.password.actualLabel, { exact: true })).toHaveCount(0);
+    await expect(page.locator('form input:not([type="hidden"])')).toHaveCount(2);
     await expect(mainNav(page)).toHaveCount(0);
     await expect(page.getByRole("button", { name: copy.auth.logout })).toBeVisible();
     await page.screenshot({ path: `${SCREENSHOT_DIR}/cambiar-password-light.png`, fullPage: true });
@@ -72,6 +83,7 @@ test.describe("forced password change", () => {
       await page.goto(path);
       await expect(page, path).toHaveURL(/\/cambiar-password$/);
     }
+    await expect(page.getByLabel(copy.password.actualLabel, { exact: true })).toHaveCount(0);
 
     // Server-side validation.
     await fillCambioPassword(page, NEW_PASSWORD, `${NEW_PASSWORD}x`);
@@ -85,10 +97,12 @@ test.describe("forced password change", () => {
     await expect(page.getByRole("heading", { level: 1, name: copy.miLegajo.title })).toBeVisible();
     await expectNavLinks(page, [copy.nav.miLegajo]);
 
-    // Still reachable, now as a voluntary change with the usual navigation.
+    // Still reachable, now as a voluntary change with the usual navigation,
+    // which asks for the current password.
     await page.goto("/cambiar-password");
     await expect(page).toHaveURL(/\/cambiar-password$/);
     await expect(page.getByText(copy.password.introVoluntaria)).toBeVisible();
+    await expect(page.getByLabel(copy.password.actualLabel, { exact: true })).toBeVisible();
     await expectNavLinks(page, [copy.nav.miLegajo]);
 
     await page.getByRole("button", { name: copy.auth.logout }).click();
@@ -101,17 +115,45 @@ test.describe("forced password change", () => {
 });
 
 test.describe("voluntary password change", () => {
-  test("an Admin changes their own password at /cambiar-password", async ({ page }) => {
+  test("an Admin changes their own password at /cambiar-password, giving the current one", async ({ page, browser }) => {
     const user = await createE2EUser("admin-cambio", "admin");
     try {
       await loginAs(page, user);
       await page.goto("/cambiar-password");
       await expect(page).toHaveURL(/\/cambiar-password$/);
       await expect(page.getByText(copy.password.introVoluntaria)).toBeVisible();
+      await expect(page.getByLabel(copy.password.actualLabel, { exact: true })).toBeVisible();
+      await expect(page.locator('form input:not([type="hidden"])')).toHaveCount(3);
       await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.usuarios]);
 
-      await fillCambioPassword(page, NEW_PASSWORD);
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute("data-theme", "light");
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/cambiar-password-voluntario-light.png`, fullPage: true });
+      await setThemeCookie(page, "dark");
+      await page.reload();
+      await expect(html).toHaveAttribute("data-theme", "dark");
+      await page.screenshot({ path: `${SCREENSHOT_DIR}/cambiar-password-voluntario-dark.png`, fullPage: true });
+
+      // A wrong current password changes nothing.
+      await fillCambioPassword(page, NEW_PASSWORD, NEW_PASSWORD, "NoEsLaActual-1");
+      await expect(page.locator("form").getByRole("alert")).toHaveText(copy.password.errors.actualIncorrecta);
+      await expect(page).toHaveURL(/\/cambiar-password$/);
+      const other = await browser.newContext();
+      try {
+        const otherPage = await other.newPage();
+        await loginAs(otherPage, user);
+      } finally {
+        await other.close();
+      }
+
+      // The correct one completes the change, and this session survives.
+      await fillCambioPassword(page, NEW_PASSWORD, NEW_PASSWORD, user.password);
       await expect(page).toHaveURL(/\/mi-legajo$/);
+      await mainNav(page).getByRole("link", { name: copy.nav.legajos }).click();
+      await expect(page).toHaveURL(/\/legajos$/);
+      await page.reload();
+      await expect(page).toHaveURL(/\/legajos$/);
+      await expect(page.getByTestId("user-email")).toHaveText(user.email);
 
       await page.getByRole("button", { name: copy.auth.logout }).click();
       await expect(page).toHaveURL(/\/login$/);

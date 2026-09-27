@@ -244,6 +244,26 @@ describe("Admin account module", () => {
       expect((await eventTypes(target.id)).map((event) => event.tipo)).toEqual(["desactivacion"]);
     });
 
+    it("reactivation is safe to retry when the account was reactivated but the ban was not lifted", async () => {
+      const target = await createTestUser(service, "modulo-alta-reintento");
+      accountIds.push(target.id);
+      as(admin);
+      expect(await cuentas.desactivarCuenta({ profileId: target.id, motivo: "Baja (prueba)" })).toEqual({ ok: true });
+
+      // First run stopped after the database part: active, logged, still banned.
+      expect((await admin.client.rpc("reactivar_cuenta", { p_profile_id: target.id })).error).toBeNull();
+      expect((await storedProfile(target.id))?.estado_cuenta).toBe("activa");
+      expect((await signIn(target.email, "IntegrationTest123!")).error?.code).toBe("user_banned");
+
+      expect(await cuentas.reactivarCuenta({ profileId: target.id })).toEqual({ ok: true });
+      expect((await signIn(target.email, "IntegrationTest123!")).error).toBeNull();
+
+      // Once complete, another run is refused as before.
+      expect(await cuentas.reactivarCuenta({ profileId: target.id })).toEqual({ ok: false, error: errors.yaActiva });
+      // No duplicate history.
+      expect((await eventTypes(target.id)).map((event) => event.tipo)).toEqual(["desactivacion", "reactivacion"]);
+    });
+
     it("refuses the caller's own account and a blank reason", async () => {
       as(admin);
       expect(await cuentas.desactivarCuenta({ profileId: admin.id, motivo: "Yo" })).toEqual({
