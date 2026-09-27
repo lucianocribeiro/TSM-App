@@ -26,7 +26,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Email + password only. No magic link, OAuth or SSO.
 - Every table has RLS enabled. Default deny.
 - Data isolation: an Empleado can never read or write another employee's rows or files (tables and storage).
-- Feature reads and writes use the server client bound to the user session. The service-role client (`src/lib/supabase/admin.ts`) is only for system jobs and seeds.
+- Feature reads and writes use the server client bound to the user session. The service-role client (`src/lib/supabase/admin.ts`) is confined to server-only modules that verify the caller is an active Admin before any privileged call (today, the account-management module `src/lib/admin/cuentas.ts`), plus system jobs and seeds. It is never reachable from a page, layout, client component or any other action. Lint enforces the restriction.
 - Role checks exist both in RLS and in server-side guards (`requireRole`). App-level filters are layered on top of RLS where RLS is broader than the view's intent.
 - Storage buckets are private. Access through signed URLs only.
 
