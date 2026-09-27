@@ -1,5 +1,6 @@
 -- LOCAL AND CI ONLY. TEST DATA. Never run against the remote project.
--- Creates one Admin and two Empleado test users with local-only credentials.
+-- Creates one Admin, two active Empleado and one inactive Empleado test users
+-- with local-only credentials.
 -- Emails use the reserved `.test` TLD; passwords are test values, not secrets.
 -- See README.md, "Local test users".
 
@@ -41,7 +42,8 @@ from (
   values
     ('00000000-0000-4000-a000-000000000001'::uuid, 'admin@mitsm.test'),
     ('00000000-0000-4000-a000-000000000002'::uuid, 'empleado.a@mitsm.test'),
-    ('00000000-0000-4000-a000-000000000003'::uuid, 'empleado.b@mitsm.test')
+    ('00000000-0000-4000-a000-000000000003'::uuid, 'empleado.b@mitsm.test'),
+    ('00000000-0000-4000-a000-000000000004'::uuid, 'empleado.inactivo@mitsm.test')
 ) as u (id, email);
 
 -- Email identities, required for email + password sign-in.
@@ -65,12 +67,41 @@ select
   now(),
   now()
 from auth.users as u
-where u.email in ('admin@mitsm.test', 'empleado.a@mitsm.test', 'empleado.b@mitsm.test');
+where u.email in (
+  'admin@mitsm.test',
+  'empleado.a@mitsm.test',
+  'empleado.b@mitsm.test',
+  'empleado.inactivo@mitsm.test'
+);
 
 -- Promote the Admin test user. The trigger never creates admins.
 update public.profiles
 set role = 'admin'
 where id = '00000000-0000-4000-a000-000000000001';
+
+-- Empleado B has a temporary password: the forced change runs at login.
+update public.profiles
+set debe_cambiar_password = true
+where id = '00000000-0000-4000-a000-000000000003';
+
+-- The inactive Empleado: deactivated by the Admin, and banned in Auth as the
+-- deactivation does (100 years stands for "until reactivated").
+update public.profiles
+set estado_cuenta = 'inactiva'
+where id = '00000000-0000-4000-a000-000000000004';
+
+update auth.users
+set banned_until = now() + interval '100 years'
+where id = '00000000-0000-4000-a000-000000000004';
+
+insert into public.cuenta_eventos (profile_id, tipo, motivo, actor_id, created_at)
+values (
+  '00000000-0000-4000-a000-000000000004',
+  'desactivacion',
+  'Baja de prueba: fin del contrato ficticio.',
+  '00000000-0000-4000-a000-000000000001',
+  now() - interval '3 days'
+);
 
 -- Legajos. The on_profile_created_create_legajo trigger already created an
 -- empty legajo per profile; fill them with clearly fictional test data.
@@ -187,6 +218,13 @@ set
   convenio = 'Convenio de Prueba',
   bruto_mensual = 720000.00
 where profile_id = '00000000-0000-4000-a000-000000000003';
+
+update public.legajos
+set
+  nombres = 'Prueba Empleado Inactivo',
+  apellido = 'Ficticio',
+  dni = '90000004'
+where profile_id = '00000000-0000-4000-a000-000000000004';
 
 -- Children for Empleado A only (Admin and Empleado B have none).
 insert into public.legajo_hijos (legajo_id, nombre_completo, fecha_nacimiento)

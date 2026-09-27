@@ -6,7 +6,15 @@ import { THEME_COOKIE, type Theme } from "../src/lib/theme/theme";
 export const SEED_PASSWORD = "TestPass123!";
 export const ADMIN = { email: "admin@mitsm.test", password: SEED_PASSWORD };
 export const EMPLEADO_A = { email: "empleado.a@mitsm.test", password: SEED_PASSWORD };
-export const EMPLEADO_B = { email: "empleado.b@mitsm.test", password: SEED_PASSWORD };
+// Seeded with a temporary password (debe_cambiar_password): login leads to
+// /cambiar-password. Only e2e/cuentas.spec.ts uses it, and it restores it.
+export const EMPLEADO_B = {
+  id: "00000000-0000-4000-a000-000000000003",
+  email: "empleado.b@mitsm.test",
+  password: SEED_PASSWORD,
+};
+// Seeded as inactive and banned.
+export const EMPLEADO_INACTIVO = { email: "empleado.inactivo@mitsm.test", password: SEED_PASSWORD };
 
 // Uploaded by CI as the e2e-screenshots artifact.
 export const SCREENSHOT_DIR = "test-results/screenshots";

@@ -56,7 +56,7 @@
   --color-accent-800: var(--accent-800);
   --color-accent-900: var(--accent-900);
 
-  /* Set by next/font in the root layout. */
+  /* Set by next/font/local in the root layout. */
   --font-heading: var(--font-heading);
   --font-body: var(--font-body);
 

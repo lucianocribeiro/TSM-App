@@ -22,7 +22,7 @@ You build. You commit, push and open PRs. You merge only when a versioned merge 
 ## Structure
 - `src/app/` routes (App Router).
 - `src/proxy.ts` Next.js 16 proxy (formerly middleware): session refresh and, from F1-10, route guards.
-- `src/lib/supabase/` clients: `client.ts` (browser), `server.ts` (session-bound), `admin.ts` (service role, system jobs and seeds only).
+- `src/lib/supabase/` clients: `client.ts` (browser), `server.ts` (session-bound), `admin.ts` (service role). The service-role client may be imported only by server-only modules that verify an active Admin before any privileged call (today `src/lib/admin/cuentas.ts`), plus system jobs and seeds. Never from a page, layout, client component or other action. The ESLint `no-restricted-imports` rule enforces it.
 - `src/lib/copy/` all es-AR UI text.
 - `supabase/migrations/` sequential migrations.
 - `docs/` Constitution and phase PRDs.

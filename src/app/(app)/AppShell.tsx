@@ -69,36 +69,38 @@ export function AppShell({
           <Logo alt={copy.app.logoAlt} size={72} preload />
         </div>
 
-        <nav aria-label={copy.nav.label} className="mt-8">
-          <ul>
-            {navItems.map((item) => {
-              const active = isActivePath(pathname, item.href);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => setMenuOpen(false)}
-                    className={cx(
-                      "flex items-baseline gap-3 border-l-2 px-[22px] py-[11px] text-[14.5px] no-underline transition-colors hover:bg-accent-soft",
-                      active
-                        ? "border-accent text-accent-deep"
-                        : "border-transparent text-rail-ink",
-                    )}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="text-[10px] tracking-[.14em] tabular-nums opacity-50"
+        {navItems.length > 0 ? (
+          <nav aria-label={copy.nav.label} className="mt-8">
+            <ul>
+              {navItems.map((item) => {
+                const active = isActivePath(pathname, item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => setMenuOpen(false)}
+                      className={cx(
+                        "flex items-baseline gap-3 border-l-2 px-[22px] py-[11px] text-[14.5px] no-underline transition-colors hover:bg-accent-soft",
+                        active
+                          ? "border-accent text-accent-deep"
+                          : "border-transparent text-rail-ink",
+                      )}
                     >
-                      {item.number}
-                    </span>
-                    <span>{item.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+                      <span
+                        aria-hidden="true"
+                        className="text-[10px] tracking-[.14em] tabular-nums opacity-50"
+                      >
+                        {item.number}
+                      </span>
+                      <span>{item.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        ) : null}
 
         <div className="mt-auto flex flex-col items-start gap-3 px-[22px] pt-8">
           <p

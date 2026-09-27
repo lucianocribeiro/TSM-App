@@ -1,4 +1,5 @@
-// System jobs and seeds only. Never use for feature reads.
+// Service role: bypasses RLS. Only src/lib/admin/cuentas.ts may import it
+// (ESLint no-restricted-imports). Never use for feature reads.
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getServerEnv } from "@/lib/env";

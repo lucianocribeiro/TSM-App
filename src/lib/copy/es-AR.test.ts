@@ -75,6 +75,36 @@ describe("es-AR copy", () => {
     expect(copy.aprobaciones.errors.solicitudPendiente).toMatch(/^Ya tenés una solicitud pendiente/);
   });
 
+  it("defines the password, account and inactive-account texts", () => {
+    const keys = [
+      copy.auth.errors.cuentaInactiva,
+      copy.auth.errors.cuentaNoVerificada,
+      copy.password.kicker,
+      copy.password.title,
+      copy.password.intro,
+      copy.password.introVoluntaria,
+      copy.password.actualLabel,
+      copy.password.nuevaLabel,
+      copy.password.confirmacionLabel,
+      copy.password.hint,
+      copy.password.submit,
+      copy.password.submitting,
+      ...Object.values(copy.password.errors),
+      ...Object.values(copy.cuentas.estados),
+      ...Object.values(copy.cuentas.eventos),
+      ...Object.values(copy.cuentas.errors),
+    ];
+    for (const text of keys) {
+      expect(typeof text).toBe("string");
+      expect(text.trim()).not.toBe("");
+    }
+    expect(Object.keys(copy.cuentas.eventos).sort()).toEqual(
+      ["creacion", "desactivacion", "password_cambiada", "password_temporal", "reactivacion"],
+    );
+    expect(copy.auth.errors.cuentaInactiva).toBe("Tu cuenta está inactiva. Contactá a Recursos Humanos.");
+    expect(copy.auth.errors.cuentaInactiva).not.toBe(copy.auth.errors.invalidCredentials);
+  });
+
   it("uses the generic login error from the PRD", () => {
     expect(copy.auth.errors.invalidCredentials).toBe(
       "Email o contraseña incorrectos.",
