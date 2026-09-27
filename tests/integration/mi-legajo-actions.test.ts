@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
+import { barrerHuerfanos } from "@/lib/documentos/limpieza";
 import { buildDocumentoPath } from "@/lib/documentos/paths";
 import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
 import { createTestUser, deleteTestUsers, serviceClient, type TestUser } from "./helpers";
@@ -290,6 +291,55 @@ describe("/mi-legajo Server Actions", () => {
       }
       const { count } = await service.from("legajo_documentos").select("id", { count: "exact", head: true }).eq("id", doc!.id);
       expect(count).toBe(1);
+    });
+
+    it("the orphan sweep removes only the caller's own old rowless objects", async () => {
+      const storage = service.storage.from(DOCUMENTOS_BUCKET);
+      const orphan = (user: TestUser) =>
+        buildDocumentoPath({ profileId: user.id, tipo: "licencia_conducir", fileId: randomUUID(), mimeType: "application/pdf" })!;
+
+      // The employee: an abandoned upload and a registered document.
+      const own = orphan(empleado);
+      paths.push(own);
+      expect((await empleado.client.storage.from(DOCUMENTOS_BUCKET).upload(own, fakePdf("orphan"), { contentType: "application/pdf" })).error).toBeNull();
+      const registered = await uploadAs(empleado, "dni_dorso", fakePdf("registered"));
+      expect((await actions.registrarDocumento({ tipo: "dni_dorso", path: registered, fileName: "d.pdf" })).ok).toBe(true);
+      // Another employee's abandoned upload.
+      const foreign = orphan(otro);
+      paths.push(foreign);
+      expect((await otro.client.storage.from(DOCUMENTOS_BUCKET).upload(foreign, fakePdf("foreign"), { contentType: "application/pdf" })).error).toBeNull();
+
+      const exists = async (path: string) => (await storage.download(path)).data !== null;
+
+      // Everything is fresh: nothing goes.
+      expect((await barrerHuerfanos(empleado.client, empleado.id)).ok).toBe(true);
+      expect(await exists(own)).toBe(true);
+
+      // An hour later, as the employee: only their own orphan goes.
+      const later = new Date(Date.now() + 60 * 60 * 1000);
+      const barrido = await barrerHuerfanos(empleado.client, empleado.id, { now: later });
+      expect(barrido.ok && barrido.eliminados >= 1).toBe(true);
+      expect(await exists(own)).toBe(false);
+      expect(await exists(registered)).toBe(true);
+      expect(await exists(foreign)).toBe(true);
+
+      // Even pointed at another folder, the employee's session reaches nothing there.
+      expect(await barrerHuerfanos(empleado.client, otro.id, { now: later })).toEqual({ ok: true, eliminados: 0 });
+      expect(await exists(foreign)).toBe(true);
+    });
+
+    it("descartarSubida removes a rowless upload but never a registered document", async () => {
+      const registered = await uploadAs(empleado, "licencia_conducir", fakePdf("keep"));
+      expect((await actions.registrarDocumento({ tipo: "licencia_conducir", path: registered, fileName: "l.pdf" })).ok).toBe(true);
+      as(empleado);
+      expect(await actions.descartarSubida({ path: registered })).toEqual({ ok: true });
+      expect((await service.storage.from(DOCUMENTOS_BUCKET).download(registered)).data).not.toBeNull();
+
+      const loose = buildDocumentoPath({ profileId: empleado.id, tipo: "dni_frente", fileId: randomUUID(), mimeType: "application/pdf" })!;
+      paths.push(loose);
+      await empleado.client.storage.from(DOCUMENTOS_BUCKET).upload(loose, fakePdf("loose"), { contentType: "application/pdf" });
+      expect(await actions.descartarSubida({ path: loose })).toEqual({ ok: true });
+      expect((await service.storage.from(DOCUMENTOS_BUCKET).download(loose)).data).toBeNull();
     });
 
     it("an Admin's own upload is approved at once and a second one replaces it in place", async () => {
