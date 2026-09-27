@@ -146,8 +146,9 @@ test.describe("Usuarios (Admin)", () => {
     await expect(other.page).toHaveURL(/\/cambiar-password$/);
     await other.close();
 
-    // Shown once: gone after a reload too.
+    // Shown once: gone after a reload too (checked once the list has loaded).
     await page.reload();
+    await expect(page.getByTestId("cuenta-row").first()).toBeVisible();
     await expect(page.getByText(password)).toHaveCount(0);
   });
 
@@ -284,6 +285,7 @@ test.describe("Usuarios (Admin)", () => {
 
     await page.getByRole("link", { name: t.detalle.volver }).click();
     await expect(page).toHaveURL(/\/usuarios$/);
+    await expect(page.getByTestId("cuenta-row").first()).toBeVisible();
   });
 });
 
