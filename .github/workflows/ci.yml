@@ -126,14 +126,20 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v7
+      # No generated password may reach an artifact: scan everything that
+      # could be uploaded (including trace zips) before uploading anything.
+      - name: Scan e2e artifacts for generated passwords
+        id: artifact-scan
         if: ${{ !cancelled() }}
+        run: node e2e/scan-artifacts.mjs
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && steps.artifact-scan.outcome == 'success' }}
         with:
           name: e2e-screenshots
           path: test-results/screenshots/
           retention-days: 14
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: ${{ failure() && steps.artifact-scan.outcome == 'success' }}
         with:
           name: playwright-report
           path: playwright-report/

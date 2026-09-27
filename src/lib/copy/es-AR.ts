@@ -33,6 +33,7 @@ export type Copy = {
     miLegajo: string;
     legajos: string;
     usuarios: string;
+    cambiarPassword: string;
   };
   theme: {
     toDark: string;
@@ -49,6 +50,103 @@ export type Copy = {
   usuarios: {
     kicker: string;
     title: string;
+    nuevoUsuario: string;
+    loading: string;
+    filtro: {
+      label: string;
+      activas: string;
+      todas: string;
+    };
+    busqueda: {
+      label: string;
+      placeholder: string;
+    };
+    columnas: {
+      cuenta: string;
+      nombre: string;
+      email: string;
+      rol: string;
+      estado: string;
+      acciones: string;
+    };
+    passwordPendiente: string;
+    sinNombre: string;
+    tuCuenta: string;
+    vacio: string;
+    sinResultados: string;
+    listaFallo: string;
+    acciones: {
+      restablecer: string;
+      desactivar: string;
+      reactivar: string;
+      purgar: string;
+      cancelar: string;
+      cerrar: string;
+      verHistorial: string;
+    };
+    crear: {
+      title: string;
+      intro: string;
+      emailLabel: string;
+      rolLabel: string;
+      passwordLabel: string;
+      passwordHint: string;
+      generar: string;
+      submit: string;
+      submitting: string;
+    };
+    passwordUnaVez: {
+      title: string;
+      creada: string;
+      restablecida: string;
+      note: string;
+      copiar: string;
+      copiada: string;
+      listo: string;
+    };
+    restablecer: {
+      title: string;
+      body: string;
+      confirm: string;
+    };
+    desactivar: {
+      title: string;
+      body: string;
+      motivoLabel: string;
+      confirm: string;
+    };
+    reactivar: {
+      title: string;
+      body: string;
+      confirm: string;
+    };
+    purgar: {
+      title: string;
+      body: string;
+      emailLabel: string;
+      confirm: string;
+    };
+    exito: {
+      creada: string;
+      restablecida: string;
+      desactivada: string;
+      reactivada: string;
+      purgada: string;
+    };
+    detalle: {
+      kicker: string;
+      volver: string;
+      datos: string;
+      historial: string;
+      sinEventos: string;
+      historialFallo: string;
+      columnas: {
+        evento: string;
+        fecha: string;
+        quien: string;
+        motivo: string;
+      };
+    };
   };
   legajo: {
     validation: {
@@ -223,6 +321,7 @@ export const copy = {
     miLegajo: "Mi Legajo",
     legajos: "Legajos",
     usuarios: "Usuarios",
+    cambiarPassword: "Cambiar contraseña",
   },
   theme: {
     toDark: "Modo oscuro",
@@ -239,6 +338,108 @@ export const copy = {
   usuarios: {
     kicker: "Administración",
     title: "Usuarios",
+    nuevoUsuario: "Nuevo usuario",
+    loading: "Cargando cuentas…",
+    filtro: {
+      label: "Estado de la cuenta",
+      activas: "Activas",
+      todas: "Todas",
+    },
+    busqueda: {
+      label: "Buscar",
+      placeholder: "Email o nombre",
+    },
+    columnas: {
+      cuenta: "Cuenta",
+      nombre: "Nombre",
+      email: "Email",
+      rol: "Rol",
+      estado: "Estado de la cuenta",
+      acciones: "Acciones",
+    },
+    passwordPendiente: "Cambio de contraseña pendiente",
+    sinNombre: "Sin nombre en el legajo",
+    tuCuenta: "Tu cuenta",
+    vacio: "Todavía no hay cuentas.",
+    sinResultados: "No hay cuentas que coincidan con la búsqueda.",
+    listaFallo: "No pudimos cargar las cuentas. Actualizá la página para intentar de nuevo.",
+    acciones: {
+      restablecer: "Restablecer contraseña",
+      desactivar: "Desactivar",
+      reactivar: "Reactivar",
+      purgar: "Purgar",
+      cancelar: "Cancelar",
+      cerrar: "Cerrar",
+      verHistorial: "Ver historial",
+    },
+    crear: {
+      title: "Nuevo usuario",
+      intro:
+        "La cuenta se crea con una contraseña temporal. La persona tiene que cambiarla la primera vez que ingresa.",
+      emailLabel: "Email",
+      rolLabel: "Rol",
+      passwordLabel: "Contraseña temporal",
+      passwordHint: "Al menos 8 caracteres. Podés escribirla o generar una.",
+      generar: "Generar",
+      submit: "Crear usuario",
+      submitting: "Creando…",
+    },
+    passwordUnaVez: {
+      title: "Contraseña temporal",
+      creada: "Creamos la cuenta de {email}.",
+      restablecida: "Restablecimos la contraseña de {email}.",
+      note:
+        "Pasale esta contraseña a la persona. No la vamos a volver a mostrar: copiala antes de cerrar.",
+      copiar: "Copiar",
+      copiada: "Copiada",
+      listo: "Listo, ya la copié",
+    },
+    restablecer: {
+      title: "Restablecer contraseña",
+      body:
+        "Vamos a asignarle a {email} una contraseña temporal. Sus sesiones abiertas se cierran y tiene que cambiarla la próxima vez que ingrese.",
+      confirm: "Restablecer",
+    },
+    desactivar: {
+      title: "Desactivar cuenta",
+      body:
+        "{email} no va a poder ingresar a Mi TSM y sus sesiones abiertas se cierran. Sus datos y su historial se conservan, y podés reactivarla cuando quieras.",
+      motivoLabel: "Motivo",
+      confirm: "Desactivar",
+    },
+    reactivar: {
+      title: "Reactivar cuenta",
+      body: "{email} va a poder volver a ingresar a Mi TSM.",
+      confirm: "Reactivar",
+    },
+    purgar: {
+      title: "Purgar cuenta",
+      body:
+        "Esto borra para siempre la cuenta de {email}: su legajo, sus documentos, sus solicitudes y su historial. No se puede deshacer. Usalo solo con cuentas de prueba; para una baja real, desactivá la cuenta.",
+      emailLabel: "Escribí el email de la cuenta para confirmar",
+      confirm: "Purgar para siempre",
+    },
+    exito: {
+      creada: "Creamos la cuenta.",
+      restablecida: "Restablecimos la contraseña.",
+      desactivada: "Desactivamos la cuenta.",
+      reactivada: "Reactivamos la cuenta.",
+      purgada: "Purgamos la cuenta.",
+    },
+    detalle: {
+      kicker: "Usuarios",
+      volver: "Volver a Usuarios",
+      datos: "Datos de la cuenta",
+      historial: "Historial de la cuenta",
+      sinEventos: "Todavía no hay eventos para esta cuenta.",
+      historialFallo: "No pudimos cargar el historial. Actualizá la página para intentar de nuevo.",
+      columnas: {
+        evento: "Evento",
+        fecha: "Fecha",
+        quien: "Quién",
+        motivo: "Motivo",
+      },
+    },
   },
   legajo: {
     validation: {

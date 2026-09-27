@@ -40,3 +40,11 @@ export async function createE2EUser(label: string, role: Database["public"]["Enu
 export async function deleteE2EUser(id: string) {
   await localServiceClient().auth.admin.deleteUser(id);
 }
+
+// Deletes an account created through the UI, found by its email.
+export async function deleteE2EUserByEmail(email: string) {
+  const service = localServiceClient();
+  const { data } = await service.auth.admin.listUsers({ perPage: 1000 });
+  const user = data?.users.find((candidate) => candidate.email === email);
+  if (user) await service.auth.admin.deleteUser(user.id);
+}

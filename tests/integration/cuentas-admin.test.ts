@@ -101,6 +101,40 @@ describe("Admin account module", () => {
     });
   });
 
+  describe("listarCuentas", () => {
+    it("gives an Admin every account with email, role, state, pending change and legajo name", async () => {
+      const target = await createTestUser(service, "modulo-lista");
+      accountIds.push(target.id);
+      await service.from("legajos").update({ nombres: "Lista", apellido: "Prueba" }).eq("profile_id", target.id);
+      await service.from("profiles").update({ debe_cambiar_password: true }).eq("id", target.id);
+
+      as(admin);
+      const result = await cuentas.listarCuentas();
+      expect(result.ok).toBe(true);
+      const lista = result.ok ? (result.data ?? []) : [];
+      expect(lista.find((cuenta) => cuenta.id === target.id)).toEqual({
+        id: target.id,
+        email: target.email,
+        rol: "empleado",
+        estado: "activa",
+        debeCambiarPassword: true,
+        nombre: "Lista Prueba",
+      });
+      expect(lista.find((cuenta) => cuenta.id === admin.id)).toMatchObject({ email: admin.email, rol: "admin", nombre: null });
+      // Every profile is listed, and every listed account has its email.
+      const { count } = await service.from("profiles").select("id", { count: "exact", head: true });
+      expect(lista).toHaveLength(count ?? -1);
+      expect(lista.every((cuenta) => cuenta.email.includes("@"))).toBe(true);
+    });
+
+    it("refuses an Empleado and an anonymous caller", async () => {
+      for (const who of [empleado, null]) {
+        as(who);
+        expect(await cuentas.listarCuentas()).toEqual({ ok: false, error: errors.noAutorizado });
+      }
+    });
+  });
+
   describe("crearUsuario", () => {
     it("creates a confirmed Empleado with a temporary password, the creation event and the forced change", async () => {
       as(admin);

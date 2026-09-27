@@ -40,6 +40,7 @@ Self-hosted in `src/app/fonts/` and loaded with `next/font/local` in the root la
   --rail: #fbfafa; --rail-ink: #00072e;
   --accent-deep: var(--accent-700); --accent-soft: rgba(252,100,50,.10);
   --shadow: 0 1px 2px rgba(45,43,43,.14);
+  --overlay: rgba(0,7,46,.40);
 }
 :root[data-theme="dark"] {
   --bg: #00072e; --surface: #040d38; --ink: #f3f2f2;
@@ -48,6 +49,7 @@ Self-hosted in `src/app/fonts/` and loaded with `next/font/local` in the root la
   --rail: #000418; --rail-ink: #f3f2f2;
   --accent-deep: var(--accent-300); --accent-soft: rgba(252,100,50,.16);
   --shadow: 0 1px 2px rgba(0,0,0,.5);
+  --overlay: rgba(0,2,14,.62);
 }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
 h1,h2,h3,h4 { font-family: var(--font-heading); }
@@ -57,7 +59,7 @@ a { color: var(--accent-deep); }
 ```
 In `globals.css` the element rules (`body`, headings, `a`, `:focus-visible`, `::selection`) sit inside `@layer base` so Tailwind utilities can override them.
 
-Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink`, `ink-soft`, `line`, `line-soft`, `rail`, `rail-ink`, `accent`, `accent-deep`, `accent-soft`, `accent-100` to `accent-900`; fonts `font-heading`, `font-body`; radii `rounded-sm`, `rounded-md`, `rounded-lg`; shadow `shadow-panel`. Breakpoint `nav` = 900px (sidebar collapses below it).
+Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink`, `ink-soft`, `line`, `line-soft`, `rail`, `rail-ink`, `accent`, `accent-deep`, `accent-soft`, `overlay` (behind modals and the mobile menu; darkens in both themes), `accent-100` to `accent-900`; fonts `font-heading`, `font-body`; radii `rounded-sm`, `rounded-md`, `rounded-lg`; shadow `shadow-panel`. Breakpoint `nav` = 900px (sidebar collapses below it).
 
 ## Style rules
 - **Layout:** fixed left sidebar 234px wide (`--rail` background, `--rail-ink` text, right border `--line`, vertical padding 26px, horizontal 22px). Main area: header with bottom border `--line`, padding `26px 34px 16px`; content padding `26px 34px 40px`. Below 900px the sidebar collapses behind a menu button in a top bar, with the same items and footer.
@@ -70,7 +72,7 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 - **Status badge:** inline-flex, gap 7px, padding `3px 9px`, 1px `--line` border, radius `--radius-md`, 11.5px, with a 6px dot (`--accent` for active; `--ink-soft` for secondary states).
 - Numbers use `font-variant-numeric: tabular-nums`. Secondary text uses `--ink-soft`; helper text may be italic 12.5px.
 
-### Specs for later components (not built yet)
+### Component specs (Table and Segmented filter are built; KPI strip and Label/value grid not yet)
 - **KPI strip:** grid `repeat(auto-fit, minmax(148px,1fr))`, one bordered `--surface` container, cells padding `18px 20px` separated by `--line-soft`; label 10.5px uppercase letter-spacing .18em `--ink-soft`; value heading font 36px tabular.
 - **Table:** bordered `--surface` container with horizontal scroll; header row 10.5px uppercase letter-spacing .16em `--ink-soft`, padding `11px 18px`, bottom border `--line`; rows padding `14px 18px`, bottom border `--line-soft`, 14px, hover `--accent-soft`, pointer when clickable; secondary columns `--ink-soft`.
 - **Label/value grid:** `repeat(auto-fit, minmax(150px,1fr))`, gap `18px 26px`; label as input label style; value 15px.
@@ -87,5 +89,9 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 | `StatusBadge` | Status with dot | `label`, `tone: "active" \| "secondary"` |
 | `ThemeToggle` | Switches light/dark and persists the `tsm-theme` cookie | `initialTheme`, `toDarkLabel`, `toLightLabel` |
 | `Logo` | TSM logo via `next/image` | `alt`, `size?`, `preload?` |
+| `Table`, `Th`, `Td`, `rowClassName` | Bordered surface table with horizontal scroll; header and body cells; row hover (pointer when clickable) | native table props; `rowClassName(clickable)` |
+| `SegmentedFilter` | Mutually exclusive filter buttons (`aria-pressed`) | `label`, `options`, `value`, `onChange` |
+| `Dialog` | Modal on the native `<dialog>` (focus trap, Escape, backdrop click close) | `open`, `onClose`, `title`, `children`, `footer?` |
+| `Select` | Label + native select, styled like `Field` | `label`, `options`, select props |
 
-Helper: `cx` joins class names.
+Helpers: `cx` joins class names; `buttonClassName(variant)` gives the `Button` look to a link.

@@ -105,6 +105,29 @@ describe("es-AR copy", () => {
     expect(copy.auth.errors.cuentaInactiva).not.toBe(copy.auth.errors.invalidCredentials);
   });
 
+  it("defines the Usuarios screen texts, with the {email} placeholder where the dialogs need it", () => {
+    function strings(value: unknown): string[] {
+      if (typeof value === "string") return [value];
+      return value && typeof value === "object" ? Object.values(value).flatMap(strings) : [];
+    }
+    for (const text of [...strings(copy.usuarios), copy.nav.cambiarPassword]) {
+      expect(text.trim()).not.toBe("");
+    }
+    for (const text of [
+      copy.usuarios.restablecer.body,
+      copy.usuarios.desactivar.body,
+      copy.usuarios.reactivar.body,
+      copy.usuarios.purgar.body,
+      copy.usuarios.passwordUnaVez.creada,
+      copy.usuarios.passwordUnaVez.restablecida,
+    ]) {
+      expect(text).toContain("{email}");
+    }
+    expect(copy.usuarios.purgar.body).toMatch(/para siempre/);
+    expect(copy.usuarios.purgar.body).toMatch(/prueba/);
+    expect(copy.usuarios.passwordUnaVez.note).toMatch(/No la vamos a volver a mostrar/);
+  });
+
   it("uses the generic login error from the PRD", () => {
     expect(copy.auth.errors.invalidCredentials).toBe(
       "Email o contraseña incorrectos.",

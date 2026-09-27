@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { passwordSchema } from "@/lib/auth/password";
 import { copy } from "@/lib/copy/es-AR";
+import { nombreCompleto, type CuentaListItem } from "@/lib/cuentas/listado";
 import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
@@ -99,6 +100,52 @@ function authErrorMessage(error: { code?: string } | null): string {
       return copy.password.errors.demasiadoCorta;
     default:
       return errors.accionFallo;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// List (read only)
+// ---------------------------------------------------------------------------
+// Every account, for the Usuarios screen. Emails live only in Auth, so they
+// come from the Auth Admin API; role, state and the pending password change
+// (profiles) and the name (legajos) are read with the Admin's own session,
+// under RLS.
+export async function listarCuentas(): Promise<ActionResult<CuentaListItem[]>> {
+  const admin = await requireAdmin();
+  if (!admin) return failed(errors.noAutorizado);
+
+  const [profiles, legajos] = await Promise.all([
+    admin.session.from("profiles").select("id, role, estado_cuenta, debe_cambiar_password"),
+    admin.session.from("legajos").select("profile_id, nombres, apellido"),
+  ]);
+  if (profiles.error || legajos.error) return failed(errors.accionFallo);
+
+  const emails = await listAuthEmails(createAdminClient());
+  if (!emails) return failed(errors.accionFallo);
+
+  const nombres = new Map(
+    (legajos.data ?? []).map((legajo) => [legajo.profile_id, nombreCompleto(legajo.nombres, legajo.apellido)]),
+  );
+  const cuentas = (profiles.data ?? []).map((profile) => ({
+    id: profile.id,
+    email: emails.get(profile.id) ?? "",
+    rol: profile.role,
+    estado: profile.estado_cuenta,
+    debeCambiarPassword: profile.debe_cambiar_password,
+    nombre: nombres.get(profile.id) ?? null,
+  }));
+  return { ok: true, data: cuentas };
+}
+
+// Auth user id -> email, every page. Null when a page fails.
+async function listAuthEmails(service: ServiceClient): Promise<Map<string, string> | null> {
+  const emails = new Map<string, string>();
+  const perPage = 1000;
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage });
+    if (error) return null;
+    for (const user of data.users) emails.set(user.id, user.email ?? "");
+    if (data.users.length < perPage) return emails;
   }
 }
 
