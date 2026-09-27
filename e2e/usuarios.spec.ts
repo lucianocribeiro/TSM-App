@@ -217,7 +217,11 @@ test.describe("Usuarios (Admin)", () => {
       await rowFor(page, throwaway.email).getByRole("button", { name: t.acciones.purgar }).click();
 
       const dialog = page.getByRole("dialog", { name: t.purgar.title });
-      await expect(dialog.getByText(/para siempre/)).toBeVisible();
+      // The dialog states it is permanent and meant for test data.
+      const body = dialog.getByText(/No se puede deshacer/);
+      await expect(body).toContainText(throwaway.email);
+      await expect(body).toContainText(/para siempre/);
+      await expect(body).toContainText(/cuentas de prueba/);
       const emailField = dialog.getByLabel(t.purgar.emailLabel, { exact: true });
       await emailField.fill(throwaway.email.toUpperCase());
       await dialog.getByRole("button", { name: t.purgar.confirm }).click();
