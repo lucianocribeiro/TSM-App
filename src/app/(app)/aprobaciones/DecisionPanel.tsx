@@ -136,7 +136,10 @@ export function DecisionPanel({ clase, id }: DecisionPanelProps) {
           maxLength={MAX_MOTIVO_RECHAZO}
           hint={formatCopy(t.motivoHint, { max: String(MAX_MOTIVO_RECHAZO) })}
           error={motivoError ?? undefined}
-          onChange={(event) => setMotivo(event.target.value)}
+          onChange={(event) => {
+            setMotivo(event.target.value);
+            setMotivoError(null);
+          }}
         />
         <div className="mt-2 flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={() => setRechazando(false)}>
