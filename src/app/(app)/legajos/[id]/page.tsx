@@ -4,8 +4,10 @@ import { z } from "zod";
 import { buttonClassName } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { listarCuentas } from "@/lib/admin/cuentas";
 import { requireRole } from "@/lib/auth/require-role";
 import { copy } from "@/lib/copy/es-AR";
+import { historialDocumentos, reemplazantes } from "@/lib/documentos/historial";
 import { resumirDocumentos } from "@/lib/documentos/resumen";
 import { cargarLegajoAdmin } from "@/lib/legajo/admin-legajos";
 import { formLaboralInicial } from "@/lib/legajo/laborales";
@@ -50,6 +52,14 @@ export default async function LegajoPage({ params }: LegajoPageProps) {
   }
 
   const { legajo } = data;
+  // Who replaced each version: the name from their legajo, else their email
+  // (as in Usuarios). Accounts are listed only when there is history.
+  const nombres = new Map<string, string>();
+  if (reemplazantes(data.documentos).length > 0) {
+    const cuentas = await listarCuentas();
+    for (const cuenta of cuentas.ok ? (cuentas.data ?? []) : []) nombres.set(cuenta.id, cuenta.nombre ?? cuenta.email);
+  }
+
   return (
     <LegajoAdminScreen
       profileId={id}
@@ -61,6 +71,7 @@ export default async function LegajoPage({ params }: LegajoPageProps) {
       laborales={datosLaboralesVista(legajo)}
       formLaboral={formLaboralInicial(legajo)}
       documentos={resumirDocumentos(data.documentos)}
+      historial={historialDocumentos(data.documentos, nombres)}
     />
   );
 }

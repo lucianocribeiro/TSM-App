@@ -1,5 +1,6 @@
 import type { ActionResult } from "@/lib/action-result";
 import { copy } from "@/lib/copy/es-AR";
+import type { ModoReemplazo } from "./reemplazo";
 import type { DocumentoTipo } from "./tipos";
 
 // The browser side of a document upload: a path from the server, the file to
@@ -10,7 +11,8 @@ import type { DocumentoTipo } from "./tipos";
 export type SubidaPasos = {
   preparar: (input: { tipo: DocumentoTipo; fileName: string; mimeType: string; sizeBytes: number }) => Promise<ActionResult<{ path: string }>>;
   subirArchivo: (path: string) => Promise<{ error: unknown }>;
-  registrar: (input: { tipo: DocumentoTipo; path: string; fileName: string }) => Promise<ActionResult<unknown>>;
+  // modo: only when an Admin replaces a current document.
+  registrar: (input: { tipo: DocumentoTipo; path: string; fileName: string; modo?: ModoReemplazo }) => Promise<ActionResult<unknown>>;
   descartar: (input: { path: string }) => Promise<ActionResult>;
 };
 

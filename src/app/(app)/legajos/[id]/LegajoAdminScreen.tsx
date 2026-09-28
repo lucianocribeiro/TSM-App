@@ -7,6 +7,7 @@ import { buttonClassName } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { LegajoActual } from "@/lib/aprobaciones/solicitudes";
 import { copy } from "@/lib/copy/es-AR";
+import type { HistorialTipo } from "@/lib/documentos/historial";
 import type { ResumenDocumento } from "@/lib/documentos/resumen";
 import { grupoBloqueado } from "@/lib/legajo/bloqueo";
 import { GRUPOS_EDITABLES, type GrupoEditable } from "@/lib/legajo/grupos";
@@ -25,6 +26,7 @@ import {
   registrarDocumentoAdmin,
 } from "../actions";
 import { GrupoLaboralPanel } from "./GrupoLaboralPanel";
+import { HistorialDocumentos } from "./HistorialDocumentos";
 
 const t = copy.legajos;
 
@@ -39,6 +41,8 @@ type LegajoAdminScreenProps = {
   laborales: DatoLaboral[];
   formLaboral: FormLaboral;
   documentos: ResumenDocumento[];
+  // Replaced versions, by type (Admin only).
+  historial: HistorialTipo[];
 };
 
 export function LegajoAdminScreen({
@@ -51,6 +55,7 @@ export function LegajoAdminScreen({
   laborales,
   formLaboral,
   documentos,
+  historial,
 }: LegajoAdminScreenProps) {
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -95,7 +100,14 @@ export function LegajoAdminScreen({
         ) : null}
 
         {pendiente ? (
-          <Banner tone="attention">
+          <Banner
+            tone="attention"
+            actions={
+              <Link href={`/aprobaciones/solicitudes/${pendiente.id}`} className={buttonClassName("secondary")}>
+                {t.detalle.revisarSolicitud}
+              </Link>
+            }
+          >
             <span data-testid="banner-pendiente">{t.detalle.solicitudPendiente}</span>
           </Banner>
         ) : null}
@@ -129,6 +141,8 @@ export function LegajoAdminScreen({
           intro={t.documentos.intro}
           onAviso={setAviso}
         />
+
+        <HistorialDocumentos historial={historial} descargar={accionesDocumentos.descargar} />
       </div>
     </>
   );

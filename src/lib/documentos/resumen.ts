@@ -13,6 +13,9 @@ export type DocumentoFila = {
   fileName: string;
   creadoEn: string;
   motivoRechazo: string | null;
+  // Replaced documents only (Admin reads; an Empleado never gets these rows).
+  reemplazadoEn?: string | null;
+  reemplazadoPor?: string | null;
 };
 
 // The state shown for a type: pending first, then a rejection that is the
