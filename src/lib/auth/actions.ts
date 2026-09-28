@@ -60,11 +60,12 @@ export async function login(
         // The activity marker starts with the session (server-side
         // inactivity limit, src/lib/sesion/marca.ts).
         const sesionId = sesionIdDeToken(data.session.access_token);
-        if (!sesionId) {
+        // Without a session id, or without a usable SESSION_SECRET (fail
+        // closed), the session could not pass the guard: end it here.
+        if (!sesionId || !(await sellarActividad(sesionId))) {
           await supabase.auth.signOut();
           outcome = LOGIN_FAILED;
         } else {
-          await sellarActividad(sesionId);
           // Back to the page that asked for the sign-in, when it is a safe,
           // known route; a pending password change comes first.
           const volver = rutaRetornoSegura(formData.get(VOLVER_PARAM));

@@ -42,6 +42,18 @@ describe("activity marker", async () => {
     expect((await leerMarca(clave, await firmarMarca(clave, OTRA, AHORA), SESION, AHORA)).estado).toBe("invalida");
   });
 
+  it("a marker signed with one secret is refused under another", async () => {
+    const otra = await claveMarca("otro-secreto-de-prueba-0123456789abcdefghijk");
+    const marca = await firmarMarca(otra, SESION, AHORA);
+    expect((await leerMarca(clave, marca, SESION, AHORA)).estado).toBe("invalida");
+    expect((await leerMarca(otra, marca, SESION, AHORA)).estado).toBe("vigente");
+  });
+
+  it("without a key (no usable secret) every marker is refused", async () => {
+    const marca = await firmarMarca(clave, SESION, AHORA);
+    expect(await leerMarca(null, marca, SESION, AHORA)).toEqual({ estado: "invalida" });
+  });
+
   it("refuses a marker stamped in the future", async () => {
     const marca = await firmarMarca(clave, SESION, AHORA + 5 * 60_000);
     expect((await leerMarca(clave, marca, SESION, AHORA)).estado).toBe("invalida");

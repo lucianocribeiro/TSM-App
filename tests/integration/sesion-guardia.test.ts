@@ -58,7 +58,10 @@ describe("route guard against the local stack", () => {
   const marca = (sesionId: string, haceMs = 0) => firmarMarca(clave, sesionId, Date.now() - haceMs);
 
   beforeAll(async () => {
-    clave = await claveMarca(getServerEnv().supabaseServiceRoleKey);
+    // The same dedicated secret the proxy reads (set per CI run).
+    const secreto = process.env.SESSION_SECRET;
+    if (!secreto) throw new Error("SESSION_SECRET is required for this test");
+    clave = await claveMarca(secreto);
     empleado = await createTestUser(service, "guardia-empleado");
     admin = await createTestUser(service, "guardia-admin", "admin");
     ids.push(empleado.id, admin.id);

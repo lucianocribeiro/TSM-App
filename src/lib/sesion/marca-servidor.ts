@@ -1,7 +1,6 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
-import { getServerEnv } from "@/lib/env";
-import { claveMarca, firmarMarca, MARCA_COOKIE, opcionesMarca } from "./marca";
+import { claveMarcaEntorno, firmarMarca, MARCA_COOKIE, opcionesMarca } from "./marca";
 
 // Setting and clearing the activity marker from a Server Action (after
 // sign-in, after a password change, on sign-out). The proxy re-stamps it on
@@ -22,10 +21,14 @@ async function esHttps(): Promise<boolean> {
   return process.env.NODE_ENV === "production";
 }
 
-export async function sellarActividad(sesionId: string): Promise<void> {
-  const clave = await claveMarca(getServerEnv().supabaseServiceRoleKey);
+// False when there is no usable SESSION_SECRET: no marker is set, and the
+// session would be refused on the next request.
+export async function sellarActividad(sesionId: string): Promise<boolean> {
+  const clave = await claveMarcaEntorno();
+  if (!clave) return false;
   const valor = await firmarMarca(clave, sesionId, Date.now());
   (await cookies()).set(MARCA_COOKIE, valor, opcionesMarca(await esHttps()));
+  return true;
 }
 
 export async function borrarActividad(): Promise<void> {

@@ -2,8 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { PATHNAME_HEADER } from "@/lib/auth/gate";
 import { decidirAcceso, type SesionGuardia } from "@/lib/auth/guardia";
-import { getPublicEnv, getServerEnv } from "@/lib/env";
-import { claveMarca, firmarMarca, leerMarca, MARCA_COOKIE, opcionesMarca } from "@/lib/sesion/marca";
+import { getPublicEnv } from "@/lib/env";
+import { claveMarcaEntorno, firmarMarca, leerMarca, MARCA_COOKIE, opcionesMarca } from "@/lib/sesion/marca";
 import type { Database } from "@/lib/supabase/database.types";
 
 // Auth session cookie names of @supabase/ssr (including chunked cookies).
@@ -74,7 +74,8 @@ export async function updateSession(request: NextRequest) {
       .eq("id", userId)
       .maybeSingle();
 
-    clave = await claveMarca(getServerEnv().supabaseServiceRoleKey);
+    // Null without a usable SESSION_SECRET: every marker is then invalid.
+    clave = await claveMarcaEntorno();
     const marca = sesionId
       ? await leerMarca(clave, request.cookies.get(MARCA_COOKIE)?.value, sesionId, ahora)
       : ({ estado: "invalida" } as const);

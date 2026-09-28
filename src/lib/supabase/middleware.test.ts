@@ -28,13 +28,15 @@ vi.mock("@supabase/ssr", () => ({
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
-process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+// A test-only secret (not a real one); long enough to be accepted.
+const SECRETO = "test-session-secret-0123456789abcdefghijklmnopq";
+process.env.SESSION_SECRET = SECRETO;
 
 const { updateSession } = await import("./middleware");
 const { claveMarca, firmarMarca, MARCA_COOKIE } = await import("@/lib/sesion/marca");
 
 const SESSION_COOKIE = "sb-127-auth-token";
-const clave = await claveMarca("test-service-role-key");
+const clave = await claveMarca(SECRETO);
 
 async function marca(haceMs = 0, sesion = SESION) {
   return firmarMarca(clave, sesion, Date.now() - haceMs);
@@ -222,6 +224,29 @@ describe("proxy route guard", () => {
     it("a token without a session id cannot carry a marker", async () => {
       state.claims = { sub: "user-1" };
       expect(locationOf(await updateSession(await request("/mi-legajo")))).toBe(LOGIN_INACTIVIDAD);
+    });
+
+    it("fails closed without a usable SESSION_SECRET: every marker is refused, protected routes too", async () => {
+      const errores = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      for (const valor of [undefined, "", "demasiado-corto"]) {
+        vi.resetModules();
+        if (valor === undefined) delete process.env.SESSION_SECRET;
+        else process.env.SESSION_SECRET = valor;
+        const { updateSession: sinSecreto } = await import("./middleware");
+        state.profile = perfil({ role: "admin" });
+        for (const path of ["/mi-legajo", "/legajos", "/aprobaciones"]) {
+          const response = await sinSecreto(await request(path));
+          expect(locationOf(response), `${String(valor)} ${path}`).toBe(LOGIN_INACTIVIDAD);
+          expect(clears(response, SESSION_COOKIE)).toBe(true);
+        }
+      }
+      // One clear configuration error per process, never the value.
+      const mensajes = errores.mock.calls.map((call) => call.join(" "));
+      expect(mensajes.some((m) => m.includes("SESSION_SECRET"))).toBe(true);
+      expect(mensajes.join(" ")).not.toContain("demasiado-corto");
+      errores.mockRestore();
+      process.env.SESSION_SECRET = SECRETO;
+      vi.resetModules();
     });
 
     it("does not redirect the login page to itself", async () => {

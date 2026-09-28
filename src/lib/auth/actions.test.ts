@@ -66,7 +66,7 @@ beforeEach(() => {
   mocks.createClient.mockReset();
   mocks.verifyCurrentPassword.mockReset();
   mocks.redirect.mockClear();
-  mocks.sellarActividad.mockReset().mockResolvedValue(undefined);
+  mocks.sellarActividad.mockReset().mockResolvedValue(true);
   mocks.borrarActividad.mockReset().mockResolvedValue(undefined);
   mocks.getSessionUser.mockReset();
 });
@@ -139,6 +139,15 @@ describe("login", () => {
     await expect(login(null, form({ email: "ana@mitsm.test", password: "secret", volver: "/legajos" }))).rejects.toThrow(
       "NEXT_REDIRECT:/cambiar-password",
     );
+  });
+
+  it("fails closed when the activity marker cannot be signed (no usable SESSION_SECRET)", async () => {
+    const { client, signOut } = signedInClient({ estado_cuenta: "activa", debe_cambiar_password: false });
+    mocks.createClient.mockResolvedValue(client);
+    mocks.sellarActividad.mockResolvedValue(false);
+    await expect(login(null, form({ email: "ana@mitsm.test", password: "secret" }))).resolves.toEqual(INVALID);
+    expect(signOut).toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
   it("signs out when the new session has no id to bind the activity marker to", async () => {

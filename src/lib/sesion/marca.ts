@@ -1,12 +1,13 @@
+import { leerSecretoSesion } from "./secreto";
 import { INACTIVIDAD_MS, MARCA_DESFASE_MS, MARCA_RENOVAR_MS } from "./tiempos";
 
 // Server-side inactivity enforcement: the last-activity marker.
 //
 // An httpOnly cookie "v1.<session id>.<last activity, ms>.<signature>". The
 // signature is an HMAC-SHA256 over the first three parts, with a key only the
-// server has: derived (HKDF) from the server-only SUPABASE_SERVICE_ROLE_KEY,
-// so no new secret is needed, and the service-role key itself is never used
-// or exposed as a key. The browser cannot read it (httpOnly), cannot stamp a
+// server has: derived (HKDF, fixed context label) from the dedicated
+// server-only SESSION_SECRET (./secreto.ts; no key at all when it is missing
+// or too short). The browser cannot read it (httpOnly), cannot stamp a
 // later time (the signature would not match), and cannot reuse a marker from
 // another session (the session id is part of what is signed and must match
 // the JWT's session_id). Only the server re-stamps it, on requests the user
@@ -23,6 +24,12 @@ const encoder = new TextEncoder();
 
 let clavePromesa: Promise<CryptoKey> | null = null;
 let claveOrigen: string | null = null;
+
+// The key from SESSION_SECRET, or null (fail closed) when it is not usable.
+export async function claveMarcaEntorno(): Promise<CryptoKey | null> {
+  const secreto = leerSecretoSesion();
+  return secreto ? claveMarca(secreto) : null;
+}
 
 // The HMAC key, derived once per secret.
 export function claveMarca(secreto: string): Promise<CryptoKey> {
@@ -77,12 +84,13 @@ export type EstadoMarca =
 // malformed, forged, altered or from another session. Callers treat
 // "invalida" and "vencida" the same way (the session ends).
 export async function leerMarca(
-  clave: CryptoKey,
+  clave: CryptoKey | null,
   valor: string | undefined,
   sesionId: string,
   ahora: number,
 ): Promise<EstadoMarca> {
-  if (!valor || valor.length > 256) return { estado: "invalida" };
+  // No key (SESSION_SECRET missing or too short): nothing is ever valid.
+  if (!clave || !valor || valor.length > 256) return { estado: "invalida" };
   const partes = valor.split(".");
   if (partes.length !== 4) return { estado: "invalida" };
   const [version, id, instanteTexto, firmaTexto] = partes;
