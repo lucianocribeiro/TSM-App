@@ -131,9 +131,11 @@ async function documentoDe(input: unknown) {
 }
 
 // Deletes the current (approved) document. The row goes first, so no row
-// ever points to a missing file; if removing the object then fails, it is
-// a rowless object and the next sweep of that folder removes it. Pending
-// employee uploads are decided in the approvals inbox, not deleted here.
+// ever points to a missing file. If removing the object then fails, the
+// Admin gets the controlled cleanup error (the document is already gone from
+// the legajo); the object is rowless and the next sweep of that folder
+// removes it. Pending employee uploads are decided in the approvals inbox,
+// not deleted here.
 export async function eliminarDocumentoAdmin(input: unknown): Promise<ActionResult> {
   const found = await documentoDe(input);
   if (!found) return noAutorizado;
@@ -143,9 +145,12 @@ export async function eliminarDocumentoAdmin(input: unknown): Promise<ActionResu
   const { supabase, documento, profileId } = found;
   const deleted = await supabase.from("legajo_documentos").delete().eq("id", documento.id).select("id");
   if (deleted.error || !deleted.data?.length) return { ok: false, error: docErrors.eliminarFallo };
-  if (!(await eliminarObjeto(supabase, documento.storage_path))) avisarFalloLimpieza(ORIGEN, "delete");
-
+  // The row is gone either way: the page shows it.
   revalidar(profileId);
+  if (!(await eliminarObjeto(supabase, documento.storage_path))) {
+    avisarFalloLimpieza(ORIGEN, "delete");
+    return { ok: false, error: docErrors.limpiezaFallo };
+  }
   return { ok: true };
 }
 

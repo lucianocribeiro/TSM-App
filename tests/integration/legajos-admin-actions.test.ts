@@ -18,6 +18,17 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => session.client }));
 vi.mock("@/lib/auth/session", () => ({ getSessionUser: async () => session.user }));
+// Storage cannot be made to fail on demand, so the removal of one object can
+// be forced to fail here; by default it is the real removal.
+const limpieza = vi.hoisted(() => ({ fallarEliminacion: false }));
+vi.mock("@/lib/documentos/limpieza", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/documentos/limpieza")>();
+  return {
+    ...actual,
+    eliminarObjeto: async (...args: Parameters<typeof actual.eliminarObjeto>) =>
+      limpieza.fallarEliminacion ? false : actual.eliminarObjeto(...args),
+  };
+});
 
 const actions = await import("@/app/(app)/legajos/actions");
 const { cargarListadoLegajos } = await import("@/lib/legajo/admin-legajos");
@@ -295,6 +306,30 @@ describe("/legajos Server Actions (Admin)", () => {
       const { count } = await service.from("legajo_documentos").select("id", { count: "exact", head: true }).eq("id", row!.id);
       expect(count).toBe(0);
       expect(await exists(second)).toBe(false);
+    });
+
+    it("a failed object removal on delete returns the cleanup error; the row is gone and the sweep removes the object", async () => {
+      const path = await uploadFor(empleado, "dni_frente", fakePdf("delete fails"));
+      expect((await actions.registrarDocumentoAdmin({ profileId: empleado.id, tipo: "dni_frente", path, fileName: "d.pdf" })).ok).toBe(true);
+      const { data: row } = await service.from("legajo_documentos").select("id").eq("storage_path", path).single();
+
+      limpieza.fallarEliminacion = true;
+      try {
+        as(admin, "admin");
+        expect(await actions.eliminarDocumentoAdmin({ profileId: empleado.id, documentoId: row!.id })).toEqual({
+          ok: false,
+          error: copy.miLegajo.documentos.errors.limpiezaFallo,
+        });
+      } finally {
+        limpieza.fallarEliminacion = false;
+      }
+      const { count } = await service.from("legajo_documentos").select("id", { count: "exact", head: true }).eq("id", row!.id);
+      expect(count).toBe(0);
+      expect(await exists(path)).toBe(true);
+
+      // Rowless and, an hour later, old: the existing sweep of that folder takes it.
+      await barrerHuerfanos(admin.client, empleado.id, { now: new Date(Date.now() + 60 * 60 * 1000) });
+      expect(await exists(path)).toBe(false);
     });
 
     it("shows but does not delete an employee's pending upload, and refuses a new one of that type meanwhile", async () => {

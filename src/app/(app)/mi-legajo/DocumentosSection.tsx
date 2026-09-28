@@ -39,6 +39,10 @@ type DocumentosSectionProps = {
 
 export function DocumentosSection({ documentos, acciones, esAdmin, eliminable, intro, onAviso }: DocumentosSectionProps) {
   const [aEliminar, setAEliminar] = useState<DocumentoFila | null>(null);
+  // A failed delete, shown under the table once the dialog closes. The table
+  // itself shows the real state (after a failed object removal the document
+  // is already gone from the legajo).
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   return (
     <section aria-labelledby="documentos-title" className="flex flex-col gap-3" data-testid="documentos">
@@ -66,17 +70,29 @@ export function DocumentosSection({ documentos, acciones, esAdmin, eliminable, i
               esAdmin={esAdmin}
               eliminable={eliminable}
               onAviso={onAviso}
-              onEliminar={setAEliminar}
+              onEliminar={(documento) => {
+                setErrorEliminar(null);
+                setAEliminar(documento);
+              }}
             />
           ))}
         </tbody>
       </Table>
+      {errorEliminar ? (
+        <p role="alert" data-testid="documentos-error" className="text-[12.5px] italic text-accent-deep">
+          {errorEliminar}
+        </p>
+      ) : null}
       <EliminarDialog
         documento={aEliminar}
         eliminar={acciones.eliminar}
         body={eliminable === "vigente" ? copy.legajos.documentos.eliminarVigenteBody : t.eliminarBody}
         onClose={() => setAEliminar(null)}
         onAviso={onAviso}
+        onError={(mensaje) => {
+          setAEliminar(null);
+          setErrorEliminar(mensaje);
+        }}
       />
     </section>
   );
@@ -243,25 +259,31 @@ function EliminarDialog({
   body,
   onClose,
   onAviso,
+  onError,
 }: {
   documento: DocumentoFila | null;
   eliminar: AccionesDocumentos["eliminar"];
   body: string;
   onClose: () => void;
   onAviso: (mensaje: string) => void;
+  // A failed delete closes the dialog and hands the es-AR error to the section.
+  onError: (mensaje: string) => void;
 }) {
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function confirmar() {
     if (!documento) return;
     startTransition(async () => {
-      const result = await eliminar({ documentoId: documento.id });
+      let result: Awaited<ReturnType<AccionesDocumentos["eliminar"]>>;
+      try {
+        result = await eliminar({ documentoId: documento.id });
+      } catch {
+        result = { ok: false, error: t.errors.eliminarFallo };
+      }
       if (!result.ok) {
-        setError(result.error);
+        onError(result.error);
         return;
       }
-      setError(null);
       onClose();
       onAviso(t.exito.eliminado);
     });
@@ -270,21 +292,13 @@ function EliminarDialog({
   return (
     <Dialog
       open={documento !== null}
-      onClose={() => {
-        setError(null);
-        onClose();
-      }}
+      onClose={onClose}
       title={t.eliminarTitle}
     >
       <p className="text-ink-soft">
         {body}
         {documento ? ` (${copy.documentos.tipos[documento.tipo]}: ${documento.fileName})` : ""}
       </p>
-      {error ? (
-        <p role="alert" className="text-[12.5px] italic text-accent-deep">
-          {error}
-        </p>
-      ) : null}
       <div className="mt-2 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
           {copy.miLegajo.pendiente.volver}

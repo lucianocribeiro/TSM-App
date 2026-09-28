@@ -297,10 +297,11 @@ describe("eliminarDocumentoAdmin", () => {
     expect(state.remove).not.toHaveBeenCalled();
   });
 
-  it("still succeeds when the object removal fails, noting it for the sweep", async () => {
+  it("returns the cleanup error when the object removal fails, after deleting the row", async () => {
     state.resolve = (_table, ops) => (ops.includes("delete") ? { data: [{ id: DOC_ID }], error: null } : { data: documento("aprobado"), error: null });
     state.remove = vi.fn(async () => ({ data: null, error: { message: "x" } }));
-    await expect(eliminar()).resolves.toEqual({ ok: true });
+    await expect(eliminar()).resolves.toEqual({ ok: false, error: docErrors.limpiezaFallo });
+    expect(state.queries.some((q) => q.ops.includes("delete"))).toBe(true);
     expect(logged()).toContain("[legajos] legajo-docs cleanup failed: delete");
     expect(logged()).not.toContain(FILE_ID);
   });
