@@ -267,7 +267,7 @@ describe("/legajos Server Actions (Admin)", () => {
       return path;
     }
 
-    it("uploads for an employee as approved, replaces in place, downloads and deletes", async () => {
+    it("uploads for an employee as approved, replaces for good, downloads and deletes", async () => {
       const first = await uploadFor(empleado, "dni_dorso", fakePdf("admin v1"));
       expect(await actions.registrarDocumentoAdmin({ profileId: empleado.id, tipo: "dni_dorso", path: first, fileName: "v1.pdf" })).toEqual({
         ok: true,
@@ -276,34 +276,44 @@ describe("/legajos Server Actions (Admin)", () => {
       const { data: row } = await service.from("legajo_documentos").select("id, estado, uploaded_by, revisado_por").eq("storage_path", first).single();
       expect(row).toMatchObject({ estado: "aprobado", uploaded_by: admin.id, revisado_por: admin.id });
 
-      // Replace: the same row gets the new file; the old object goes.
-      const second = await uploadFor(empleado, "dni_dorso", fakePdf("admin v2"));
-      expect(await actions.registrarDocumentoAdmin({ profileId: empleado.id, tipo: "dni_dorso", path: second, fileName: "v2.pdf" })).toEqual({
-        ok: true,
-        data: { estado: "aprobado" },
+      // A replacement needs a mode: without one, nothing changes and the upload is removed.
+      const sinModo = await uploadFor(empleado, "dni_dorso", fakePdf("admin sin modo"));
+      expect(await actions.registrarDocumentoAdmin({ profileId: empleado.id, tipo: "dni_dorso", path: sinModo, fileName: "x.pdf" })).toEqual({
+        ok: false,
+        error: copy.legajos.documentos.errors.modoRequerido,
       });
+      expect(await exists(sinModo)).toBe(false);
+
+      // Replace for good: the previous row and its object go; the new file is approved.
+      const second = await uploadFor(empleado, "dni_dorso", fakePdf("admin v2"));
+      expect(
+        await actions.registrarDocumentoAdmin({ profileId: empleado.id, tipo: "dni_dorso", path: second, fileName: "v2.pdf", modo: "definitivo" }),
+      ).toEqual({ ok: true, data: { estado: "aprobado" } });
       const legajo = await legajoOf(empleado.id);
       const { data: filas } = await service
         .from("legajo_documentos")
-        .select("id, storage_path, file_name")
+        .select("id, storage_path, file_name, estado, revisado_por")
         .eq("legajo_id", legajo.id)
         .eq("tipo", "dni_dorso");
-      expect(filas).toEqual([{ id: row!.id, storage_path: second, file_name: "v2.pdf" }]);
+      expect(filas).toHaveLength(1);
+      expect(filas?.[0]).toMatchObject({ storage_path: second, file_name: "v2.pdf", estado: "aprobado", revisado_por: admin.id });
+      expect(filas?.[0].id).not.toBe(row!.id);
       expect(await exists(first)).toBe(false);
+      const nuevo = filas![0];
 
       as(admin, "admin");
-      const url = await actions.obtenerUrlDocumentoAdmin({ profileId: empleado.id, documentoId: row!.id });
+      const url = await actions.obtenerUrlDocumentoAdmin({ profileId: empleado.id, documentoId: nuevo.id });
       expect(url.ok).toBe(true);
       const response = await fetch(url.ok ? url.data!.url : "");
       expect(await response.text()).toContain("FAKE TEST FILE - admin v2");
       expect(response.headers.get("content-disposition")).toContain("attachment");
 
       // The id must belong to the employee in the input.
-      expect((await actions.obtenerUrlDocumentoAdmin({ profileId: otro.id, documentoId: row!.id })).ok).toBe(false);
-      expect((await actions.eliminarDocumentoAdmin({ profileId: otro.id, documentoId: row!.id })).ok).toBe(false);
+      expect((await actions.obtenerUrlDocumentoAdmin({ profileId: otro.id, documentoId: nuevo.id })).ok).toBe(false);
+      expect((await actions.eliminarDocumentoAdmin({ profileId: otro.id, documentoId: nuevo.id })).ok).toBe(false);
 
-      expect(await actions.eliminarDocumentoAdmin({ profileId: empleado.id, documentoId: row!.id })).toEqual({ ok: true });
-      const { count } = await service.from("legajo_documentos").select("id", { count: "exact", head: true }).eq("id", row!.id);
+      expect(await actions.eliminarDocumentoAdmin({ profileId: empleado.id, documentoId: nuevo.id })).toEqual({ ok: true });
+      const { count } = await service.from("legajo_documentos").select("id", { count: "exact", head: true }).eq("id", nuevo.id);
       expect(count).toBe(0);
       expect(await exists(second)).toBe(false);
     });

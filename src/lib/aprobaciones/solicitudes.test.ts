@@ -4,6 +4,7 @@ import { legajoPersonalSchema, type LegajoPersonal } from "@/lib/legajo/validati
 import {
   buildSolicitudItems,
   buildSolicitudItemsDe,
+  decisionBandejaError,
   decisionErrorMessage,
   DOCUMENTO_PENDIENTE_INDEX,
   documentoErrorMessage,
@@ -191,6 +192,18 @@ describe("error messages", () => {
     expect(decisionErrorMessage({ code: "55000" })).toBe(messages.noPendiente);
     expect(decisionErrorMessage({ code: "42501", message: "permission denied" })).toBe(messages.guardarFallo);
     expect(decisionErrorMessage(null)).toBe(messages.guardarFallo);
+    expect(decisionErrorMessage({ code: "55000", hint: "cuenta_propia" })).toBe(messages.cuentaPropia);
+  });
+
+  it("maps inbox decision errors, flagging items that are no longer pending", () => {
+    expect(decisionBandejaError({ code: "55000" })).toEqual({ error: messages.yaDecidido, yaDecidido: true });
+    expect(decisionBandejaError({ code: "P0002" })).toEqual({ error: messages.yaDecidido, yaDecidido: true });
+    expect(decisionBandejaError({ code: "55000", hint: "cuenta_propia" })).toEqual({ error: messages.cuentaPropia, yaDecidido: false });
+    expect(decisionBandejaError({ code: "22023" })).toEqual({ error: messages.motivoRequerido, yaDecidido: false });
+    expect(decisionBandejaError({ code: "42501", message: "permission denied for x" })).toEqual({
+      error: messages.guardarFallo,
+      yaDecidido: false,
+    });
   });
 });
 
