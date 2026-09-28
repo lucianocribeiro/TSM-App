@@ -5,7 +5,8 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 // Everything /mi-legajo shows, read with the user's own session: RLS limits
-// every query to their legajo, children, documents and requests.
+// every query to their legajo, children, documents and requests. /legajos
+// reuses it for any employee with an Admin's session (whose RLS reaches all).
 
 type LegajoRow = Database["public"]["Tables"]["legajos"]["Row"];
 type SolicitudEstado = Database["public"]["Enums"]["solicitud_estado"];

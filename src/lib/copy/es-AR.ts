@@ -172,6 +172,67 @@ export type Copy = {
   legajos: {
     kicker: string;
     title: string;
+    loading: string;
+    listaFallo: string;
+    vacio: string;
+    sinResultados: string;
+    total: string;
+    kpis: {
+      label: string;
+      activos: string;
+      ingresosDelMes: string;
+    };
+    busqueda: {
+      label: string;
+      placeholder: string;
+    };
+    filtros: {
+      label: string;
+      estadoLaboral: string;
+      area: string;
+      sede: string;
+      modalidad: string;
+      todos: string;
+      todas: string;
+      mostrarBajas: string;
+      limpiar: string;
+    };
+    columnas: {
+      empleado: string;
+      cuil: string;
+      area: string;
+      puesto: string;
+      sede: string;
+      modalidad: string;
+      estadoLaboral: string;
+    };
+    sinNombre: string;
+    sinDato: string;
+    numeroLegajo: string;
+    dadoDeBaja: string;
+    detalle: {
+      kicker: string;
+      volver: string;
+      verCuenta: string;
+      nota: string;
+      propio: string;
+      cuentaInactiva: string;
+      solicitudPendiente: string;
+      cargaFallo: string;
+    };
+    laborales: {
+      antiguedadNota: string;
+    };
+    documentos: {
+      intro: string;
+      eliminarVigenteBody: string;
+    };
+    errors: {
+      solicitudPendiente: string;
+      documentoPendiente: string;
+      numeroLegajoDuplicado: string;
+      noEncontrado: string;
+    };
   };
   usuarios: {
     kicker: string;
@@ -594,6 +655,70 @@ export const copy = {
   legajos: {
     kicker: "Administración",
     title: "Legajos",
+    loading: "Cargando legajos…",
+    listaFallo: "No pudimos cargar los legajos. Intentá de nuevo.",
+    vacio: "Todavía no hay empleados con legajo.",
+    sinResultados: "No encontramos empleados con esa búsqueda o esos filtros.",
+    total: "{n} de {total} empleados",
+    kpis: {
+      label: "Resumen del personal",
+      activos: "Activos",
+      ingresosDelMes: "Ingresos del mes",
+    },
+    busqueda: {
+      label: "Buscar",
+      placeholder: "Nombre, DNI, CUIL o número de legajo",
+    },
+    filtros: {
+      label: "Filtros",
+      estadoLaboral: "Estado laboral",
+      area: "Área",
+      sede: "Sede",
+      modalidad: "Modalidad",
+      todos: "Todos",
+      todas: "Todas",
+      mostrarBajas: "Mostrar dados de baja",
+      limpiar: "Limpiar filtros",
+    },
+    columnas: {
+      empleado: "Empleado",
+      cuil: "CUIL",
+      area: "Área",
+      puesto: "Puesto",
+      sede: "Sede",
+      modalidad: "Modalidad",
+      estadoLaboral: "Estado laboral",
+    },
+    sinNombre: "Sin nombre cargado",
+    sinDato: "—",
+    numeroLegajo: "Legajo {numero}",
+    dadoDeBaja: "Dado de baja",
+    detalle: {
+      kicker: "Legajo",
+      volver: "Volver a Legajos",
+      verCuenta: "Ver cuenta en Usuarios",
+      nota: "Los cambios que hagas acá se guardan directamente, sin pasar por aprobación.",
+      propio: "Este es tu propio legajo. Desde acá también podés editar tus datos laborales.",
+      cuentaInactiva: "La cuenta de este empleado está dada de baja. Su legajo se puede consultar y corregir.",
+      solicitudPendiente:
+        "Este empleado tiene una solicitud de cambios pendiente. Sus datos personales, de contacto, familiares y de emergencia no se pueden editar hasta que se resuelva. Los datos laborales y los documentos se pueden editar igual.",
+      cargaFallo: "No pudimos cargar este legajo. Intentá de nuevo.",
+    },
+    laborales: {
+      antiguedadNota: "La antigüedad se calcula a partir de la fecha de ingreso.",
+    },
+    documentos: {
+      intro: "Subí archivos PDF, JPG o PNG de hasta 10 MB. Los documentos que subas quedan aprobados.",
+      eliminarVigenteBody: "Vamos a eliminar el documento vigente. Esta acción no se puede deshacer.",
+    },
+    errors: {
+      solicitudPendiente:
+        "Este empleado tiene una solicitud de cambios pendiente. Tiene que resolverse antes de editar estos datos.",
+      documentoPendiente:
+        "Este empleado tiene un documento de este tipo pendiente de aprobación. Tiene que resolverse antes de subir otro.",
+      numeroLegajoDuplicado: "Ese número de legajo ya está asignado a otro empleado.",
+      noEncontrado: "No encontramos este legajo.",
+    },
   },
   usuarios: {
     kicker: "Administración",

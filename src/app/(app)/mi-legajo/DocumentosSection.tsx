@@ -5,33 +5,44 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { rowClassName, Table, Td, Th } from "@/components/ui/Table";
+import type { ActionResult } from "@/lib/action-result";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
 import type { DocumentoFila, ResumenDocumento } from "@/lib/documentos/resumen";
-import { subirDocumento } from "@/lib/documentos/subida";
+import { subirDocumento, type SubidaPasos } from "@/lib/documentos/subida";
 import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "@/lib/documentos/tipos";
 import { validateDocumentoUpload } from "@/lib/documentos/validation";
 import { formatearFechaHora } from "@/lib/format/fecha";
 import { createClient } from "@/lib/supabase/client";
-import {
-  descartarSubida,
-  eliminarDocumentoPendiente,
-  obtenerUrlDocumento,
-  prepararSubidaDocumento,
-  registrarDocumento,
-} from "./actions";
 
 const t = copy.miLegajo.documentos;
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
 
+// The Server Actions behind the section: /mi-legajo's for the own legajo,
+// /legajos' (bound to the employee) for an Admin acting on any legajo.
+export type AccionesDocumentos = Pick<SubidaPasos, "preparar" | "registrar" | "descartar"> & {
+  descargar: (input: { documentoId: string }) => Promise<ActionResult<{ url: string }>>;
+  eliminar: (input: { documentoId: string }) => Promise<ActionResult>;
+};
+
 type DocumentosSectionProps = {
   documentos: ResumenDocumento[];
+  acciones: AccionesDocumentos;
+  // Admin uploads need no approval (success message).
   esAdmin: boolean;
+  // Which file can be deleted: the own pending upload (/mi-legajo) or the
+  // current approved document (Admin in /legajos).
+  eliminable: "pendiente" | "vigente";
+  intro: string;
   onAviso: (mensaje: string) => void;
 };
 
-export function DocumentosSection({ documentos, esAdmin, onAviso }: DocumentosSectionProps) {
+export function DocumentosSection({ documentos, acciones, esAdmin, eliminable, intro, onAviso }: DocumentosSectionProps) {
   const [aEliminar, setAEliminar] = useState<DocumentoFila | null>(null);
+  // A failed delete, shown under the table once the dialog closes. The table
+  // itself shows the real state (after a failed object removal the document
+  // is already gone from the legajo).
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   return (
     <section aria-labelledby="documentos-title" className="flex flex-col gap-3" data-testid="documentos">
@@ -39,7 +50,7 @@ export function DocumentosSection({ documentos, esAdmin, onAviso }: DocumentosSe
         <h2 id="documentos-title" className="text-[24px] font-normal leading-[1.1]">
           {t.title}
         </h2>
-        <p className="mt-1 text-[12.5px] italic text-ink-soft">{t.intro}</p>
+        <p className="mt-1 text-[12.5px] italic text-ink-soft">{intro}</p>
       </div>
       <Table>
         <thead>
@@ -55,26 +66,50 @@ export function DocumentosSection({ documentos, esAdmin, onAviso }: DocumentosSe
             <DocumentoRow
               key={resumen.tipo}
               resumen={resumen}
+              acciones={acciones}
               esAdmin={esAdmin}
+              eliminable={eliminable}
               onAviso={onAviso}
-              onEliminar={setAEliminar}
+              onEliminar={(documento) => {
+                setErrorEliminar(null);
+                setAEliminar(documento);
+              }}
             />
           ))}
         </tbody>
       </Table>
-      <EliminarDialog documento={aEliminar} onClose={() => setAEliminar(null)} onAviso={onAviso} />
+      {errorEliminar ? (
+        <p role="alert" data-testid="documentos-error" className="text-[12.5px] italic text-accent-deep">
+          {errorEliminar}
+        </p>
+      ) : null}
+      <EliminarDialog
+        documento={aEliminar}
+        eliminar={acciones.eliminar}
+        body={eliminable === "vigente" ? copy.legajos.documentos.eliminarVigenteBody : t.eliminarBody}
+        onClose={() => setAEliminar(null)}
+        onAviso={onAviso}
+        onError={(mensaje) => {
+          setAEliminar(null);
+          setErrorEliminar(mensaje);
+        }}
+      />
     </section>
   );
 }
 
 function DocumentoRow({
   resumen,
+  acciones,
   esAdmin,
+  eliminable,
   onAviso,
   onEliminar,
 }: {
   resumen: ResumenDocumento;
+  acciones: AccionesDocumentos;
   esAdmin: boolean;
+  eliminable: "pendiente" | "vigente";
   onAviso: (mensaje: string) => void;
   onEliminar: (documento: DocumentoFila) => void;
 }) {
@@ -88,7 +123,7 @@ function DocumentoRow({
   function descargar(documento: DocumentoFila) {
     setError(null);
     startDownload(async () => {
-      const result = await obtenerUrlDocumento({ documentoId: documento.id });
+      const result = await acciones.descargar({ documentoId: documento.id });
       if (!result.ok || !result.data) {
         setError(result.ok ? copy.documentos.errors.downloadFailed : result.error);
         return;
@@ -118,7 +153,7 @@ function DocumentoRow({
     }
     startUpload(async () => {
       // subir never throws, so the transition always ends (no stuck spinner).
-      const error = await subir(resumen.tipo, file);
+      const error = await subir(acciones, resumen.tipo, file);
       if (error) {
         setError(error);
         return;
@@ -152,18 +187,27 @@ function DocumentoRow({
       <Td>
         <div className="flex flex-wrap gap-2 *:whitespace-nowrap">
           {resumen.vigente ? (
-            <Button variant="secondary" onClick={() => descargar(resumen.vigente!)} disabled={descargando}>
-              {t.descargar}
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => descargar(resumen.vigente!)} disabled={descargando}>
+                {t.descargar}
+              </Button>
+              {eliminable === "vigente" ? (
+                <Button variant="secondary" onClick={() => onEliminar(resumen.vigente!)}>
+                  {t.eliminar}
+                </Button>
+              ) : null}
+            </>
           ) : null}
           {resumen.pendiente ? (
             <>
               <Button variant="secondary" onClick={() => descargar(resumen.pendiente!)} disabled={descargando}>
                 {t.descargarPendiente}
               </Button>
-              <Button variant="secondary" onClick={() => onEliminar(resumen.pendiente!)}>
-                {t.eliminar}
-              </Button>
+              {eliminable === "pendiente" ? (
+                <Button variant="secondary" onClick={() => onEliminar(resumen.pendiente!)}>
+                  {t.eliminar}
+                </Button>
+              ) : null}
             </>
           ) : null}
           {resumen.puedeSubir ? (
@@ -195,14 +239,14 @@ function DocumentoRow({
 // Upload: a path from the server, the file straight to Storage with the
 // user's session, then the server records it; a failed registration discards
 // the object (src/lib/documentos/subida.ts). Returns an es-AR error or null.
-function subir(tipo: DocumentoTipo, file: File): Promise<string | null> {
+function subir(acciones: AccionesDocumentos, tipo: DocumentoTipo, file: File): Promise<string | null> {
   return subirDocumento(
     {
-      preparar: prepararSubidaDocumento,
+      preparar: acciones.preparar,
       subirArchivo: (path) =>
         createClient().storage.from(DOCUMENTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: false }),
-      registrar: registrarDocumento,
-      descartar: descartarSubida,
+      registrar: acciones.registrar,
+      descartar: acciones.descartar,
     },
     tipo,
     file,
@@ -211,25 +255,35 @@ function subir(tipo: DocumentoTipo, file: File): Promise<string | null> {
 
 function EliminarDialog({
   documento,
+  eliminar,
+  body,
   onClose,
   onAviso,
+  onError,
 }: {
   documento: DocumentoFila | null;
+  eliminar: AccionesDocumentos["eliminar"];
+  body: string;
   onClose: () => void;
   onAviso: (mensaje: string) => void;
+  // A failed delete closes the dialog and hands the es-AR error to the section.
+  onError: (mensaje: string) => void;
 }) {
-  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function confirmar() {
     if (!documento) return;
     startTransition(async () => {
-      const result = await eliminarDocumentoPendiente({ documentoId: documento.id });
+      let result: Awaited<ReturnType<AccionesDocumentos["eliminar"]>>;
+      try {
+        result = await eliminar({ documentoId: documento.id });
+      } catch {
+        result = { ok: false, error: t.errors.eliminarFallo };
+      }
       if (!result.ok) {
-        setError(result.error);
+        onError(result.error);
         return;
       }
-      setError(null);
       onClose();
       onAviso(t.exito.eliminado);
     });
@@ -238,21 +292,13 @@ function EliminarDialog({
   return (
     <Dialog
       open={documento !== null}
-      onClose={() => {
-        setError(null);
-        onClose();
-      }}
+      onClose={onClose}
       title={t.eliminarTitle}
     >
       <p className="text-ink-soft">
-        {t.eliminarBody}
+        {body}
         {documento ? ` (${copy.documentos.tipos[documento.tipo]}: ${documento.fileName})` : ""}
       </p>
-      {error ? (
-        <p role="alert" className="text-[12.5px] italic text-accent-deep">
-          {error}
-        </p>
-      ) : null}
       <div className="mt-2 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
           {copy.miLegajo.pendiente.volver}

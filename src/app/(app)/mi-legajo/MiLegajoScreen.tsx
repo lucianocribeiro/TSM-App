@@ -13,13 +13,28 @@ import { formatCopy } from "@/lib/copy/format";
 import type { ResumenDocumento } from "@/lib/documentos/resumen";
 import { GRUPOS_EDITABLES } from "@/lib/legajo/grupos";
 import type { SolicitudActual } from "@/lib/legajo/mi-legajo";
-import { cancelarSolicitud } from "./actions";
-import { DocumentosSection } from "./DocumentosSection";
+import type { DatoLaboral } from "@/lib/legajo/vista";
+import {
+  cancelarSolicitud,
+  descartarSubida,
+  eliminarDocumentoPendiente,
+  obtenerUrlDocumento,
+  prepararSubidaDocumento,
+  registrarDocumento,
+} from "./actions";
+import { DocumentosSection, type AccionesDocumentos } from "./DocumentosSection";
 import { GrupoPanel } from "./GrupoPanel";
 
 const t = copy.miLegajo;
 
-export type DatoLaboral = { key: keyof typeof t.camposLaborales; value: string };
+const ACCIONES_DOCUMENTOS: AccionesDocumentos = {
+  preparar: prepararSubidaDocumento,
+  registrar: registrarDocumento,
+  descartar: descartarSubida,
+  descargar: obtenerUrlDocumento,
+  eliminar: eliminarDocumentoPendiente,
+};
+
 
 type MiLegajoScreenProps = {
   actual: LegajoActual;
@@ -114,7 +129,14 @@ export function MiLegajoScreen({ actual, solicitud, laborales, documentos, esAdm
           />
         </Panel>
 
-        <DocumentosSection documentos={documentos} esAdmin={esAdmin} onAviso={setAviso} />
+        <DocumentosSection
+          documentos={documentos}
+          acciones={ACCIONES_DOCUMENTOS}
+          esAdmin={esAdmin}
+          eliminable="pendiente"
+          intro={t.documentos.intro}
+          onAviso={setAviso}
+        />
       </div>
 
       <Dialog

@@ -2,12 +2,15 @@ import { parseHijosValor, serializeValor, type HijoValor, type LegajoActual } fr
 import type { CampoSolicitud } from "@/lib/aprobaciones/campos";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
-import { formatearFecha } from "@/lib/format/fecha";
-import type { Antiguedad } from "./antiguedad";
+import { formatearFecha, formatearPesos } from "@/lib/format/fecha";
+import type { Database } from "@/lib/supabase/database.types";
+import { calcularAntiguedad, type Antiguedad } from "./antiguedad";
+import { hoyEnArgentina } from "./fechas";
 import type { GrupoEditable } from "./grupos";
 import { ESTADOS_CIVILES } from "./options";
 
-// Display and form helpers for /mi-legajo. Pure.
+// Display and form helpers for /mi-legajo and /legajos. Pure (antigüedad is
+// as of today in Argentina).
 
 const t = copy.miLegajo;
 const DATE_FIELDS = new Set<string>(["fecha_nacimiento", "fecha_ingreso"]);
@@ -43,6 +46,30 @@ export function textoAntiguedad(antiguedad: Antiguedad | null): string {
   if (anios > 0) partes.push(formatCopy(anios === 1 ? t.antiguedad.anio : t.antiguedad.anios, { n: String(anios) }));
   if (meses > 0) partes.push(formatCopy(meses === 1 ? t.antiguedad.mes : t.antiguedad.meses, { n: String(meses) }));
   return partes.join(t.antiguedad.separador);
+}
+
+export type DatoLaboral = { key: keyof typeof t.camposLaborales; value: string };
+
+// Group E for display, in page order, with antigüedad calculated.
+export function datosLaboralesVista(legajo: Database["public"]["Tables"]["legajos"]["Row"]): DatoLaboral[] {
+  const sinDato = (value: string) => value || t.sinDato;
+  return [
+    { key: "numero_legajo", value: sinDato(legajo.numero_legajo ?? "") },
+    { key: "area", value: sinDato(legajo.area ?? "") },
+    { key: "puesto", value: sinDato(legajo.puesto ?? "") },
+    { key: "fecha_ingreso", value: sinDato(formatearFecha(legajo.fecha_ingreso)) },
+    {
+      key: "antiguedad",
+      value: legajo.fecha_ingreso
+        ? textoAntiguedad(calcularAntiguedad(legajo.fecha_ingreso, hoyEnArgentina()))
+        : t.sinDato,
+    },
+    { key: "estado_laboral", value: legajo.estado_laboral ? t.estadosLaborales[legajo.estado_laboral] : t.sinDato },
+    { key: "sede", value: sinDato(legajo.sede ?? "") },
+    { key: "modalidad", value: sinDato(legajo.modalidad ?? "") },
+    { key: "convenio", value: sinDato(legajo.convenio ?? "") },
+    { key: "bruto_mensual", value: sinDato(formatearPesos(legajo.bruto_mensual)) },
+  ];
 }
 
 // The value of a field in its stored text form.

@@ -1,6 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.5 (draft) | Governed by: `docs/constitucion.md`
-Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7).
+Version: 0.6 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded.
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -45,7 +45,10 @@ As Admin, I see the list of employees and open any legajo.
 - I can edit all legajo data (groups A to E); my changes apply directly, with no approval step.
 - I review pending changes and document uploads from employees and approve or reject them (detail in US-7).
 - I can upload, replace, delete and download documents for any employee; files go to a private bucket.
-- The Legajos list shows a KPI strip with legajo-based numbers only (no licencias or recibos metrics in Fase 1).
+- The Legajos list shows two KPI cards, over the whole workforce (not affected by the list's filters, search or the deactivated toggle):
+  - Activos: employees whose account is not deactivated and whose estado laboral is Activo or En prueba. Legajos without estado laboral are excluded.
+  - Ingresos del mes: of those active employees, the ones whose Fecha de ingreso falls in the current calendar month in Argentina (America/Argentina/Buenos_Aires).
+  "En licencia" arrives with the Licencias module in Fase 3 and "Recibos sin firmar" with Recibos in Fase 2; neither is shown in Fase 1.
 
 ### US-5 User management
 As Admin, I create an employee account and assign a role.
