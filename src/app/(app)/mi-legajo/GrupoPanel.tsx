@@ -10,6 +10,7 @@ import type { CampoSolicitud } from "@/lib/aprobaciones/campos";
 import type { LegajoActual } from "@/lib/aprobaciones/solicitudes";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
+import type { ActionResult } from "@/lib/action-result";
 import { camposDelGrupo, ESQUEMA_GRUPO, type GrupoEditable } from "@/lib/legajo/grupos";
 import { ESTADOS_CIVILES, PARTIDO_OTRO, PARTIDOS } from "@/lib/legajo/options";
 import { fieldErrors } from "@/lib/legajo/validation";
@@ -27,10 +28,13 @@ type GrupoPanelProps = {
   // A request is pending: nothing can be edited until it is decided.
   bloqueado: boolean;
   esAdmin: boolean;
+  // Saves the group. Default: the own legajo (an Admin's applies directly,
+  // an Empleado's becomes a change request). /legajos passes its own.
+  guardar?: (input: { grupo: GrupoEditable; valores: Record<string, unknown> }) => Promise<ActionResult>;
   onGuardado: (mensaje: string) => void;
 };
 
-export function GrupoPanel({ grupo, actual, propuestos, bloqueado, esAdmin, onGuardado }: GrupoPanelProps) {
+export function GrupoPanel({ grupo, actual, propuestos, bloqueado, esAdmin, guardar, onGuardado }: GrupoPanelProps) {
   const campos = camposDelGrupo(grupo);
   const [editando, setEditando] = useState(false);
   const titleId = `grupo-${grupo}-title`;
@@ -54,6 +58,7 @@ export function GrupoPanel({ grupo, actual, propuestos, bloqueado, esAdmin, onGu
             campos={campos}
             actual={actual}
             esAdmin={esAdmin}
+            guardar={guardar}
             onCancel={() => setEditando(false)}
             onSaved={(mensaje) => {
               setEditando(false);
@@ -95,6 +100,7 @@ function GrupoForm({
   campos,
   actual,
   esAdmin,
+  guardar,
   onCancel,
   onSaved,
 }: {
@@ -102,6 +108,7 @@ function GrupoForm({
   campos: CampoSolicitud[];
   actual: LegajoActual;
   esAdmin: boolean;
+  guardar: GrupoPanelProps["guardar"];
   onCancel: () => void;
   onSaved: (mensaje: string) => void;
 }) {
@@ -125,7 +132,7 @@ function GrupoForm({
     setErrores({});
     setError(null);
     startTransition(async () => {
-      const action = esAdmin ? actualizarLegajoPropio : enviarSolicitud;
+      const action = guardar ?? (esAdmin ? actualizarLegajoPropio : enviarSolicitud);
       const result = await action({ grupo, valores });
       if (!result.ok) {
         setErrores(result.fieldErrors ?? {});

@@ -95,5 +95,6 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 | `Select` | Label + native select, styled like `Field` | `label`, `options`, `placeholder?`, `error?`, select props |
 | `LabelValueGrid` | Label/value grid (auto-fit, min 150px), with an optional note line per item | `items: { key, label, value, note? }[]` |
 | `Banner` | Page-level notice (role=status); `attention` uses accent border and tint | `tone?: "info" \| "attention"`, `actions?` |
+| `Checkbox` | Native checkbox with its label; checked color from `--accent` | `label`, native input props |
 
 Helpers: `cx` joins class names; `buttonClassName(variant)` gives the `Button` look to a link.

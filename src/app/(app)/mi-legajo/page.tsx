@@ -4,12 +4,9 @@ import { Panel } from "@/components/ui/Panel";
 import { getSessionUser } from "@/lib/auth/session";
 import { copy } from "@/lib/copy/es-AR";
 import { resumirDocumentos } from "@/lib/documentos/resumen";
-import { formatearFecha, formatearPesos } from "@/lib/format/fecha";
-import { calcularAntiguedad } from "@/lib/legajo/antiguedad";
-import { hoyEnArgentina } from "@/lib/legajo/fechas";
 import { cargarMiLegajo } from "@/lib/legajo/mi-legajo";
-import { legajoVacio, textoAntiguedad } from "@/lib/legajo/vista";
-import { MiLegajoScreen, type DatoLaboral } from "./MiLegajoScreen";
+import { datosLaboralesVista, legajoVacio } from "@/lib/legajo/vista";
+import { MiLegajoScreen } from "./MiLegajoScreen";
 
 const t = copy.miLegajo;
 
@@ -36,31 +33,11 @@ export default async function MiLegajoPage() {
   }
 
   const { legajo } = data;
-  const sinDato = (value: string) => value || t.sinDato;
-  // Group E, formatted on the server (antigüedad as of today in Argentina).
-  const laborales: DatoLaboral[] = [
-    { key: "numero_legajo", value: sinDato(legajo.numero_legajo ?? "") },
-    { key: "area", value: sinDato(legajo.area ?? "") },
-    { key: "puesto", value: sinDato(legajo.puesto ?? "") },
-    { key: "fecha_ingreso", value: sinDato(formatearFecha(legajo.fecha_ingreso)) },
-    {
-      key: "antiguedad",
-      value: legajo.fecha_ingreso
-        ? textoAntiguedad(calcularAntiguedad(legajo.fecha_ingreso, hoyEnArgentina()))
-        : t.sinDato,
-    },
-    { key: "estado_laboral", value: legajo.estado_laboral ? t.estadosLaborales[legajo.estado_laboral] : t.sinDato },
-    { key: "sede", value: sinDato(legajo.sede ?? "") },
-    { key: "modalidad", value: sinDato(legajo.modalidad ?? "") },
-    { key: "convenio", value: sinDato(legajo.convenio ?? "") },
-    { key: "bruto_mensual", value: sinDato(formatearPesos(legajo.bruto_mensual)) },
-  ];
-
   return (
     <MiLegajoScreen
       actual={{ ...legajo, hijos: data.hijos }}
       solicitud={data.solicitud}
-      laborales={laborales}
+      laborales={datosLaboralesVista(legajo)}
       documentos={resumirDocumentos(data.documentos)}
       esAdmin={user.role === "admin"}
       vacio={legajoVacio(legajo, data.hijos)}

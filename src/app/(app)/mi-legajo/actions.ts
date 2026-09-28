@@ -1,26 +1,17 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
-import {
-  buildSolicitudItemsDe,
-  documentoErrorMessage,
-  solicitudErrorMessage,
-  type LegajoActual,
-} from "@/lib/aprobaciones/solicitudes";
-import { CAMPO_HIJOS, type CampoSolicitudColumna } from "@/lib/aprobaciones/campos";
+import { buildSolicitudItemsDe, type LegajoActual } from "@/lib/aprobaciones/solicitudes";
 import { sessionWithRole } from "@/lib/auth/require-role";
 import { getSessionUser, type SessionUser } from "@/lib/auth/session";
 import { copy } from "@/lib/copy/es-AR";
-import { buildDocumentoPath, parseDocumentoPath } from "@/lib/documentos/paths";
+import { descartarObjeto, prepararRuta, registrarObjeto } from "@/lib/documentos/registro";
 import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
-import { barrerHuerfanos, eliminarObjeto } from "@/lib/documentos/limpieza";
-import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "@/lib/documentos/tipos";
-import { validateDocumentoUpload } from "@/lib/documentos/validation";
-import { camposDelGrupo, ESQUEMA_GRUPO, isGrupoEditable, type GrupoEditable } from "@/lib/legajo/grupos";
-import { fieldErrors } from "@/lib/legajo/validation";
+import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
+import { camposDelGrupo } from "@/lib/legajo/grupos";
+import { aplicarGrupo, dbErrorMessage, validarGrupo } from "@/lib/legajo/escritura";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,46 +20,15 @@ import { createClient } from "@/lib/supabase/server";
 // each user reaches. An Empleado's changes go through crear_solicitud; an
 // Admin's own changes apply directly. Errors are es-AR, never internals.
 
-type LegajoUpdate = Database["public"]["Tables"]["legajos"]["Update"];
-
 const MI_LEGAJO_PATH = "/mi-legajo";
 const t = copy.miLegajo;
 const aprobacionErrors = copy.aprobaciones.errors;
 const noAutorizado: ActionResult = { ok: false, error: copy.cuentas.errors.noAutorizado };
 
-const UNIQUE_VIOLATION = "23505";
-const CHECK_VIOLATION = "23514";
-const INVALID_PARAMETER = "22023";
-
 // The signed-in user, when their account was read and is active.
 async function usuarioActivo(): Promise<SessionUser | null> {
   const user = await getSessionUser();
   return user && user.cuenta?.estadoCuenta === "activa" ? user : null;
-}
-
-type GrupoInput = { grupo: GrupoEditable; valores: unknown };
-const grupoInput = z.object({ grupo: z.string().refine(isGrupoEditable), valores: z.unknown() });
-
-// Validates one group's values with its shared schema. Field errors come back
-// keyed by field for the form.
-function validarGrupo(input: unknown) {
-  const shape = grupoInput.safeParse(input);
-  if (!shape.success) return { ok: false as const, result: { ok: false, error: aprobacionErrors.guardarFallo } as ActionResult };
-  const grupo = shape.data.grupo as GrupoInput["grupo"];
-  const parsed = ESQUEMA_GRUPO[grupo].safeParse(shape.data.valores);
-  if (!parsed.success) {
-    return {
-      ok: false as const,
-      result: { ok: false, error: t.errors.revisarCampos, fieldErrors: fieldErrors(parsed.error) } as ActionResult,
-    };
-  }
-  return { ok: true as const, grupo, valores: parsed.data as Record<string, unknown> };
-}
-
-function dbErrorMessage(error: { code?: string; message?: string }): string {
-  if (error.code === UNIQUE_VIOLATION) return solicitudErrorMessage(error);
-  if (error.code === CHECK_VIOLATION || error.code === INVALID_PARAMETER) return aprobacionErrors.valorInvalido;
-  return aprobacionErrors.guardarFallo;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,35 +93,9 @@ export async function actualizarLegajoPropio(input: unknown): Promise<ActionResu
   const validado = validarGrupo(input);
   if (!validado.ok) return validado.result;
 
-  const campos = camposDelGrupo(validado.grupo);
-  const update: LegajoUpdate = {};
-  for (const campo of campos) {
-    if (campo !== CAMPO_HIJOS) {
-      Object.assign(update, { [campo as CampoSolicitudColumna]: validado.valores[campo] });
-    }
-  }
-
   const supabase = await createClient();
-  const { data: legajo, error } = await supabase
-    .from("legajos")
-    .update(update)
-    .eq("profile_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error || !legajo) return { ok: false, error: error ? dbErrorMessage(error) : aprobacionErrors.guardarFallo };
-
-  // The children set is replaced as a whole, as an approved request does.
-  if (campos.includes(CAMPO_HIJOS)) {
-    const hijos = (validado.valores.hijos ?? []) as { nombre_completo: string; fecha_nacimiento: string }[];
-    const removed = await supabase.from("legajo_hijos").delete().eq("legajo_id", legajo.id);
-    if (removed.error) return { ok: false, error: aprobacionErrors.guardarFallo };
-    if (hijos.length > 0) {
-      const inserted = await supabase
-        .from("legajo_hijos")
-        .insert(hijos.map((hijo) => ({ legajo_id: legajo.id, ...hijo })));
-      if (inserted.error) return { ok: false, error: aprobacionErrors.guardarFallo };
-    }
-  }
+  const result = await aplicarGrupo(supabase, user.id, validado);
+  if (!result.ok) return result;
 
   revalidatePath(MI_LEGAJO_PATH);
   return { ok: true };
@@ -170,65 +104,14 @@ export async function actualizarLegajoPropio(input: unknown): Promise<ActionResu
 // ---------------------------------------------------------------------------
 // Documents
 // ---------------------------------------------------------------------------
-// The file goes from the browser straight to Storage with the user's session
-// (the storage policies apply), between two actions:
-// 1. prepararSubidaDocumento validates the declared file and returns a fresh
-//    path in the user's own folder;
-// 2. registrarDocumento checks the stored object's real size and type again
-//    and records it; if anything fails, the object is removed.
-// This keeps files off the app server, whose request body limit is far below
-// the 10 MB the bucket allows.
-//
-// No object may stay without its row (AUD08-02): every failure after the
-// upload removes it and checks that the removal worked; the browser calls
-// descartarSubida when registration fails or never answers; and each new
-// upload first sweeps the caller's own folder for rowless objects older than
-// UMBRAL_HUERFANO_MINUTOS (src/lib/documentos/limpieza.ts).
-
-// Server-side note for a cleanup that failed. No paths, ids or credentials.
-function avisarFalloLimpieza(motivo: string) {
-  console.error(`[mi-legajo] legajo-docs cleanup failed: ${motivo}`);
-}
-
-const subidaInput = z.object({
-  tipo: z.string(),
-  fileName: z.string(),
-  mimeType: z.string(),
-  sizeBytes: z.number(),
-});
+// Three steps around a browser-direct upload to the caller's own folder, with
+// cleanup on every failure (src/lib/documentos/registro.ts).
+const ORIGEN = "mi-legajo";
 
 export async function prepararSubidaDocumento(input: unknown): Promise<ActionResult<{ path: string }>> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  const parsed = subidaInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: t.documentos.errors.subirFallo };
-
-  const valid = validateDocumentoUpload(parsed.data);
-  if (!valid.ok) return valid;
-
-  const supabase = await createClient();
-  const pendientes = await supabase
-    .from("legajo_documentos")
-    .select("id, legajos!inner(profile_id)", { count: "exact", head: true })
-    .eq("legajos.profile_id", user.id)
-    .eq("tipo", valid.data.tipo)
-    .eq("estado", "pendiente");
-  if (pendientes.error) return { ok: false, error: t.documentos.errors.subirFallo };
-  if ((pendientes.count ?? 0) > 0) return { ok: false, error: aprobacionErrors.documentoPendiente };
-
-  // Lazy sweep of abandoned uploads in the caller's own folder. A failure is
-  // noted and never blocks the new upload.
-  const barrido = await barrerHuerfanos(supabase, user.id);
-  if (!barrido.ok) avisarFalloLimpieza("sweep");
-
-  const path = buildDocumentoPath({
-    profileId: user.id,
-    tipo: valid.data.tipo,
-    fileId: randomUUID(),
-    mimeType: valid.data.mimeType,
-  });
-  if (!path) return { ok: false, error: t.documentos.errors.subirFallo };
-  return { ok: true, data: { path } };
+  return prepararRuta(await createClient(), user.id, input, { origen: ORIGEN });
 }
 
 export async function registrarDocumento(
@@ -236,121 +119,19 @@ export async function registrarDocumento(
 ): Promise<ActionResult<{ estado: Database["public"]["Enums"]["documento_estado"] }>> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  const parsed = z.object({ tipo: z.string(), path: z.string(), fileName: z.string() }).safeParse(input);
-  if (!parsed.success) return { ok: false, error: t.documentos.errors.subirFallo };
-
-  const ruta = parseDocumentoPath(parsed.data.path);
-  if (!ruta || ruta.profileId !== user.id || ruta.tipo !== parsed.data.tipo) {
-    return { ok: false, error: t.documentos.errors.subirFallo };
-  }
-  const tipo: DocumentoTipo = ruta.tipo;
-  const path = parsed.data.path;
-
-  const supabase = await createClient();
-  const bucket = supabase.storage.from(DOCUMENTOS_BUCKET);
-
-  // From here the object may exist: every failure removes it first. If the
-  // removal itself fails, the user gets a controlled error (and the sweep
-  // retries later).
-  const discard = async (error: string): Promise<ActionResult<never>> => {
-    if (await eliminarObjeto(supabase, path)) return { ok: false, error };
-    avisarFalloLimpieza("register");
-    return { ok: false, error: t.documentos.errors.limpiezaFallo };
-  };
-
-  const objectName = path.split("/")[2];
-  const listed = await bucket.list(`${user.id}/${tipo}`, { search: objectName });
-  if (listed.error) return discard(t.documentos.errors.subirFallo);
-  const object = listed.data?.find((entry) => entry.name === objectName);
-  // Not stored (or not visible): removing a missing path is harmless.
-  if (!object) return discard(t.documentos.errors.subirFallo);
-
-  // What was actually stored, not what the browser declared.
-  const metadata = (object.metadata ?? {}) as { size?: number; mimetype?: string };
-  const valid = validateDocumentoUpload({
-    tipo,
-    fileName: parsed.data.fileName,
-    mimeType: metadata.mimetype,
-    sizeBytes: metadata.size,
-  });
-  if (!valid.ok) return discard(valid.error);
-  if (valid.data.mimeType !== ruta.mimeType) return discard(copy.documentos.validation.fileTypeMismatch);
-
-  const { data: legajo } = await supabase.from("legajos").select("id").eq("profile_id", user.id).maybeSingle();
-  if (!legajo) return discard(t.documentos.errors.subirFallo);
-
-  const archivo = {
-    storage_path: path,
-    file_name: valid.data.fileName,
-    mime_type: valid.data.mimeType,
-    size_bytes: valid.data.sizeBytes,
-    uploaded_by: user.id,
-  };
-
-  // An Admin's own uploads are approved at once (Constitution §9): a new file
-  // for a type that already has an approved one replaces it in place, and the
-  // old object is removed.
-  if (user.role === "admin") {
-    const vigente = await supabase
-      .from("legajo_documentos")
-      .select("id, storage_path")
-      .eq("legajo_id", legajo.id)
-      .eq("tipo", tipo)
-      .eq("estado", "aprobado")
-      .maybeSingle();
-    if (vigente.error) return discard(t.documentos.errors.subirFallo);
-    if (vigente.data) {
-      const replaced = await supabase
-        .from("legajo_documentos")
-        .update(archivo)
-        .eq("id", vigente.data.id)
-        .select("estado")
-        .single();
-      if (replaced.error || !replaced.data) return discard(t.documentos.errors.subirFallo);
-      // The replaced file has no row any more. If removing it fails, the
-      // upload still succeeded; the sweep removes it later.
-      if (!(await eliminarObjeto(supabase, vigente.data.storage_path))) avisarFalloLimpieza("replace");
-      revalidatePath(MI_LEGAJO_PATH);
-      return { ok: true, data: { estado: replaced.data.estado } };
-    }
-  }
-
-  const inserted = await supabase
-    .from("legajo_documentos")
-    .insert({ legajo_id: legajo.id, tipo, ...archivo })
-    .select("estado")
-    .single();
-  if (inserted.error || !inserted.data) {
-    return discard(
-      inserted.error?.code === UNIQUE_VIOLATION ? documentoErrorMessage(inserted.error) : t.documentos.errors.subirFallo,
-    );
-  }
-
-  revalidatePath(MI_LEGAJO_PATH);
-  return { ok: true, data: { estado: inserted.data.estado } };
+  const result = await registrarObjeto(
+    { client: await createClient(), ownerId: user.id, uploaderId: user.id, esAdmin: user.role === "admin", origen: ORIGEN },
+    input,
+  );
+  if (result.ok) revalidatePath(MI_LEGAJO_PATH);
+  return result;
 }
 
-// Called by the browser when registration failed or never answered: removes
-// the uploaded object, only in the caller's own folder and only while no
-// document row points to it (a registered document is never removed here).
+// Called by the browser when registration failed or never answered.
 export async function descartarSubida(input: unknown): Promise<ActionResult> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  const parsed = z.object({ path: z.string() }).safeParse(input);
-  const ruta = parsed.success ? parseDocumentoPath(parsed.data.path) : null;
-  if (!parsed.success || !ruta || ruta.profileId !== user.id) return { ok: false, error: t.documentos.errors.subirFallo };
-
-  const supabase = await createClient();
-  const fila = await supabase
-    .from("legajo_documentos")
-    .select("id", { count: "exact", head: true })
-    .eq("storage_path", parsed.data.path);
-  if (fila.error) return { ok: false, error: t.documentos.errors.limpiezaFallo };
-  if ((fila.count ?? 0) > 0) return { ok: true };
-
-  if (await eliminarObjeto(supabase, parsed.data.path)) return { ok: true };
-  avisarFalloLimpieza("discard");
-  return { ok: false, error: t.documentos.errors.limpiezaFallo };
+  return descartarObjeto(await createClient(), user.id, input, ORIGEN);
 }
 
 // A document of the caller's own legajo, found by id. An Admin's RLS reaches

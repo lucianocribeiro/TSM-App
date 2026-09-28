@@ -15,7 +15,7 @@ export function PageHeader({ kicker, title, actions }: PageHeaderProps) {
         </p>
         <h1 className="mt-1.5 text-[38px] font-normal leading-[1.08]">{title}</h1>
       </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }
