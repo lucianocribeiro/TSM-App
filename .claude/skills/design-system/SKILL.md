@@ -97,5 +97,7 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 | `Banner` | Page-level notice (role=status); `attention` uses accent border and tint | `tone?: "info" \| "attention"`, `actions?` |
 | `Checkbox` | Native checkbox with its label; checked color from `--accent` | `label`, native input props |
 | `KpiStrip` | KPI cards (label + number) in one bordered strip, cells separated by `--line-soft` | `label` (accessible name), `items: { key, label, value }[]` |
+| `TextArea` | Label + multi-line input, styled like `Field`, with optional hint and error | `label`, `hint?`, `error?`, textarea props |
+| `BellLink` | Bell icon link with an optional count badge (`--accent` border, `--accent-deep` text on `--rail`); neutral without a badge | `href`, `label` (accessible name), `badge: string \| null` |
 
 Helpers: `cx` joins class names; `buttonClassName(variant)` gives the `Button` look to a link.
