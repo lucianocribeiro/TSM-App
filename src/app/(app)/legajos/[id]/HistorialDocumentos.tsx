@@ -58,7 +58,7 @@ export function HistorialDocumentos({
             <tbody>
               {versiones.map((version) => (
                 <tr key={version.id} className={rowClassName(false)} data-testid="historial-version">
-                  <Td className="break-all">{version.fileName}</Td>
+                  <Td className="min-w-[180px] break-words">{version.fileName}</Td>
                   <Td className="whitespace-nowrap tabular-nums text-ink-soft">{formatearFechaHora(version.creadoEn)}</Td>
                   <Td className="whitespace-nowrap tabular-nums text-ink-soft">
                     {version.reemplazadoEn ? formatearFechaHora(version.reemplazadoEn) : t.sinDato}

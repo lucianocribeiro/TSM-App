@@ -219,21 +219,9 @@ function DocumentoRow({
             </>
           ) : null}
           {reemplazable ? (
-            <>
-              <Button onClick={() => setReemplazando(true)} disabled={subiendo}>
-                {subiendo ? t.subiendo : copy.legajos.documentos.reemplazar}
-              </Button>
-              <ReemplazarDialog
-                open={reemplazando}
-                nombre={nombre}
-                vigente={resumen.vigente}
-                onClose={() => setReemplazando(false)}
-                onArchivo={(file, modo) => {
-                  setReemplazando(false);
-                  procesar(file, modo);
-                }}
-              />
-            </>
+            <Button onClick={() => setReemplazando(true)} disabled={subiendo}>
+              {subiendo ? t.subiendo : copy.legajos.documentos.reemplazar}
+            </Button>
           ) : resumen.puedeSubir ? (
             <>
               <input
@@ -254,6 +242,19 @@ function DocumentoRow({
           <p role="alert" className="mt-2 text-[12.5px] italic text-accent-deep">
             {error}
           </p>
+        ) : null}
+        {/* Outside the button row, whose children do not wrap. */}
+        {reemplazable ? (
+          <ReemplazarDialog
+            open={reemplazando}
+            nombre={nombre}
+            vigente={resumen.vigente}
+            onClose={() => setReemplazando(false)}
+            onArchivo={(file, modo) => {
+              setReemplazando(false);
+              procesar(file, modo);
+            }}
+          />
         ) : null}
       </Td>
     </tr>
