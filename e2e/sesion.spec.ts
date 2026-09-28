@@ -155,24 +155,22 @@ test.describe("inactivity", () => {
   test("two tabs: activity in one keeps both; signing out in one closes both", async ({ context }) => {
     const user = await usuario("inactividad-pestanas");
     const inicio = new Date("2026-10-01T12:00:00-03:00");
+    // One clock for the whole context: every tab sees the same time.
+    await context.clock.install({ time: inicio });
     const a = await context.newPage();
     const b = await context.newPage();
-    await a.clock.install({ time: inicio });
-    await b.clock.install({ time: inicio });
     await loginAs(a, user);
     await b.goto("/mi-legajo");
     await expect(b).toHaveURL(/\/mi-legajo$/);
 
-    await a.clock.fastForward("10:00");
-    await b.clock.fastForward("10:00");
+    await context.clock.fastForward("10:00");
     // Real input in tab A only; the shared last activity moves forward.
     const ultima = () => a.evaluate(() => Number(window.localStorage.getItem("tsm-ultima-actividad")));
     const antes = await ultima();
     await a.bringToFront();
     await a.getByRole("heading", { level: 1 }).click();
     await expect.poll(ultima).toBeGreaterThan(antes);
-    await a.clock.fastForward("05:00");
-    await b.clock.fastForward("05:00");
+    await context.clock.fastForward("05:00");
     // 15 minutes since B's own activity, 5 since A's: nobody is warned.
     await expect(aviso(b)).toBeHidden();
     await expect(aviso(a)).toBeHidden();
