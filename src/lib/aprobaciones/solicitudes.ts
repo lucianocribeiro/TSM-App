@@ -124,8 +124,11 @@ export const DOCUMENTO_PENDIENTE_INDEX = "legajo_documentos_un_pendiente_por_tip
 const UNIQUE_VIOLATION = "23505";
 const INVALID_PARAMETER = "22023";
 const NOT_PENDING = "55000";
+const NOT_FOUND = "P0002";
+// HINT of the 55000 raised when an Admin decides on their own legajo.
+export const CUENTA_PROPIA_HINT = "cuenta_propia";
 
-type DbError = { code?: string; message?: string } | null | undefined;
+type DbError = { code?: string; message?: string; hint?: string } | null | undefined;
 
 // es-AR messages for failed database calls. They never expose the database
 // message; anything unexpected gets the generic message.
@@ -150,6 +153,19 @@ export function documentoErrorMessage(error: DbError): string {
 // aprobar_* and rechazar_* functions.
 export function decisionErrorMessage(error: DbError): string {
   if (error?.code === INVALID_PARAMETER) return messages.motivoRequerido;
+  if (error?.code === NOT_PENDING && error.hint === CUENTA_PROPIA_HINT) return messages.cuentaPropia;
   if (error?.code === NOT_PENDING) return messages.noPendiente;
   return messages.guardarFallo;
+}
+
+// The same functions from the approvals inbox. yaDecidido: the item is no
+// longer pending (decided in another tab, or cancelled by the employee), so
+// the inbox refreshes instead of offering the decision again.
+export function decisionBandejaError(error: DbError): { error: string; yaDecidido: boolean } {
+  if (error?.code === NOT_PENDING && error.hint === CUENTA_PROPIA_HINT) {
+    return { error: messages.cuentaPropia, yaDecidido: false };
+  }
+  if (error?.code === NOT_PENDING || error?.code === NOT_FOUND) return { error: messages.yaDecidido, yaDecidido: true };
+  if (error?.code === INVALID_PARAMETER) return { error: messages.motivoRequerido, yaDecidido: false };
+  return { error: messages.guardarFallo, yaDecidido: false };
 }

@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useActionState, useState, type ReactNode } from "react";
+import { BellLink } from "@/components/ui/BellLink";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { Logo } from "@/components/ui/Logo";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { etiquetaCampana, textoCampana } from "@/lib/aprobaciones/campana";
 import { logout } from "@/lib/auth/actions";
 import { CAMBIAR_PASSWORD_PATH } from "@/lib/auth/gate";
 import { copy } from "@/lib/copy/es-AR";
 import { isActivePath, type NavItem } from "@/lib/nav/nav";
 import type { Theme } from "@/lib/theme/theme";
+import { usePendientesAprobacion } from "./usePendientesAprobacion";
 
 type AppShellProps = {
   navItems: NavItem[];
@@ -21,8 +24,12 @@ type AppShellProps = {
   userEmail: string;
   roleLabel: string;
   initialTheme: Theme;
+  // The Admin's pending approvals, for the bell. Null: no bell (not an Admin).
+  pendientes: number | null;
   children: ReactNode;
 };
+
+const APROBACIONES_PATH = "/aprobaciones";
 
 const SIDEBAR_ID = "app-sidebar";
 
@@ -32,25 +39,40 @@ export function AppShell({
   userEmail,
   roleLabel,
   initialTheme,
+  pendientes,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutState, logoutAction, logoutPending] = useActionState(logout, null);
+  const totalPendientes = usePendientesAprobacion(pendientes);
+  const campana = (className?: string) =>
+    totalPendientes === null ? null : (
+      <BellLink
+        href={APROBACIONES_PATH}
+        label={etiquetaCampana(totalPendientes)}
+        badge={textoCampana(totalPendientes)}
+        onClick={() => setMenuOpen(false)}
+        className={className}
+      />
+    );
 
   return (
     <div className="min-h-screen">
       {/* Top bar, below 900px only. */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-rail px-4 py-2 text-rail-ink nav:hidden">
         <Logo alt={copy.app.logoAlt} size={40} />
-        <Button
-          variant="secondary"
-          aria-expanded={menuOpen}
-          aria-controls={SIDEBAR_ID}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          {menuOpen ? copy.common.closeMenu : copy.common.openMenu}
-        </Button>
+        <div className="flex items-center gap-3">
+          {campana()}
+          <Button
+            variant="secondary"
+            aria-expanded={menuOpen}
+            aria-controls={SIDEBAR_ID}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? copy.common.closeMenu : copy.common.openMenu}
+          </Button>
+        </div>
       </div>
 
       {menuOpen ? (
@@ -107,6 +129,8 @@ export function AppShell({
         ) : null}
 
         <div className="mt-auto flex flex-col items-start gap-3 px-[22px] pt-8">
+          {/* Below 900px the bell is in the top bar. */}
+          {campana("hidden nav:inline-flex")}
           <p
             className="max-w-full break-all text-[12.5px] text-ink-soft"
             data-testid="user-email"

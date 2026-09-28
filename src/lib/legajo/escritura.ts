@@ -21,8 +21,12 @@ const aprobacionErrors = copy.aprobaciones.errors;
 const UNIQUE_VIOLATION = "23505";
 const CHECK_VIOLATION = "23514";
 const INVALID_PARAMETER = "22023";
+const OBJECT_STATE = "55000";
+// HINT of the lock that refuses groups A to D while a request is pending.
+export const SOLICITUD_PENDIENTE_HINT = "solicitud_pendiente";
 
-export function dbErrorMessage(error: { code?: string; message?: string }): string {
+export function dbErrorMessage(error: { code?: string; message?: string; hint?: string }): string {
+  if (error.code === OBJECT_STATE && error.hint === SOLICITUD_PENDIENTE_HINT) return copy.legajos.errors.solicitudPendiente;
   if (error.code === UNIQUE_VIOLATION) return solicitudErrorMessage(error);
   if (error.code === CHECK_VIOLATION || error.code === INVALID_PARAMETER) return aprobacionErrors.valorInvalido;
   return aprobacionErrors.guardarFallo;
@@ -76,12 +80,12 @@ export async function aplicarGrupo(
   if (campos.includes(CAMPO_HIJOS)) {
     const hijos = (valores.hijos ?? []) as { nombre_completo: string; fecha_nacimiento: string }[];
     const removed = await client.from("legajo_hijos").delete().eq("legajo_id", legajo.id);
-    if (removed.error) return { ok: false, error: aprobacionErrors.guardarFallo };
+    if (removed.error) return { ok: false, error: dbErrorMessage(removed.error) };
     if (hijos.length > 0) {
       const inserted = await client
         .from("legajo_hijos")
         .insert(hijos.map((hijo) => ({ legajo_id: legajo.id, ...hijo })));
-      if (inserted.error) return { ok: false, error: aprobacionErrors.guardarFallo };
+      if (inserted.error) return { ok: false, error: dbErrorMessage(inserted.error) };
     }
   }
   return { ok: true };
@@ -110,7 +114,9 @@ export async function aplicarDatosLaborales(client: Client, profileId: string, v
 
 // True when the legajo of profileId has a pending change request, null when
 // that cannot be read. While one is pending, groups A to D and the children
-// are not edited directly (F1-09A decision): the request is resolved first.
+// are not edited directly: the request is resolved first. The database
+// enforces it too (legajos_bloquear_pendiente, F1-09B); this check comes
+// first for the clear message and to avoid a partial write.
 export async function tieneSolicitudPendiente(client: Client, profileId: string): Promise<boolean | null> {
   const { count, error } = await client
     .from("solicitudes_cambio")
