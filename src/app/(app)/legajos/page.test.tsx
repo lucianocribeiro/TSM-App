@@ -5,7 +5,7 @@ import type { LegajoListItem } from "@/lib/legajo/listado";
 // and hands them to the screen once: filters, search and the deactivated
 // toggle live in the screen and never reach them.
 
-const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, area: null, puesto: null, sede: null, modalidad: null, estadoLaboral: null };
+const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, area: null, puesto: null, sede: null, modalidad: null, estadoLaboral: "activo" as const };
 const hoy = new Date();
 const mesActual = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit" }).format(hoy);
 const LISTA: LegajoListItem[] = [

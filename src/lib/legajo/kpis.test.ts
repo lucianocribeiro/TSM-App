@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import { calcularKpis } from "./kpis";
 import { filtrarLegajos, FILTROS_INICIALES, type LegajoListItem } from "./listado";
 
-type Fila = Pick<LegajoListItem, "estadoCuenta" | "fechaIngreso">;
-const fila = (fechaIngreso: string | null, estadoCuenta: Fila["estadoCuenta"] = "activa"): Fila => ({ estadoCuenta, fechaIngreso });
+type Fila = Pick<LegajoListItem, "estadoCuenta" | "estadoLaboral" | "fechaIngreso">;
+const fila = (
+  fechaIngreso: string | null,
+  estadoCuenta: Fila["estadoCuenta"] = "activa",
+  estadoLaboral: Fila["estadoLaboral"] = "activo",
+): Fila => ({ estadoCuenta, estadoLaboral, fechaIngreso });
 
 // Noon in Argentina (UTC-3) on 2026-09-15: well inside September everywhere.
 const SEPTIEMBRE = new Date("2026-09-15T15:00:00Z");
@@ -14,10 +18,15 @@ describe("calcularKpis", () => {
     expect(kpis.activos).toBe(2);
   });
 
-  it("counts every estado laboral, En prueba included (the account decides)", () => {
-    // estado laboral is not an input: an active account in prueba is active.
-    const items: Fila[] = [fila("2026-09-10"), fila(null)];
-    expect(calcularKpis(items, SEPTIEMBRE)).toEqual({ activos: 2, ingresosDelMes: 1 });
+  it("counts En prueba as well as Activo", () => {
+    const items: Fila[] = [fila("2026-09-10", "activa", "en_prueba"), fila("2020-01-01", "activa", "activo"), fila(null)];
+    expect(calcularKpis(items, SEPTIEMBRE)).toEqual({ activos: 3, ingresosDelMes: 1 });
+  });
+
+  it("leaves a legajo without estado laboral out of both cards", () => {
+    const items: Fila[] = [fila("2026-09-10", "activa", null), fila("2026-09-11")];
+    expect(calcularKpis(items, SEPTIEMBRE)).toEqual({ activos: 1, ingresosDelMes: 1 });
+    expect(calcularKpis([fila("2026-09-10", "activa", null)], SEPTIEMBRE)).toEqual({ activos: 0, ingresosDelMes: 0 });
   });
 
   it("counts ingresos on the first and last day of the current month, not the months around it", () => {
@@ -40,7 +49,7 @@ describe("calcularKpis", () => {
   });
 
   it("is computed over the whole list, whatever the filters show", () => {
-    const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, puesto: null, sede: null, modalidad: null, estadoLaboral: null };
+    const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, puesto: null, sede: null, modalidad: null, estadoLaboral: "activo" as const };
     const items: LegajoListItem[] = [
       { ...base, profileId: "a", nombre: "Ana", area: "Ventas", fechaIngreso: "2026-09-02", estadoCuenta: "activa" },
       { ...base, profileId: "b", nombre: "Beto", area: "Taller", fechaIngreso: "2026-01-02", estadoCuenta: "activa" },

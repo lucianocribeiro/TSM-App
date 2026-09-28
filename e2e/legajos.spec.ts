@@ -72,12 +72,16 @@ const filas = (page: Page) => page.getByTestId("legajo-row");
 const kpi = (page: Page, key: string) => page.locator(`[data-kpi="${key}"] dd`);
 
 // The expected card values, straight from the database: accounts not
-// deactivated, and those with fecha de ingreso in the current month in Argentina.
+// deactivated with estado laboral Activo or En prueba, and those of them with
+// fecha de ingreso in the current month in Argentina.
 async function kpisEsperados() {
   const mes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit" }).format(new Date());
-  const { data, error } = await localServiceClient().from("legajos").select("fecha_ingreso, profiles!inner(estado_cuenta)");
+  const { data, error } = await localServiceClient().from("legajos").select("fecha_ingreso, estado_laboral, profiles!inner(estado_cuenta)");
   if (error) throw new Error(`kpi setup failed: ${error.message}`);
-  const activos = (data ?? []).filter((fila) => fila.profiles.estado_cuenta === "activa");
+  const activos = (data ?? []).filter(
+    (fila) =>
+      fila.profiles.estado_cuenta === "activa" && (fila.estado_laboral === "activo" || fila.estado_laboral === "en_prueba"),
+  );
   return {
     mes,
     activos: activos.length,
