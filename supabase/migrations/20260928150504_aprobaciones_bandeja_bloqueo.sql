@@ -115,6 +115,11 @@ begin
       select distinct x.id from pg_catalog.unnest(ids) as x (id) order by x.id
     loop
       perform 1 from public.legajos as l where l.id = legajo for share;
+      -- The legajo itself is being deleted (a purge cascades through its
+      -- children): nothing is left to protect.
+      if not found then
+        continue;
+      end if;
       if public.hay_solicitud_pendiente(legajo) then
         raise exception 'The legajo has a pending change request'
           using errcode = '55000', hint = 'solicitud_pendiente';

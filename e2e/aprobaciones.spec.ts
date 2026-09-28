@@ -255,9 +255,13 @@ test("the Admin replaces a document keeping history, then for good after confirm
   await expect(historial).toContainText("original.pdf");
 
   const service = localServiceClient();
+  // File name and state of each dni_frente row, oldest first.
   const estados = async () =>
-    (await service.from("legajo_documentos").select("storage_path, estado, file_name").eq("tipo", "dni_frente").like("storage_path", `${emp.id}/%`).order("created_at")).data ?? [];
-  expect((await estados()).map((doc) => [doc.file_name, doc.estado])).toEqual([
+    (
+      (await service.from("legajo_documentos").select("estado, file_name").eq("tipo", "dni_frente").like("storage_path", `${emp.id}/%`).order("created_at"))
+        .data ?? []
+    ).map((doc) => [doc.file_name, doc.estado]);
+  await expect.poll(estados).toEqual([
     ["original.pdf", "reemplazado"],
     ["segundo.pdf", "aprobado"],
   ]);
@@ -272,14 +276,14 @@ test("the Admin replaces a document keeping history, then for good after confirm
   chooser = page.waitForEvent("filechooser");
   await confirm.getByRole("button", { name: r.confirmar }).click();
   await (await chooser).setFiles(pdf("tercero"));
-  await expect(page.getByRole("status").filter({ hasText: r.reemplazado })).toBeVisible();
-  await expect(historial.getByTestId("historial-version")).toHaveCount(1);
-
-  const final = await estados();
-  expect(final.map((doc) => [doc.file_name, doc.estado])).toEqual([
+  // The success message is already on the page from the first replacement:
+  // wait for the stored state instead.
+  await expect.poll(estados).toEqual([
     ["original.pdf", "reemplazado"],
     ["tercero.pdf", "aprobado"],
   ]);
+  await expect(page.getByRole("status").filter({ hasText: r.reemplazado })).toBeVisible();
+  await expect(historial.getByTestId("historial-version")).toHaveCount(1);
   expect((await service.storage.from(BUCKET).download(original.path)).data).not.toBeNull();
 
   // The history version downloads.

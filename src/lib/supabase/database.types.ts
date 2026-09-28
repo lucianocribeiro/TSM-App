@@ -485,6 +485,14 @@ export type Database = {
         Returns: Json
       }
       reactivar_cuenta: { Args: { p_profile_id: string }; Returns: undefined }
+      rechazar_documento: {
+        Args: { p_documento_id: string; p_motivo: string }
+        Returns: undefined
+      }
+      rechazar_solicitud: {
+        Args: { p_motivo: string; p_solicitud_id: string }
+        Returns: undefined
+      }
       reemplazar_documento: {
         Args: {
           p_conservar_historial: boolean
@@ -499,14 +507,6 @@ export type Database = {
           documento_id: string
           storage_path_eliminado: string
         }[]
-      }
-      rechazar_documento: {
-        Args: { p_documento_id: string; p_motivo: string }
-        Returns: undefined
-      }
-      rechazar_solicitud: {
-        Args: { p_motivo: string; p_solicitud_id: string }
-        Returns: undefined
       }
       registrar_creacion_cuenta: {
         Args: { p_profile_id: string }
