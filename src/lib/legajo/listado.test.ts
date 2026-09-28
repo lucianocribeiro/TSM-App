@@ -22,6 +22,7 @@ function item(overrides: Partial<LegajoListItem> = {}): LegajoListItem {
     sede: "San Martín",
     modalidad: "Presencial",
     estadoLaboral: "activo",
+    fechaIngreso: "2020-03-01",
     estadoCuenta: "activa",
     ...overrides,
   };
@@ -41,6 +42,7 @@ describe("itemDesdeFila", () => {
       sede: null,
       modalidad: null,
       estado_laboral: null,
+      fecha_ingreso: null,
       estado_cuenta: "inactiva" as const,
     };
     expect(itemDesdeFila(fila)).toMatchObject({ profileId: "p9", nombre: "Ana Gómez", nombres: "Ana", estadoCuenta: "inactiva" });

@@ -69,6 +69,21 @@ async function admin() {
 }
 
 const filas = (page: Page) => page.getByTestId("legajo-row");
+const kpi = (page: Page, key: string) => page.locator(`[data-kpi="${key}"] dd`);
+
+// The expected card values, straight from the database: accounts not
+// deactivated, and those with fecha de ingreso in the current month in Argentina.
+async function kpisEsperados() {
+  const mes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit" }).format(new Date());
+  const { data, error } = await localServiceClient().from("legajos").select("fecha_ingreso, profiles!inner(estado_cuenta)");
+  if (error) throw new Error(`kpi setup failed: ${error.message}`);
+  const activos = (data ?? []).filter((fila) => fila.profiles.estado_cuenta === "activa");
+  return {
+    mes,
+    activos: activos.length,
+    ingresosDelMes: activos.filter((fila) => fila.fecha_ingreso?.slice(0, 7) === mes).length,
+  };
+}
 const grupo = (page: Page, id: string) => page.getByTestId(`grupo-${id}`);
 const dato = (page: Page, id: string, campo: string) => grupo(page, id).locator(`[data-campo="${campo}"]`);
 
@@ -128,6 +143,44 @@ test("the Admin filters, searches and shows deactivated employees in the list", 
   await page.getByRole("button", { name: t.filtros.limpiar }).click();
   await expect(page.getByLabel(t.filtros.area, { exact: true })).toHaveValue("");
   await expect(page.getByLabel(t.filtros.mostrarBajas, { exact: true })).not.toBeChecked();
+});
+
+test("the KPI cards show Activos and Ingresos del mes for the whole workforce, and nothing else", async ({ page }) => {
+  // One active employee who joined this month (Argentina), so the count is not trivially zero.
+  const { mes } = await kpisEsperados();
+  const area = `Área E2E ${randomUUID().slice(0, 6)}`;
+  const nuevo = await empleado("kpi", area, { nombres: "Gala", apellido: "Gómez", dni: "95100007" });
+  await fillLegajo(nuevo.id, { fecha_ingreso: `${mes}-01` });
+
+  await loginAs(page, await admin());
+  await page.goto("/legajos");
+  await expect(page.getByText(t.kpis.activos, { exact: true })).toBeVisible();
+  await expect(page.getByText(t.kpis.ingresosDelMes, { exact: true })).toBeVisible();
+  await expect(page.locator("[data-kpi]")).toHaveCount(2);
+  for (const ausente of ["En licencia", "Recibos sin firmar"]) {
+    await expect(page.getByText(ausente, { exact: false })).toHaveCount(0);
+  }
+
+  // Other tests add and remove accounts in parallel: compare against a fresh
+  // count on each attempt.
+  let esperado = { activos: 0, ingresosDelMes: 0 };
+  await expect(async () => {
+    esperado = await kpisEsperados();
+    await page.reload();
+    await expect(kpi(page, "activos")).toHaveText(String(esperado.activos), { timeout: 2_000 });
+    await expect(kpi(page, "ingresos-del-mes")).toHaveText(String(esperado.ingresosDelMes), { timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+  expect(esperado.ingresosDelMes).toBeGreaterThanOrEqual(1);
+  await screenshotBoth(page, "legajos-kpis");
+
+  // Filters, search and the deactivated toggle leave the cards as they are.
+  const antes = { activos: await kpi(page, "activos").textContent(), ingresos: await kpi(page, "ingresos-del-mes").textContent() };
+  await page.getByLabel(t.filtros.area, { exact: true }).selectOption(area);
+  await page.getByLabel(t.busqueda.label, { exact: true }).fill("gomez");
+  await page.getByLabel(t.filtros.mostrarBajas, { exact: true }).check();
+  await expect(filas(page)).toHaveCount(1);
+  await expect(kpi(page, "activos")).toHaveText(antes.activos ?? "");
+  await expect(kpi(page, "ingresos-del-mes")).toHaveText(antes.ingresos ?? "");
 });
 
 test("the Admin opens a legajo, edits groups E and A directly, and uploads and downloads a document", async ({ page }) => {

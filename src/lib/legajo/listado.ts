@@ -22,6 +22,8 @@ export type LegajoListItem = {
   sede: string | null;
   modalidad: string | null;
   estadoLaboral: EstadoLaboral | null;
+  // YYYY-MM-DD, for the "Ingresos del mes" card.
+  fechaIngreso: string | null;
   estadoCuenta: CuentaEstado;
 };
 
@@ -59,6 +61,7 @@ export function itemDesdeFila(fila: {
   sede: string | null;
   modalidad: string | null;
   estado_laboral: EstadoLaboral | null;
+  fecha_ingreso: string | null;
   estado_cuenta: CuentaEstado;
 }): LegajoListItem {
   return {
@@ -74,6 +77,7 @@ export function itemDesdeFila(fila: {
     sede: fila.sede,
     modalidad: fila.modalidad,
     estadoLaboral: fila.estado_laboral,
+    fechaIngreso: fila.fecha_ingreso,
     estadoCuenta: fila.estado_cuenta,
   };
 }
