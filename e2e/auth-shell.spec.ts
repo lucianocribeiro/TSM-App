@@ -65,9 +65,9 @@ test.describe("login page", () => {
 });
 
 test.describe("session and menu", () => {
-  test("unauthenticated visit to /mi-legajo redirects to /login", async ({ page }) => {
+  test("unauthenticated visit to /mi-legajo redirects to /login, keeping where to return", async ({ page }) => {
     await page.goto("/mi-legajo");
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login\?volver=%2Fmi-legajo$/);
   });
 
   test("empleado lands on /mi-legajo and sees only Mi Legajo", async ({ page }) => {
@@ -89,10 +89,10 @@ test.describe("session and menu", () => {
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-empleado-dark.png`, fullPage: true });
   });
 
-  test("admin sees Mi Legajo, Legajos and Usuarios", async ({ page }) => {
+  test("admin sees Mi Legajo, Legajos, Aprobaciones and Usuarios", async ({ page }) => {
     await loginAs(page, ADMIN);
 
-    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.usuarios]);
+    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.aprobaciones, copy.nav.usuarios]);
     const links = mainNav(page).getByRole("link");
     await expect(page.getByText(copy.auth.roles.admin, { exact: true })).toBeVisible();
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-light.png`, fullPage: true });
@@ -116,7 +116,7 @@ test.describe("session and menu", () => {
     await expect(nav).toBeHidden();
     await page.getByRole("button", { name: copy.common.openMenu }).click();
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveCount(3);
+    await expect(nav.getByRole("link")).toHaveCount(4);
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-mobile-menu.png` });
 
     await setThemeCookie(page, "dark");
@@ -160,7 +160,7 @@ test.describe("theme and logout", () => {
       await expect(page).toHaveURL(/\/login$/);
 
       await page.goto("/mi-legajo");
-      await expect(page).toHaveURL(/\/login$/);
+      await expect(page).toHaveURL(/\/login\?volver=%2Fmi-legajo$/);
     } finally {
       await deleteE2EUser(user.id);
     }

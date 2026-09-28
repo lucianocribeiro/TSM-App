@@ -7,13 +7,29 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
+  sellarActividad: vi.fn(),
+  borrarActividad: vi.fn(),
+  getSessionUser: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("./verify-password", () => ({ verifyCurrentPassword: mocks.verifyCurrentPassword }));
+vi.mock("@/lib/sesion/marca-servidor", () => ({
+  sellarActividad: mocks.sellarActividad,
+  borrarActividad: mocks.borrarActividad,
+}));
+vi.mock("./session", () => ({ getSessionUser: mocks.getSessionUser }));
 
-const { cambiarPassword, login, logout } = await import("./actions");
+const { cambiarPassword, cerrarSesionPorInactividad, login, logout, mantenerSesion } = await import("./actions");
+
+const SESION_ID = "7c0ffee0-1234-4abc-8def-0123456789ab";
+// An access token whose payload carries the session id (not verified here:
+// the Auth server has just issued it).
+function token(payload: Record<string, unknown>) {
+  const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${b64({ alg: "ES256" })}.${b64(payload)}.firma`;
+}
 
 const INVALID = { ok: false, error: copy.auth.errors.invalidCredentials };
 const INACTIVE = { ok: false, error: copy.auth.errors.cuentaInactiva };
@@ -39,14 +55,20 @@ function signedInClient(profile: Profile, profileError: unknown = null) {
   const eq = vi.fn(() => ({ maybeSingle }));
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
-  const signInWithPassword = vi.fn().mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
-  return { client: { auth: { signInWithPassword, signOut }, from }, signOut, from, eq };
+  const signInWithPassword = vi.fn().mockResolvedValue({
+    data: { user: { id: "user-1" }, session: { access_token: token({ sub: "user-1", session_id: SESION_ID }) } },
+    error: null,
+  });
+  return { client: { auth: { signInWithPassword, signOut }, from }, signOut, from, eq, signInWithPassword };
 }
 
 beforeEach(() => {
   mocks.createClient.mockReset();
   mocks.verifyCurrentPassword.mockReset();
   mocks.redirect.mockClear();
+  mocks.sellarActividad.mockReset().mockResolvedValue(undefined);
+  mocks.borrarActividad.mockReset().mockResolvedValue(undefined);
+  mocks.getSessionUser.mockReset();
 });
 
 describe("login", () => {
@@ -89,6 +111,43 @@ describe("login", () => {
     );
     expect(from).toHaveBeenCalledWith("profiles");
     expect(eq).toHaveBeenCalledWith("id", "user-1");
+    // The activity marker starts with the session.
+    expect(mocks.sellarActividad).toHaveBeenCalledWith(SESION_ID);
+  });
+
+  it("returns to a safe ?volver= route after signing in, and ignores an unsafe one", async () => {
+    for (const [volver, destino] of [
+      ["/legajos/abc?x=1", "/legajos/abc?x=1"],
+      ["/aprobaciones", "/aprobaciones"],
+      ["https://evil.example/legajos", "/mi-legajo"],
+      ["//evil.example", "/mi-legajo"],
+      ["/%2F%2Fevil.example", "/mi-legajo"],
+      ["/login", "/mi-legajo"],
+    ]) {
+      mocks.redirect.mockClear();
+      const { client } = signedInClient({ estado_cuenta: "activa", debe_cambiar_password: false });
+      mocks.createClient.mockResolvedValue(client);
+      await expect(login(null, form({ email: "ana@mitsm.test", password: "secret", volver })), volver).rejects.toThrow(
+        `NEXT_REDIRECT:${destino}`,
+      );
+    }
+  });
+
+  it("a pending password change wins over ?volver=", async () => {
+    const { client } = signedInClient({ estado_cuenta: "activa", debe_cambiar_password: true });
+    mocks.createClient.mockResolvedValue(client);
+    await expect(login(null, form({ email: "ana@mitsm.test", password: "secret", volver: "/legajos" }))).rejects.toThrow(
+      "NEXT_REDIRECT:/cambiar-password",
+    );
+  });
+
+  it("signs out when the new session has no id to bind the activity marker to", async () => {
+    const { client, signOut, signInWithPassword } = signedInClient({ estado_cuenta: "activa", debe_cambiar_password: false });
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "user-1" }, session: { access_token: token({ sub: "user-1" }) } }, error: null });
+    mocks.createClient.mockResolvedValue(client);
+    await expect(login(null, form({ email: "ana@mitsm.test", password: "secret" }))).resolves.toEqual(INVALID);
+    expect(signOut).toHaveBeenCalled();
+    expect(mocks.sellarActividad).not.toHaveBeenCalled();
   });
 
   it("redirects to /cambiar-password when the password is temporary", async () => {
@@ -139,7 +198,11 @@ describe("cambiarPassword", () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: confirmError });
     const maybeSingle = vi.fn().mockResolvedValue({ data: { debe_cambiar_password: debe }, error: null });
     const from = vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle })) })) }));
-    mocks.createClient.mockResolvedValue({ auth: { getUser, updateUser }, rpc, from });
+    const getSession = vi.fn().mockResolvedValue({
+      data: { session: { access_token: token({ sub: "user-1", session_id: SESION_ID }) } },
+      error: null,
+    });
+    mocks.createClient.mockResolvedValue({ auth: { getUser, updateUser, getSession }, rpc, from });
     return { updateUser, rpc };
   }
 
@@ -166,6 +229,7 @@ describe("cambiarPassword", () => {
       expect(mocks.verifyCurrentPassword).not.toHaveBeenCalled();
       expect(updateUser).toHaveBeenCalledWith({ password: "NuevaClave-1" });
       expect(rpc).toHaveBeenCalledWith("confirmar_cambio_password");
+      expect(mocks.sellarActividad).toHaveBeenCalledWith(SESION_ID);
     });
 
     it("asks for a different password when it equals the current one", async () => {
@@ -248,8 +312,31 @@ describe("logout", () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
-  it("redirects to /login on success", async () => {
+  it("redirects to /login on success, clearing the activity marker", async () => {
     mocks.createClient.mockResolvedValue(authClient({ signOut: vi.fn().mockResolvedValue({ error: null }) }));
     await expect(logout()).rejects.toThrow("NEXT_REDIRECT:/login");
+    expect(mocks.borrarActividad).toHaveBeenCalled();
+  });
+});
+
+describe("inactivity actions", () => {
+  it("mantenerSesion answers ok only for an active signed-in user", async () => {
+    mocks.getSessionUser.mockResolvedValue({ id: "u", email: "", role: "empleado", cuenta: { estadoCuenta: "activa", debeCambiarPassword: false } });
+    await expect(mantenerSesion()).resolves.toEqual({ ok: true });
+    mocks.getSessionUser.mockResolvedValue(null);
+    await expect(mantenerSesion()).resolves.toEqual({ ok: false, error: copy.auth.errors.sesionInactividad });
+    mocks.getSessionUser.mockResolvedValue({ id: "u", email: "", role: "admin", cuenta: { estadoCuenta: "inactiva", debeCambiarPassword: false } });
+    expect((await mantenerSesion()).ok).toBe(false);
+  });
+
+  it("cerrarSesionPorInactividad signs out, clears the marker and shows the reason, even if signOut fails", async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: null });
+    mocks.createClient.mockResolvedValue(authClient({ signOut }));
+    await expect(cerrarSesionPorInactividad()).rejects.toThrow("NEXT_REDIRECT:/login?sesion=inactividad");
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mocks.borrarActividad).toHaveBeenCalled();
+
+    mocks.createClient.mockRejectedValue(new Error("boom"));
+    await expect(cerrarSesionPorInactividad()).rejects.toThrow("NEXT_REDIRECT:/login?sesion=inactividad");
   });
 });
