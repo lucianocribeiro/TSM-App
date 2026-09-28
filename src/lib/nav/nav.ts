@@ -12,10 +12,12 @@ export type NavItem = {
 const entries: Array<{ href: string; label: string; roles: AppRole[] }> = [
   { href: "/mi-legajo", label: copy.nav.miLegajo, roles: ["empleado", "admin"] },
   { href: "/legajos", label: copy.nav.legajos, roles: ["admin"] },
+  { href: "/aprobaciones", label: copy.nav.aprobaciones, roles: ["admin"] },
   { href: "/usuarios", label: copy.nav.usuarios, roles: ["admin"] },
 ];
 
-// Menu items for a role. Presentation only: per-route role enforcement is F1-10.
+// Menu items for a role (Constitution §6). Presentation only: the route guard
+// (src/lib/auth/guardia.ts) and the pages enforce the roles.
 export function getNavItems(role: AppRole): NavItem[] {
   return entries
     .filter((entry) => entry.roles.includes(role))

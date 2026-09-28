@@ -21,6 +21,7 @@ export type Copy = {
       logoutFailed: string;
       cuentaInactiva: string;
       cuentaNoVerificada: string;
+      sesionInactividad: string;
     };
     logout: string;
     roles: {
@@ -33,7 +34,14 @@ export type Copy = {
     miLegajo: string;
     legajos: string;
     usuarios: string;
+    aprobaciones: string;
     cambiarPassword: string;
+  };
+  sesion: {
+    avisoTitulo: string;
+    avisoCuerpo: string;
+    seguirConectado: string;
+    cerrarSesion: string;
   };
   campana: {
     sinPendientes: string;
@@ -618,6 +626,7 @@ export const copy = {
       cuentaInactiva: "Tu cuenta está inactiva. Contactá a Recursos Humanos.",
       cuentaNoVerificada:
         "No pudimos verificar tu cuenta. Ingresá de nuevo y, si el problema sigue, contactá a Recursos Humanos.",
+      sesionInactividad: "Tu sesión se cerró por inactividad. Ingresá de nuevo para seguir.",
     },
     logout: "Cerrar sesión",
     roles: {
@@ -630,7 +639,15 @@ export const copy = {
     miLegajo: "Mi Legajo",
     legajos: "Legajos",
     usuarios: "Usuarios",
+    aprobaciones: "Aprobaciones",
     cambiarPassword: "Cambiar contraseña",
+  },
+  sesion: {
+    avisoTitulo: "¿Seguís ahí?",
+    avisoCuerpo:
+      "Por inactividad, tu sesión se va a cerrar en {tiempo}. Si tenés cambios sin guardar, se van a perder.",
+    seguirConectado: "Seguir conectado",
+    cerrarSesion: "Cerrar sesión",
   },
   campana: {
     sinPendientes: "Aprobaciones: no hay pendientes",
