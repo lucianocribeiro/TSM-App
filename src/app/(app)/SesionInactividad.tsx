@@ -72,10 +72,17 @@ export function SesionInactividad() {
       if (event.key === ULTIMA_ACTIVIDAD_KEY) instancia.sincronizar();
       if (event.key === SALIDA_KEY) {
         const motivo = leerSalida(event.newValue);
-        if (motivo) {
-          instancia.detener();
-          irAlLogin(motivo === "inactividad" ? LOGIN_INACTIVIDAD : LOGIN_PATH);
-        }
+        if (!motivo) return;
+        instancia.detener();
+        // End the session from this tab too, rather than only going to the
+        // login page: the other tab's sign-out may still be in flight, and
+        // the login page sends a live session back in.
+        const salida = motivo === "inactividad" ? cerrarSesionPorInactividad() : logout();
+        salida
+          .then((result) => {
+            if (result && !result.ok) irAlLogin(LOGIN_PATH);
+          })
+          .catch(() => irAlLogin(motivo === "inactividad" ? LOGIN_INACTIVIDAD : LOGIN_PATH));
       }
     };
     window.addEventListener("storage", alAlmacenar);
