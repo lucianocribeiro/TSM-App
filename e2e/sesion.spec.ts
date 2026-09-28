@@ -89,7 +89,10 @@ test.describe("access matrix", () => {
     const user = await usuario("volver", "admin");
     await page.goto("/aprobaciones");
     await expect(page).toHaveURL(/\/login\?volver=%2Faprobaciones$/);
-    await fillLogin(page, user.email, user.password);
+    // On this page (fillLogin would reload /login without the parameter).
+    await page.getByLabel(copy.auth.login.emailLabel, { exact: true }).fill(user.email);
+    await page.getByLabel(copy.auth.login.passwordLabel, { exact: true }).fill(user.password);
+    await page.getByRole("button", { name: copy.auth.login.submit }).click();
     await expect(page).toHaveURL(/\/aprobaciones$/);
   });
 
@@ -162,8 +165,12 @@ test.describe("inactivity", () => {
 
     await a.clock.fastForward("10:00");
     await b.clock.fastForward("10:00");
-    // Real input in tab A only.
-    await a.keyboard.press("Shift");
+    // Real input in tab A only; the shared last activity moves forward.
+    const ultima = () => a.evaluate(() => Number(window.localStorage.getItem("tsm-ultima-actividad")));
+    const antes = await ultima();
+    await a.bringToFront();
+    await a.getByRole("heading", { level: 1 }).click();
+    await expect.poll(ultima).toBeGreaterThan(antes);
     await a.clock.fastForward("05:00");
     await b.clock.fastForward("05:00");
     // 15 minutes since B's own activity, 5 since A's: nobody is warned.
