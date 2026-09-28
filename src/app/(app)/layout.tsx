@@ -10,7 +10,8 @@ import { parseTheme, THEME_COOKIE } from "@/lib/theme/theme";
 import { AppShell } from "./AppShell";
 
 // Session-based access only. The menu depends on the role for presentation;
-// per-route role enforcement (requireRole) arrives in F1-10.
+// roles are enforced by the route guard in the proxy and by each page
+// (requireRole) and action.
 // The account gate runs in the proxy on every request; the layout repeats it
 // on every full render, for the path the proxy forwards. A session that must
 // end (account inactive or not verifiable) goes to /auth/salir, which clears

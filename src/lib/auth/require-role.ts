@@ -6,7 +6,8 @@ import { getSessionUser, type AppRole, type SessionUser } from "@/lib/auth/sessi
 // Server-side role guard for role-restricted pages (Constitution §4). Returns
 // the signed-in user when their account is readable, active and has the role;
 // otherwise redirects before the page reads any data: no session to /login,
-// anything else to /mi-legajo. The global route guards arrive in F1-10.
+// anything else to /mi-legajo. The route guard in the proxy
+// (src/lib/auth/guardia.ts) checks first; this stays as defense in depth.
 export async function requireRole(role: AppRole): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect(LOGIN_PATH);

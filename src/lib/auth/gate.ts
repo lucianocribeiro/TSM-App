@@ -10,8 +10,9 @@ import type { Database } from "@/lib/supabase/database.types";
 // - a user who must change their password reaches only /cambiar-password.
 // /cambiar-password is also where any user, an Admin included, changes their
 // own password voluntarily.
-// Pure: the proxy applies the decision, and the app layout repeats it for the
-// path the proxy forwards.
+// Pure. The proxy applies these rules through the route guard
+// (src/lib/auth/guardia.ts); the app layout repeats this decision for the path
+// the proxy forwards.
 
 type CuentaEstado = Database["public"]["Enums"]["cuenta_estado"];
 
