@@ -85,6 +85,13 @@ jobs:
             grep -q "^${name}=." "$RUNNER_TEMP/supabase.env" || { echo "Missing ${name} from supabase status"; exit 1; }
           done
           cat "$RUNNER_TEMP/supabase.env" >> "$GITHUB_ENV"
+      # A fresh random SESSION_SECRET for this run only, masked in the logs.
+      # Never stored in the repository.
+      - name: Generate an ephemeral session secret
+        run: |
+          secret="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))")"
+          echo "::add-mask::${secret}"
+          echo "SESSION_SECRET=${secret}" >> "$GITHUB_ENV"
       - run: npm run test:integration
       # The committed types must match types generated from the migrated database.
       - name: Check database types are up to date
@@ -123,11 +130,19 @@ jobs:
             grep -q "^${name}=." "$RUNNER_TEMP/supabase.env" || { echo "Missing ${name} from supabase status"; exit 1; }
           done
           cat "$RUNNER_TEMP/supabase.env" >> "$GITHUB_ENV"
+      # A fresh random SESSION_SECRET for this run only, masked in the logs.
+      # Never stored in the repository.
+      - name: Generate an ephemeral session secret
+        run: |
+          secret="$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))")"
+          echo "::add-mask::${secret}"
+          echo "SESSION_SECRET=${secret}" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run test:e2e
-      # No generated password may reach an artifact: scan everything that
-      # could be uploaded (including trace zips) before uploading anything.
+      # No generated password, nor this run's SESSION_SECRET, may reach an
+      # artifact: scan everything that could be uploaded (including trace
+      # zips) before uploading anything.
       - name: Scan e2e artifacts for generated passwords
         id: artifact-scan
         if: ${{ !cancelled() }}
