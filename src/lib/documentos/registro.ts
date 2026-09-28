@@ -8,6 +8,7 @@ import { copy } from "@/lib/copy/es-AR";
 import type { Database } from "@/lib/supabase/database.types";
 import { barrerHuerfanos, eliminarObjeto } from "./limpieza";
 import { buildDocumentoPath, parseDocumentoPath } from "./paths";
+import { MODOS_REEMPLAZO, type ModoReemplazo } from "./reemplazo";
 import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "./tipos";
 import { validateDocumentoUpload } from "./validation";
 
@@ -35,7 +36,9 @@ type Client = SupabaseClient<Database>;
 type DocumentoEstado = Database["public"]["Enums"]["documento_estado"];
 
 const errors = copy.miLegajo.documentos.errors;
+const reemplazoErrors = copy.legajos.documentos.errors;
 const UNIQUE_VIOLATION = "23505";
+const OBJECT_STATE = "55000";
 
 // Server-side note for a cleanup that failed. No paths, ids or credentials.
 export function avisarFalloLimpieza(origen: string, motivo: string) {
@@ -92,8 +95,9 @@ export type Registro = {
   ownerId: string;
   // Who uploads (the signed-in user).
   uploaderId: string;
-  // Admin uploads are approved at once (set by the database) and replace the
-  // approved document of the same type in place.
+  // Admin uploads are approved at once (set by the database). When the type
+  // already has an approved document, the input's modo says how it is
+  // replaced (public.reemplazar_documento).
   esAdmin: boolean;
   origen: string;
 };
@@ -103,7 +107,9 @@ export async function registrarObjeto(
   { client, ownerId, uploaderId, esAdmin, origen }: Registro,
   input: unknown,
 ): Promise<ActionResult<{ estado: DocumentoEstado }>> {
-  const parsed = z.object({ tipo: z.string(), path: z.string(), fileName: z.string() }).safeParse(input);
+  const parsed = z
+    .object({ tipo: z.string(), path: z.string(), fileName: z.string(), modo: z.enum(MODOS_REEMPLAZO).optional() })
+    .safeParse(input);
   if (!parsed.success) return { ok: false, error: errors.subirFallo };
 
   const ruta = parseDocumentoPath(parsed.data.path);
@@ -152,30 +158,21 @@ export async function registrarObjeto(
     uploaded_by: uploaderId,
   };
 
-  // Admin uploads are approved at once (Constitution §9): a new file for a
-  // type that already has an approved one replaces it in place, and the old
-  // object is removed.
+  // Admin uploads are approved at once (Constitution §9). A new file for a
+  // type that already has an approved one replaces it, in the mode the Admin
+  // chose, in one database transaction.
   if (esAdmin) {
     const vigente = await client
       .from("legajo_documentos")
-      .select("id, storage_path")
+      .select("id")
       .eq("legajo_id", legajo.id)
       .eq("tipo", tipo)
       .eq("estado", "aprobado")
       .maybeSingle();
     if (vigente.error) return discard(errors.subirFallo);
     if (vigente.data) {
-      const replaced = await client
-        .from("legajo_documentos")
-        .update(archivo)
-        .eq("id", vigente.data.id)
-        .select("estado")
-        .single();
-      if (replaced.error || !replaced.data) return discard(errors.subirFallo);
-      // The replaced file has no row any more. If removing it fails, the
-      // upload still succeeded; the sweep removes it later.
-      if (!(await eliminarObjeto(client, vigente.data.storage_path))) avisarFalloLimpieza(origen, "replace");
-      return { ok: true, data: { estado: replaced.data.estado } };
+      if (!parsed.data.modo) return discard(reemplazoErrors.modoRequerido);
+      return reemplazar(client, { legajoId: legajo.id, tipo, archivo, modo: parsed.data.modo, origen }, discard);
     }
   }
 
@@ -190,6 +187,46 @@ export async function registrarObjeto(
     );
   }
   return { ok: true, data: { estado: inserted.data.estado } };
+}
+
+type Reemplazo = {
+  legajoId: string;
+  tipo: DocumentoTipo;
+  archivo: { storage_path: string; file_name: string; mime_type: string; size_bytes: number };
+  modo: ModoReemplazo;
+  origen: string;
+};
+
+// Replaces the approved document through public.reemplazar_documento. In the
+// permanent mode the previous row is gone when it returns, and its object is
+// removed here: if that fails, the replacement stands, the caller gets the
+// cleanup error and the rowless object is left to the folder sweep.
+async function reemplazar(
+  client: Client,
+  { legajoId, tipo, archivo, modo, origen }: Reemplazo,
+  discard: (error: string) => Promise<ActionResult<never>>,
+): Promise<ActionResult<{ estado: DocumentoEstado }>> {
+  const { data, error } = await client.rpc("reemplazar_documento", {
+    p_legajo_id: legajoId,
+    p_tipo: tipo,
+    p_storage_path: archivo.storage_path,
+    p_file_name: archivo.file_name,
+    p_mime_type: archivo.mime_type,
+    p_size_bytes: archivo.size_bytes,
+    p_conservar_historial: modo === "conservar",
+  });
+  if (error || !data?.length) {
+    return discard(
+      error?.code === OBJECT_STATE ? copy.legajos.errors.documentoPendiente : errors.subirFallo,
+    );
+  }
+  // Null in the keep-history mode (the generated type does not say so).
+  const anterior: string | null = data[0].storage_path_eliminado ?? null;
+  if (anterior && !(await eliminarObjeto(client, anterior))) {
+    avisarFalloLimpieza(origen, "replace");
+    return { ok: false, error: reemplazoErrors.limpiezaFallo };
+  }
+  return { ok: true, data: { estado: "aprobado" } };
 }
 
 // Called (through an action) when registration failed or never answered:

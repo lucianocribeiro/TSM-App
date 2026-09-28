@@ -1,6 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.6 (draft) | Governed by: `docs/constitucion.md`
-Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded.
+Version: 0.7 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6).
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -45,6 +45,9 @@ As Admin, I see the list of employees and open any legajo.
 - I can edit all legajo data (groups A to E); my changes apply directly, with no approval step.
 - I review pending changes and document uploads from employees and approve or reject them (detail in US-7).
 - I can upload, replace, delete and download documents for any employee; files go to a private bucket.
+- Replacing a current document asks how: **Conservar historial** keeps the previous document as replaced, or **Reemplazar definitivamente** deletes it and its file for good, after an explicit confirmation. While the employee has a pending document of that type, I cannot upload or replace that type; it is decided in the approvals inbox first.
+- The legajo detail lists the replaced versions of each document type (when replaced, who replaced it) and lets me download them. Employees never see replaced documents.
+- While the employee has a pending change request, groups A to D and the children cannot be edited directly (group E and documents can); the notice links to the request in the inbox.
 - The Legajos list shows two KPI cards, over the whole workforce (not affected by the list's filters, search or the deactivated toggle):
   - Activos: employees whose account is not deactivated and whose estado laboral is Activo or En prueba. Legajos without estado laboral are excluded.
   - Ingresos del mes: of those active employees, the ones whose Fecha de ingreso falls in the current calendar month in Argentina (America/Argentina/Buenos_Aires).
@@ -68,6 +71,13 @@ As Admin, I create an employee account and assign a role.
 - An Admin sees pending items with an in-app indicator, reviews the submitted value against the current one, and approves or rejects with a reason.
 - On approval the value (or document) becomes current; on rejection nothing changes.
 - Every decision records who and when.
+- Indicator: a bell in the app shell, for Admin only, with the number of pending change requests plus pending documents (shown as "9+" above nine, no number at zero). It opens the approvals inbox. In-app only; no email. It refreshes on navigation and after each decision, with no polling.
+- Approvals inbox (`/aprobaciones`, Admin only): pending change requests and documents, oldest first, with employee name, número de legajo, submission date and what is pending (groups changed, or document type). Items of deactivated employees are shown and marked.
+- A change request is compared field by field (current value beside the submitted value, only for fields that change, grouped A to D; children as a list of added, removed and modified) and is approved or rejected **as a whole, exactly as submitted**: there is no editing in the inbox. To correct something, the Admin rejects with a reason, or approves and then edits the legajo directly.
+- A pending document is previewed or downloaded next to the current approved document of that type, if any.
+- A rejection requires a reason (trimmed, not empty, up to 500 characters), which the employee sees verbatim.
+- Before applying an approval, the submitted values are validated again with the rules of 5.7. If a value no longer passes (for example, a rule added after submission), the approval is refused and the Admin rejects with a reason instead.
+- An item already decided elsewhere shows a message and the inbox refreshes. Nobody decides on items of their own legajo.
 
 ### US-8 Estado de la cuenta
 - Estado de la cuenta is Activa or Inactiva. Deactivating sets it to Inactiva.
@@ -150,6 +160,8 @@ Source: TSM validated employee update form ("Formulario de actualización - Tecn
 | Documents | Uploads own; they apply after Admin approval; reads own | Uploads, replaces, deletes and reads for anyone |
 
 Validation (required fields, DNI digits only, Partido otro, children rule) is enforced on the server, not only in the form.
+
+While a legajo has a pending change request, the database refuses direct changes to groups A to D and to the children, for every API user including Admin; group E stays editable. Approving or rejecting the request (or the employee cancelling it) releases the lock.
 
 ### 5.7 Field validations
 - CUIL: 11 digits in `XX-XXXXXXXX-X` format, prefix 20, 23, 24 or 27, with the check digit validated (modulo 11; a DNI whose check digit would be 10 takes prefix 23).

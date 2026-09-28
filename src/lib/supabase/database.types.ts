@@ -60,6 +60,8 @@ export type Database = {
           legajo_id: string
           mime_type: string
           motivo_rechazo: string | null
+          reemplazado_en: string | null
+          reemplazado_por: string | null
           revisado_en: string | null
           revisado_por: string | null
           size_bytes: number
@@ -76,6 +78,8 @@ export type Database = {
           legajo_id: string
           mime_type: string
           motivo_rechazo?: string | null
+          reemplazado_en?: string | null
+          reemplazado_por?: string | null
           revisado_en?: string | null
           revisado_por?: string | null
           size_bytes: number
@@ -92,6 +96,8 @@ export type Database = {
           legajo_id?: string
           mime_type?: string
           motivo_rechazo?: string | null
+          reemplazado_en?: string | null
+          reemplazado_por?: string | null
           revisado_en?: string | null
           revisado_por?: string | null
           size_bytes?: number
@@ -106,6 +112,13 @@ export type Database = {
             columns: ["legajo_id"]
             isOneToOne: false
             referencedRelation: "legajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legajo_documentos_reemplazado_por_fkey"
+            columns: ["reemplazado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -441,6 +454,14 @@ export type Database = {
         Args: { p_motivo: string; p_profile_id: string }
         Returns: undefined
       }
+      estado_documento_propio: {
+        Args: { p_storage_path: string }
+        Returns: Database["public"]["Enums"]["documento_estado"]
+      }
+      hay_solicitud_pendiente: {
+        Args: { p_legajo_id: string }
+        Returns: boolean
+      }
       is_admin: { Args: never; Returns: boolean }
       is_valid_hijos_json: { Args: { valor: string }; Returns: boolean }
       is_valid_legajo_doc_path: { Args: { path: string }; Returns: boolean }
@@ -471,6 +492,21 @@ export type Database = {
       rechazar_solicitud: {
         Args: { p_motivo: string; p_solicitud_id: string }
         Returns: undefined
+      }
+      reemplazar_documento: {
+        Args: {
+          p_conservar_historial: boolean
+          p_file_name: string
+          p_legajo_id: string
+          p_mime_type: string
+          p_size_bytes: number
+          p_storage_path: string
+          p_tipo: Database["public"]["Enums"]["documento_tipo"]
+        }
+        Returns: {
+          documento_id: string
+          storage_path_eliminado: string
+        }[]
       }
       registrar_creacion_cuenta: {
         Args: { p_profile_id: string }

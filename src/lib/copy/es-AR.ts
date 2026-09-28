@@ -35,6 +35,11 @@ export type Copy = {
     usuarios: string;
     cambiarPassword: string;
   };
+  campana: {
+    sinPendientes: string;
+    pendientes: string;
+    tope: string;
+  };
   theme: {
     toDark: string;
     toLight: string;
@@ -218,6 +223,7 @@ export type Copy = {
       propio: string;
       cuentaInactiva: string;
       solicitudPendiente: string;
+      revisarSolicitud: string;
       cargaFallo: string;
     };
     laborales: {
@@ -226,6 +232,39 @@ export type Copy = {
     documentos: {
       intro: string;
       eliminarVigenteBody: string;
+      reemplazar: string;
+      reemplazarTitle: string;
+      reemplazarBody: string;
+      conservar: {
+        label: string;
+        descripcion: string;
+      };
+      definitivo: {
+        label: string;
+        descripcion: string;
+      };
+      elegirArchivo: string;
+      confirmarTitle: string;
+      confirmarBody: string;
+      confirmar: string;
+      volver: string;
+      reemplazado: string;
+      historial: {
+        title: string;
+        intro: string;
+        columnas: {
+          archivo: string;
+          cargado: string;
+          reemplazado: string;
+          quien: string;
+          acciones: string;
+        };
+        sinDato: string;
+      };
+      errors: {
+        modoRequerido: string;
+        limpiezaFallo: string;
+      };
     };
     errors: {
       solicitudPendiente: string;
@@ -417,12 +456,89 @@ export type Copy = {
     };
     pendienteHint: string;
     motivoRechazoLabel: string;
+    bandeja: {
+      kicker: string;
+      title: string;
+      intro: string;
+      loading: string;
+      vacio: string;
+      listaFallo: string;
+      total: string;
+      columnas: {
+        empleado: string;
+        enviado: string;
+        pendiente: string;
+        acciones: string;
+      };
+      tipoSolicitud: string;
+      tipoDocumento: string;
+      sinNombre: string;
+      numeroLegajo: string;
+      dadoDeBaja: string;
+      propio: string;
+      revisar: string;
+    };
+    detalle: {
+      kicker: string;
+      volver: string;
+      verLegajo: string;
+      solicitudTitle: string;
+      documentoTitle: string;
+      enviado: string;
+      nota: string;
+      notaDocumento: string;
+      columnas: {
+        campo: string;
+        actual: string;
+        propuesto: string;
+      };
+      sinDiferencias: string;
+      hijos: {
+        title: string;
+        agregado: string;
+        quitado: string;
+        modificado: string;
+        antes: string;
+      };
+      propio: string;
+      cuentaInactiva: string;
+      aprobar: string;
+      aprobando: string;
+      rechazar: string;
+      rechazarTitle: string;
+      rechazarDocumentoTitle: string;
+      rechazarBody: string;
+      motivoHint: string;
+      confirmarRechazo: string;
+      rechazando: string;
+      cancelar: string;
+      noEncontrado: string;
+      cargaFallo: string;
+      documento: {
+        enviado: string;
+        vigente: string;
+        sinVigente: string;
+        descargar: string;
+        vistaPrevia: string;
+        sinVistaPrevia: string;
+      };
+    };
+    exito: {
+      solicitudAprobada: string;
+      solicitudRechazada: string;
+      documentoAprobado: string;
+      documentoRechazado: string;
+    };
     errors: {
       solicitudPendiente: string;
       documentoPendiente: string;
       sinCambios: string;
       motivoRequerido: string;
+      motivoLargo: string;
       noPendiente: string;
+      yaDecidido: string;
+      cuentaPropia: string;
+      revalidacion: string;
       guardarFallo: string;
       valorInvalido: string;
     };
@@ -515,6 +631,11 @@ export const copy = {
     legajos: "Legajos",
     usuarios: "Usuarios",
     cambiarPassword: "Cambiar contraseña",
+  },
+  campana: {
+    sinPendientes: "Aprobaciones: no hay pendientes",
+    pendientes: "Aprobaciones: {n} pendientes",
+    tope: "9+",
   },
   theme: {
     toDark: "Modo oscuro",
@@ -702,6 +823,7 @@ export const copy = {
       cuentaInactiva: "La cuenta de este empleado está dada de baja. Su legajo se puede consultar y corregir.",
       solicitudPendiente:
         "Este empleado tiene una solicitud de cambios pendiente. Sus datos personales, de contacto, familiares y de emergencia no se pueden editar hasta que se resuelva. Los datos laborales y los documentos se pueden editar igual.",
+      revisarSolicitud: "Revisar solicitud",
       cargaFallo: "No pudimos cargar este legajo. Intentá de nuevo.",
     },
     laborales: {
@@ -710,6 +832,41 @@ export const copy = {
     documentos: {
       intro: "Subí archivos PDF, JPG o PNG de hasta 10 MB. Los documentos que subas quedan aprobados.",
       eliminarVigenteBody: "Vamos a eliminar el documento vigente. Esta acción no se puede deshacer.",
+      reemplazar: "Reemplazar",
+      reemplazarTitle: "Reemplazar {documento}",
+      reemplazarBody: "Elegí qué hacer con el documento actual ({archivo}) y después elegí el archivo nuevo.",
+      conservar: {
+        label: "Conservar historial",
+        descripcion: "El documento actual queda en el historial del legajo y lo vas a poder descargar.",
+      },
+      definitivo: {
+        label: "Reemplazar definitivamente",
+        descripcion: "El documento actual se borra para siempre, con su archivo.",
+      },
+      elegirArchivo: "Elegir archivo",
+      confirmarTitle: "Reemplazar definitivamente",
+      confirmarBody:
+        "Vamos a borrar para siempre el documento actual ({archivo}) cuando subas el nuevo. Esta acción no se puede deshacer.",
+      confirmar: "Sí, reemplazar definitivamente",
+      volver: "Volver",
+      reemplazado: "Reemplazamos el documento.",
+      historial: {
+        title: "Historial de {documento}",
+        intro: "Versiones anteriores que se reemplazaron conservando el historial. Solo las ven los administradores.",
+        columnas: {
+          archivo: "Archivo",
+          cargado: "Cargado",
+          reemplazado: "Reemplazado",
+          quien: "Reemplazado por",
+          acciones: "Acciones",
+        },
+        sinDato: "—",
+      },
+      errors: {
+        modoRequerido: "Elegí si querés conservar el documento actual en el historial o reemplazarlo definitivamente.",
+        limpiezaFallo:
+          "Reemplazamos el documento, pero no pudimos borrar el archivo anterior. Se va a borrar automáticamente más tarde.",
+      },
     },
     errors: {
       solicitudPendiente:
@@ -910,6 +1067,81 @@ export const copy = {
     },
     pendienteHint: "Enviaste un cambio. Se va a aplicar cuando lo apruebe un administrador.",
     motivoRechazoLabel: "Motivo del rechazo",
+    bandeja: {
+      kicker: "Administración",
+      title: "Aprobaciones",
+      intro: "Cambios de datos y documentos que enviaron los empleados, del más antiguo al más reciente.",
+      loading: "Cargando aprobaciones…",
+      vacio: "No hay nada pendiente de aprobación.",
+      listaFallo: "No pudimos cargar las aprobaciones. Actualizá la página para intentar de nuevo.",
+      total: "{n} pendientes",
+      columnas: {
+        empleado: "Empleado",
+        enviado: "Enviado",
+        pendiente: "Pendiente",
+        acciones: "Acciones",
+      },
+      tipoSolicitud: "Cambio de datos: {grupos}",
+      tipoDocumento: "Documento: {documento}",
+      sinNombre: "Sin nombre cargado",
+      numeroLegajo: "Legajo {numero}",
+      dadoDeBaja: "Dado de baja",
+      propio: "Tu legajo",
+      revisar: "Revisar",
+    },
+    detalle: {
+      kicker: "Aprobaciones",
+      volver: "Volver a Aprobaciones",
+      verLegajo: "Ver legajo",
+      solicitudTitle: "Solicitud de cambios",
+      documentoTitle: "Documento enviado",
+      enviado: "Enviado el {fecha}",
+      nota:
+        "Aprobás o rechazás la solicitud completa, tal como la envió el empleado. Si hay que corregir algo, rechazala indicando el motivo, o aprobala y después editá el legajo.",
+      notaDocumento: "Al aprobarlo, este archivo pasa a ser el documento vigente. El anterior queda en el historial.",
+      columnas: {
+        campo: "Dato",
+        actual: "Valor actual",
+        propuesto: "Valor enviado",
+      },
+      sinDiferencias: "Los valores enviados en este grupo ya coinciden con los actuales.",
+      hijos: {
+        title: "Cambios en hijos",
+        agregado: "Se agrega",
+        quitado: "Se quita",
+        modificado: "Cambia la fecha de nacimiento",
+        antes: "(antes: {fecha})",
+      },
+      propio:
+        "Este pedido es sobre tu propio legajo. No podés aprobarlo ni rechazarlo: tiene que decidirlo otro administrador.",
+      cuentaInactiva: "La cuenta de este empleado está dada de baja.",
+      aprobar: "Aprobar",
+      aprobando: "Aprobando…",
+      rechazar: "Rechazar",
+      rechazarTitle: "Rechazar solicitud",
+      rechazarDocumentoTitle: "Rechazar documento",
+      rechazarBody: "El empleado va a ver este motivo tal como lo escribas.",
+      motivoHint: "Obligatorio. Hasta {max} caracteres.",
+      confirmarRechazo: "Rechazar",
+      rechazando: "Rechazando…",
+      cancelar: "Cancelar",
+      noEncontrado: "No encontramos este pedido. Puede que el empleado lo haya cancelado.",
+      cargaFallo: "No pudimos cargar este pedido. Intentá de nuevo.",
+      documento: {
+        enviado: "Archivo enviado",
+        vigente: "Documento vigente",
+        sinVigente: "No hay un documento aprobado de este tipo.",
+        descargar: "Descargar",
+        vistaPrevia: "Vista previa de {documento}",
+        sinVistaPrevia: "No hay vista previa. Descargá el archivo para verlo.",
+      },
+    },
+    exito: {
+      solicitudAprobada: "Aprobamos la solicitud. El empleado ya ve los datos nuevos.",
+      solicitudRechazada: "Rechazamos la solicitud. El empleado va a ver el motivo.",
+      documentoAprobado: "Aprobamos el documento.",
+      documentoRechazado: "Rechazamos el documento. El empleado va a ver el motivo.",
+    },
     errors: {
       solicitudPendiente:
         "Ya tenés una solicitud pendiente. Esperá a que la revisen o cancelala antes de enviar otra.",
@@ -917,7 +1149,12 @@ export const copy = {
         "Ya hay un documento de este tipo pendiente de aprobación. Esperá a que lo revisen o eliminalo antes de subir otro.",
       sinCambios: "No hay cambios para enviar.",
       motivoRequerido: "Indicá el motivo del rechazo.",
+      motivoLargo: "El motivo puede tener hasta {max} caracteres.",
       noPendiente: "Esta solicitud ya fue revisada o cancelada.",
+      yaDecidido: "Este pedido ya fue revisado o cancelado. Actualizamos la lista.",
+      cuentaPropia: "No podés decidir sobre tu propio legajo. Tiene que hacerlo otro administrador.",
+      revalidacion:
+        "Algunos datos enviados ya no son válidos ({campos}). No se puede aprobar: rechazá la solicitud indicando el motivo.",
       guardarFallo: "No pudimos guardar los cambios. Intentá de nuevo.",
       valorInvalido: "Alguno de los datos no es válido. Revisalo y volvé a intentar.",
     },

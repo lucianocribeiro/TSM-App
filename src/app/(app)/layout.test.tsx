@@ -7,6 +7,7 @@ import type { SessionUser } from "@/lib/auth/session";
 const state = vi.hoisted(() => ({
   user: null as SessionUser | null,
   pathname: "/mi-legajo" as string | null,
+  contarPendientes: vi.fn(async (): Promise<number | null> => 3),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -21,11 +22,12 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("./AppShell", () => ({ AppShell: () => null }));
+vi.mock("@/lib/aprobaciones/bandeja-datos", () => ({ contarPendientes: () => state.contarPendientes() }));
 
 const { default: AppLayout } = await import("./layout");
 
-function user(cuenta: SessionUser["cuenta"]): SessionUser {
-  return { id: "user-1", email: "ana@mitsm.test", role: "empleado", cuenta };
+function user(cuenta: SessionUser["cuenta"], role: SessionUser["role"] = "empleado"): SessionUser {
+  return { id: "user-1", email: "ana@mitsm.test", role, cuenta };
 }
 
 async function render() {
@@ -68,5 +70,35 @@ describe("app layout account gate", () => {
   it("renders for an active account", async () => {
     state.user = user({ estadoCuenta: "activa", debeCambiarPassword: false });
     await expect(render()).resolves.toBeTruthy();
+  });
+});
+
+describe("approvals bell", () => {
+  const activa = { estadoCuenta: "activa" as const, debeCambiarPassword: false };
+  const pendientesDe = async () => ((await render()) as { props: { pendientes: number | null } }).props.pendientes;
+
+  beforeEach(() => {
+    state.contarPendientes.mockClear();
+    state.contarPendientes.mockImplementation(async () => 3);
+  });
+
+  it("gives an active Admin the pending count", async () => {
+    state.user = user(activa, "admin");
+    expect(await pendientesDe()).toBe(3);
+  });
+
+  it("shows a neutral bell when the count cannot be read", async () => {
+    state.user = user(activa, "admin");
+    state.contarPendientes.mockImplementation(async () => null);
+    expect(await pendientesDe()).toBe(0);
+  });
+
+  it("never reads the count for an Empleado or during the forced password change", async () => {
+    state.user = user(activa);
+    expect(await pendientesDe()).toBeNull();
+    state.user = user({ estadoCuenta: "activa", debeCambiarPassword: true }, "admin");
+    state.pathname = "/cambiar-password";
+    expect(await pendientesDe()).toBeNull();
+    expect(state.contarPendientes).not.toHaveBeenCalled();
   });
 });

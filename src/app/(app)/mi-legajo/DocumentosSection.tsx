@@ -8,6 +8,7 @@ import { rowClassName, Table, Td, Th } from "@/components/ui/Table";
 import type { ActionResult } from "@/lib/action-result";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
+import type { ModoReemplazo } from "@/lib/documentos/reemplazo";
 import type { DocumentoFila, ResumenDocumento } from "@/lib/documentos/resumen";
 import { subirDocumento, type SubidaPasos } from "@/lib/documentos/subida";
 import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "@/lib/documentos/tipos";
@@ -117,8 +118,12 @@ function DocumentoRow({
   const [error, setError] = useState<string | null>(null);
   const [subiendo, startUpload] = useTransition();
   const [descargando, startDownload] = useTransition();
+  const [reemplazando, setReemplazando] = useState(false);
   const nombre = copy.documentos.tipos[resumen.tipo];
   const mostrado = resumen.pendiente ?? resumen.rechazado ?? resumen.vigente;
+  // An Admin replaces a current document through the mode dialog (F1-09B);
+  // nobody uploads over a pending one.
+  const reemplazable = esAdmin && resumen.vigente !== null && resumen.pendiente === null;
 
   function descargar(documento: DocumentoFila) {
     setError(null);
@@ -137,7 +142,10 @@ function DocumentoRow({
   function elegido(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (file) procesar(file);
+  }
+
+  function procesar(file: File, modo?: ModoReemplazo) {
     setError(null);
     // Checked here for immediate feedback, and again on the server against
     // the stored object.
@@ -153,12 +161,12 @@ function DocumentoRow({
     }
     startUpload(async () => {
       // subir never throws, so the transition always ends (no stuck spinner).
-      const error = await subir(acciones, resumen.tipo, file);
+      const error = await subir(acciones, resumen.tipo, file, modo);
       if (error) {
         setError(error);
         return;
       }
-      onAviso(esAdmin ? t.exito.subidoAdmin : t.exito.subido);
+      onAviso(modo ? copy.legajos.documentos.reemplazado : esAdmin ? t.exito.subidoAdmin : t.exito.subido);
     });
   }
 
@@ -210,7 +218,11 @@ function DocumentoRow({
               ) : null}
             </>
           ) : null}
-          {resumen.puedeSubir ? (
+          {reemplazable ? (
+            <Button onClick={() => setReemplazando(true)} disabled={subiendo}>
+              {subiendo ? t.subiendo : copy.legajos.documentos.reemplazar}
+            </Button>
+          ) : resumen.puedeSubir ? (
             <>
               <input
                 ref={input}
@@ -231,6 +243,19 @@ function DocumentoRow({
             {error}
           </p>
         ) : null}
+        {/* Outside the button row, whose children do not wrap. */}
+        {reemplazable ? (
+          <ReemplazarDialog
+            open={reemplazando}
+            nombre={nombre}
+            vigente={resumen.vigente}
+            onClose={() => setReemplazando(false)}
+            onArchivo={(file, modo) => {
+              setReemplazando(false);
+              procesar(file, modo);
+            }}
+          />
+        ) : null}
       </Td>
     </tr>
   );
@@ -238,18 +263,113 @@ function DocumentoRow({
 
 // Upload: a path from the server, the file straight to Storage with the
 // user's session, then the server records it; a failed registration discards
-// the object (src/lib/documentos/subida.ts). Returns an es-AR error or null.
-function subir(acciones: AccionesDocumentos, tipo: DocumentoTipo, file: File): Promise<string | null> {
+// the object (src/lib/documentos/subida.ts). modo: an Admin replacing the
+// current document. Returns an es-AR error or null.
+function subir(acciones: AccionesDocumentos, tipo: DocumentoTipo, file: File, modo?: ModoReemplazo): Promise<string | null> {
   return subirDocumento(
     {
       preparar: acciones.preparar,
       subirArchivo: (path) =>
         createClient().storage.from(DOCUMENTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: false }),
-      registrar: acciones.registrar,
+      registrar: (input) => acciones.registrar(modo ? { ...input, modo } : input),
       descartar: acciones.descartar,
     },
     tipo,
     file,
+  );
+}
+
+// The Admin's replacement: keep the current document in the history, or
+// delete it for good after an explicit confirmation. The file input lives
+// inside the dialog (the page behind a modal is inert) and only appears once
+// the choice is final.
+function ReemplazarDialog({
+  open,
+  nombre,
+  vigente,
+  onClose,
+  onArchivo,
+}: {
+  open: boolean;
+  nombre: string;
+  vigente: DocumentoFila | null;
+  onClose: () => void;
+  onArchivo: (file: File, modo: ModoReemplazo) => void;
+}) {
+  const r = copy.legajos.documentos;
+  const input = useRef<HTMLInputElement>(null);
+  const [modo, setModo] = useState<ModoReemplazo>("conservar");
+  const [confirmando, setConfirmando] = useState(false);
+  const archivo = vigente?.fileName ?? "";
+  const listo = modo === "conservar" || confirmando;
+
+  function cerrar() {
+    setModo("conservar");
+    setConfirmando(false);
+    onClose();
+  }
+
+  function elegido(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const elegidoModo = modo;
+    setModo("conservar");
+    setConfirmando(false);
+    onArchivo(file, elegidoModo);
+  }
+
+  return (
+    <Dialog open={open} onClose={cerrar} title={confirmando ? r.confirmarTitle : formatCopy(r.reemplazarTitle, { documento: nombre })}>
+      {confirmando ? (
+        <p className="text-ink-soft" data-testid="reemplazo-confirmacion">
+          {formatCopy(r.confirmarBody, { archivo })}
+        </p>
+      ) : (
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-2 text-ink-soft">{formatCopy(r.reemplazarBody, { archivo })}</legend>
+          {(["conservar", "definitivo"] as const).map((opcion) => (
+            <label
+              key={opcion}
+              className="flex cursor-pointer items-start gap-3 rounded-md border border-line p-3 has-checked:border-accent"
+            >
+              <input
+                type="radio"
+                name="modo-reemplazo"
+                value={opcion}
+                checked={modo === opcion}
+                onChange={() => setModo(opcion)}
+                className="mt-1 size-4 cursor-pointer accent-accent"
+              />
+              <span className="flex flex-col gap-0.5">
+                <span>{r[opcion].label}</span>
+                <span className="text-[12.5px] italic text-ink-soft">{r[opcion].descripcion}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {listo ? (
+        <input
+          ref={input}
+          type="file"
+          accept={ACCEPT}
+          className="sr-only"
+          aria-label={formatCopy(t.archivoLabel, { documento: nombre })}
+          onChange={elegido}
+        />
+      ) : null}
+      <div className="mt-2 flex flex-wrap justify-end gap-2">
+        <Button variant="secondary" onClick={confirmando ? () => setConfirmando(false) : cerrar}>
+          {r.volver}
+        </Button>
+        {modo === "definitivo" && !confirmando ? (
+          <Button onClick={() => setConfirmando(true)}>{r.definitivo.label}</Button>
+        ) : (
+          <Button onClick={() => input.current?.click()}>{confirmando ? r.confirmar : r.elegirArchivo}</Button>
+        )}
+      </div>
+    </Dialog>
   );
 }
 

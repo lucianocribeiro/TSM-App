@@ -44,7 +44,7 @@ export async function cargarMiLegajo(profileId: string): Promise<MiLegajoData | 
       .order("nombre_completo"),
     supabase
       .from("legajo_documentos")
-      .select("id, tipo, estado, file_name, created_at, motivo_rechazo")
+      .select("id, tipo, estado, file_name, created_at, motivo_rechazo, reemplazado_en, reemplazado_por")
       .eq("legajo_id", legajo.id),
     supabase
       .from("solicitudes_cambio")
@@ -66,6 +66,8 @@ export async function cargarMiLegajo(profileId: string): Promise<MiLegajoData | 
       fileName: row.file_name,
       creadoEn: row.created_at,
       motivoRechazo: row.motivo_rechazo,
+      reemplazadoEn: row.reemplazado_en,
+      reemplazadoPor: row.reemplazado_por,
     })),
     solicitud: ultima
       ? {

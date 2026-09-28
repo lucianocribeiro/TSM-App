@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
 
 // The /legajos actions with Storage and the database replaced by a fake
@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   role: "admin" as "admin" | "empleado",
   list: null as unknown as ReturnType<typeof vi.fn>,
   remove: null as unknown as ReturnType<typeof vi.fn>,
+  rpc: null as unknown as Mock<(...args: unknown[]) => Promise<unknown>>,
   queries: [] as { table: string; ops: string[] }[],
   resolve: null as unknown as (table: string, ops: string[]) => Result,
 }));
@@ -66,6 +67,7 @@ vi.mock("@/lib/supabase/server", () => ({
       }),
     },
     from: (table: string) => query(table),
+    rpc: (...args: unknown[]) => state.rpc(...args),
   }),
 }));
 
@@ -81,6 +83,7 @@ beforeEach(() => {
   state.queries = [];
   state.list = vi.fn(async () => ({ data: STORED, error: null }));
   state.remove = vi.fn(async (paths: string[]) => ({ data: paths, error: null }));
+  state.rpc = vi.fn(async () => ({ data: null, error: { code: "XX000", message: "rpc failed" } }));
   state.resolve = (table, ops) => {
     if (table === "legajos") return { data: { id: "legajo-1" }, error: null };
     if (ops.includes("insert")) return { data: null, error: { code: "XX000", message: "insert failed" } };
@@ -166,6 +169,15 @@ describe("pending change request lock", () => {
     expect(state.queries.find((q) => q.table === "legajos")?.ops).toContain("update");
   });
 
+  it("maps the database lock to the same message when a request arrives after the check", async () => {
+    state.resolve = (table) =>
+      table === "solicitudes_cambio"
+        ? { data: null, error: null, count: 0 }
+        : { data: null, error: { code: "55000", message: "The legajo has a pending change request", hint: "solicitud_pendiente" } };
+    const result = await actions.actualizarGrupoLegajo({ profileId: EMPLEADO, grupo: "B", valores: GRUPO_B });
+    expect(result).toEqual({ ok: false, error: copy.legajos.errors.solicitudPendiente });
+  });
+
   it("group E does not look at pending requests", async () => {
     state.resolve = () => ({ data: { id: "legajo-1" }, error: null, count: 1 });
     expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({ ok: true });
@@ -220,6 +232,56 @@ describe("registrarDocumentoAdmin cleanup", () => {
     };
     await expect(registrar()).resolves.toEqual({ ok: true, data: { estado: "aprobado" } });
     expect(state.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("registrarDocumentoAdmin replacing the current document", () => {
+  const OLD_PATH = `${EMPLEADO}/dni_frente/66666666-6666-4666-8666-666666666666.pdf`;
+  const registrar = (modo?: string) =>
+    actions.registrarDocumentoAdmin({ profileId: EMPLEADO, tipo: "dni_frente", path: PATH, fileName: "dni.pdf", ...(modo ? { modo } : {}) });
+
+  beforeEach(() => {
+    // An approved document of the type exists.
+    state.resolve = (table) => (table === "legajos" ? { data: { id: "legajo-1" }, error: null } : { data: { id: "vigente-1" }, error: null });
+  });
+
+  it("needs a mode, and removes the uploaded object without one", async () => {
+    await expect(registrar()).resolves.toEqual({ ok: false, error: copy.legajos.documentos.errors.modoRequerido });
+    expect(state.rpc).not.toHaveBeenCalled();
+    expect(state.remove).toHaveBeenCalledWith([PATH]);
+  });
+
+  it("keeps history: calls the function in that mode and removes nothing", async () => {
+    state.rpc = vi.fn(async () => ({ data: [{ documento_id: "nuevo", storage_path_eliminado: null }], error: null }));
+    await expect(registrar("conservar")).resolves.toEqual({ ok: true, data: { estado: "aprobado" } });
+    expect(state.rpc).toHaveBeenCalledWith("reemplazar_documento", expect.objectContaining({ p_conservar_historial: true, p_storage_path: PATH }));
+    expect(state.remove).not.toHaveBeenCalled();
+  });
+
+  it("replaces permanently: removes the previous object after the function succeeds", async () => {
+    state.rpc = vi.fn(async () => ({ data: [{ documento_id: "nuevo", storage_path_eliminado: OLD_PATH }], error: null }));
+    await expect(registrar("definitivo")).resolves.toEqual({ ok: true, data: { estado: "aprobado" } });
+    expect(state.rpc).toHaveBeenCalledWith("reemplazar_documento", expect.objectContaining({ p_conservar_historial: false }));
+    expect(state.remove).toHaveBeenCalledWith([OLD_PATH]);
+  });
+
+  it("returns the cleanup error with a path-free log when removing the previous object fails", async () => {
+    state.rpc = vi.fn(async () => ({ data: [{ documento_id: "nuevo", storage_path_eliminado: OLD_PATH }], error: null }));
+    state.remove = vi.fn(async () => ({ data: null, error: { message: "remove failed" } }));
+    await expect(registrar("definitivo")).resolves.toEqual({ ok: false, error: copy.legajos.documentos.errors.limpiezaFallo });
+    // The new file is registered: it is never removed.
+    expect(state.remove).toHaveBeenCalledTimes(1);
+    expect(state.remove).toHaveBeenCalledWith([OLD_PATH]);
+    expect(logged()).toContain("[legajos] legajo-docs cleanup failed: replace");
+    expect(logged()).not.toContain(EMPLEADO);
+  });
+
+  it("removes the uploaded object when the function refuses (pending document, or any failure)", async () => {
+    state.rpc = vi.fn(async () => ({ data: null, error: { code: "55000", hint: "documento_pendiente" } }));
+    await expect(registrar("conservar")).resolves.toEqual({ ok: false, error: copy.legajos.errors.documentoPendiente });
+    expect(state.remove).toHaveBeenCalledWith([PATH]);
+    state.rpc = vi.fn(async () => ({ data: null, error: { code: "23514", message: "check" } }));
+    await expect(registrar("definitivo")).resolves.toEqual({ ok: false, error: docErrors.subirFallo });
   });
 });
 

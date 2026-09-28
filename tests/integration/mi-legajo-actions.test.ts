@@ -342,14 +342,17 @@ describe("/mi-legajo Server Actions", () => {
       expect((await service.storage.from(DOCUMENTOS_BUCKET).download(loose)).data).toBeNull();
     });
 
-    it("an Admin's own upload is approved at once and a second one replaces it in place", async () => {
+    it("an Admin's own upload is approved at once and a second one replaces it in the chosen mode", async () => {
       const first = await uploadAs(admin, "dni_frente", fakePdf("admin v1"));
       as(admin, "admin");
       expect(await actions.registrarDocumento({ tipo: "dni_frente", path: first, fileName: "v1.pdf" })).toEqual({ ok: true, data: { estado: "aprobado" } });
 
       const second = await uploadAs(admin, "dni_frente", fakePdf("admin v2"));
       as(admin, "admin");
-      expect(await actions.registrarDocumento({ tipo: "dni_frente", path: second, fileName: "v2.pdf" })).toEqual({ ok: true, data: { estado: "aprobado" } });
+      expect(await actions.registrarDocumento({ tipo: "dni_frente", path: second, fileName: "v2.pdf", modo: "definitivo" })).toEqual({
+        ok: true,
+        data: { estado: "aprobado" },
+      });
 
       const legajo = await legajoOf(admin.id);
       const { data } = await service.from("legajo_documentos").select("storage_path, file_name").eq("legajo_id", legajo.id).eq("tipo", "dni_frente");
