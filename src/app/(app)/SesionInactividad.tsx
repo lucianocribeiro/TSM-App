@@ -57,7 +57,7 @@ export function SesionInactividad() {
       alReportar: () => {
         mantenerSesion()
           .then((result) => {
-            if (!result.ok) irAlLogin(LOGIN_INACTIVIDAD);
+            if (!result.ok && result.sesionTerminada) irAlLogin(LOGIN_INACTIVIDAD);
           })
           .catch(() => undefined);
       },
@@ -104,7 +104,9 @@ export function SesionInactividad() {
   }
 
   return (
-    <Dialog open={fase.fase === "aviso"} onClose={() => reloj.current?.continuar()} title={t.avisoTitulo}>
+    // Not dismissible: only "Seguir conectado" keeps the session, and only
+    // "Cerrar sesión" (or the limit) ends it.
+    <Dialog open={fase.fase === "aviso"} onClose={() => undefined} dismissible={false} title={t.avisoTitulo}>
       <p className="text-ink-soft" data-testid="aviso-inactividad">
         {formatCopy(t.avisoCuerpo, { tiempo: fase.fase === "aviso" ? formatoRestante(fase.restanteMs) : "" })}
       </p>

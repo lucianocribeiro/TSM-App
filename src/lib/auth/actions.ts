@@ -5,7 +5,7 @@ import type { ActionResult } from "@/lib/action-result";
 import { CAMBIAR_PASSWORD_PATH, HOME_PATH, LOGIN_PATH } from "@/lib/auth/gate";
 import { LOGIN_INACTIVIDAD } from "@/lib/auth/guardia";
 import { rutaRetornoSegura, VOLVER_PARAM } from "@/lib/auth/retorno";
-import { getSessionUser } from "@/lib/auth/session";
+import { autorizarAccion, sesionParaCerrar } from "@/lib/auth/require-role";
 import { borrarActividad, sellarActividad } from "@/lib/sesion/marca-servidor";
 import { sesionIdDeToken } from "@/lib/sesion/marca";
 import { parseLoginInput } from "@/lib/auth/login-input";
@@ -89,21 +89,34 @@ export async function login(
   redirect(outcome.destination);
 }
 
+// Clears the activity marker whatever happened: without it the proxy refuses
+// the session anyway.
+async function borrarMarcaSiempre() {
+  try {
+    await borrarActividad();
+  } catch {
+    // Nothing else to do: the marker expires on its own.
+  }
+}
+
 export async function logout(): Promise<ActionResult> {
   let signedOut = false;
   try {
+    // Sign-out path: allowed for any session (explicit exemption).
+    await sesionParaCerrar();
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut();
     signedOut = !error;
   } catch {
     signedOut = false;
+  } finally {
+    await borrarMarcaSiempre();
   }
 
   if (!signedOut) {
     return { ok: false, error: copy.auth.errors.logoutFailed };
   }
 
-  await borrarActividad();
   redirect(LOGIN_PATH);
 }
 
@@ -111,10 +124,17 @@ export async function logout(): Promise<ActionResult> {
 // (src/app/(app)/SesionInactividad.tsx). The proxy has already checked the
 // activity marker and re-stamped it for this request; an expired session
 // arrives here without a session and gets ok: false.
-export async function mantenerSesion(): Promise<ActionResult> {
-  const user = await getSessionUser();
-  if (!user || user.cuenta?.estadoCuenta !== "activa") {
-    return { ok: false, error: copy.auth.errors.sesionInactividad };
+// sesionTerminada: there is no usable session any more (the client goes to
+// the login page). A pending password change is refused too, but the session
+// stays: the proxy has already renewed the marker for this request.
+export async function mantenerSesion(): Promise<ActionResult & { sesionTerminada?: boolean }> {
+  const acceso = await autorizarAccion();
+  if (!acceso.ok) {
+    return {
+      ok: false,
+      error: copy.auth.errors.sesionInactividad,
+      sesionTerminada: acceso.motivo === "sin-sesion" || acceso.motivo === "inactiva",
+    };
   }
   return { ok: true };
 }
@@ -122,12 +142,15 @@ export async function mantenerSesion(): Promise<ActionResult> {
 // The client's inactivity limit was reached: end the session and show why.
 export async function cerrarSesionPorInactividad(): Promise<void> {
   try {
+    // Sign-out path: allowed for any session (explicit exemption).
+    await sesionParaCerrar();
     const supabase = await createClient();
     await supabase.auth.signOut({ scope: "local" });
   } catch {
     // The marker goes below either way, and the proxy refuses the session.
+  } finally {
+    await borrarMarcaSiempre();
   }
-  await borrarActividad();
   redirect(LOGIN_INACTIVIDAD);
 }
 
@@ -146,6 +169,9 @@ export async function cambiarPassword(
 
   let result: ActionResult = generic;
   try {
+    // The one action a pending forced change allows (explicit exemption).
+    const acceso = await autorizarAccion({ permitirCambioPendiente: true });
+    if (!acceso.ok) return { ok: false, error: copy.cuentas.errors.noAutorizado };
     const supabase = await createClient();
     const {
       data: { user },
