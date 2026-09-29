@@ -180,13 +180,8 @@ for (const pantalla of PANTALLAS) {
   });
 }
 
-// No horizontal scroll at 390px, per screen, in both themes. Mi Legajo (with
-// data and empty), the Legajo detail and the inactivity warning (shown over
-// Mi Legajo) do scroll sideways at 390px: a bug reported in the F1-11B build
-// report, whose fix adds them here.
-const SIN_SCROLL_390 = ["login", "cambiar-password", "legajos", "aprobaciones", "solicitud-detalle", "usuarios"];
-
-for (const pantalla of PANTALLAS.filter((p) => SIN_SCROLL_390.includes(p.nombre))) {
+// No horizontal scroll at 390px, per screen, in both themes.
+for (const pantalla of PANTALLAS) {
   test(`no horizontal scroll at 390px: ${pantalla.nombre}`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await pantalla.abrir(page);
@@ -219,4 +214,19 @@ test("visual matrix: aviso-inactividad", async ({ browser }: { browser: Browser 
     }
   }
   expect(errores).toEqual([]);
+});
+
+test("no horizontal scroll at 390px: aviso-inactividad", async ({ browser }: { browser: Browser }) => {
+  const user = await empleadoCompleto("visual-inactividad-scroll", cuentas.add);
+  for (const tema of TEMAS) {
+    const context = await browser.newContext({ baseURL: baseURL(), viewport: { width: 390, height: 844 } });
+    await context.addCookies([{ name: THEME_COOKIE, value: tema, url: baseURL() }]);
+    const page = await context.newPage();
+    await page.clock.install();
+    await loginAs(page, user);
+    await page.clock.fastForward("13:00");
+    await expect(page.getByRole("dialog", { name: copy.sesion.avisoTitulo })).toBeVisible();
+    await sinScrollHorizontal(page, `aviso-inactividad 390px ${tema}`);
+    await context.close();
+  }
 });
