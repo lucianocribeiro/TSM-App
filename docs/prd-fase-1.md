@@ -208,5 +208,5 @@ While a legajo has a pending change request, the database refuses direct changes
 
 ## Ajustes post-deploy
 Adjustments after the F1-12 deploy (user testing), before F1-13. The version is bumped in F1-13.
-- Menú: botón de menú a la derecha; logo e ítems centrados en la barra lateral y el cajón móvil.
+- Menú: botón de menú a la derecha; logo e ítems alineados a la izquierda.
 - Datos de emergencia: etiquetas de campo sin la aclaración 'contacto de emergencia' (implícita por el título de la sección).

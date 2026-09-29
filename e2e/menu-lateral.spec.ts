@@ -26,30 +26,31 @@ async function centrado(elemento: Locator, contenedor: Locator) {
   return Math.abs(a.x + a.width / 2 - (b.x + b.width / 2));
 }
 
-// The sidebar/drawer content is centered: the logo, each nav item (number
-// and label as a unit) and the footer controls. The active item is
-// underlined in the accent color; the others are not.
-async function contenidoCentrado(page: Page) {
+// The sidebar/drawer content is left-aligned: the logo and each nav item
+// start at the 22px padding. The active item has the accent left border; the
+// others do not.
+async function contenidoAlineado(page: Page) {
   const aside = page.locator("aside#app-sidebar");
-  expect(await centrado(logo(aside), aside)).toBeLessThanOrEqual(1.5);
-  const items = aside.getByTestId("nav-item");
-  expect(await items.count()).toBeGreaterThan(0);
-  for (const item of await items.all()) expect(await centrado(item, aside)).toBeLessThanOrEqual(1.5);
-  for (const control of [aside.getByRole("button", { name: copy.auth.logout }), aside.getByText(copy.auth.roles.empleado, { exact: true })]) {
-    expect(await centrado(control, aside)).toBeLessThanOrEqual(1.5);
+  const menu = (await aside.boundingBox())!;
+  const izquierda = async (locator: Locator) => (await locator.boundingBox())!.x - menu.x;
+  expect(await izquierda(logo(aside))).toBeLessThanOrEqual(24);
+  const enlaces = mainNav(page).getByRole("link");
+  expect(await enlaces.count()).toBeGreaterThan(0);
+  for (const enlace of await enlaces.all()) {
+    // The number is the first thing in the link: 2px border + 22px padding.
+    expect(await izquierda(enlace.locator("span").first())).toBeLessThanOrEqual(26);
   }
-  const subrayado = (item: Locator) => item.evaluate((el) => getComputedStyle(el).borderBottomColor);
-  const activo = aside.locator('a[aria-current="page"]').getByTestId("nav-item");
-  expect(await subrayado(activo)).not.toBe("rgba(0, 0, 0, 0)");
-  for (const otro of await aside.locator('a:not([aria-current="page"])').getByTestId("nav-item").all()) {
-    expect(await subrayado(otro)).toBe("rgba(0, 0, 0, 0)");
+  const borde = (enlace: Locator) => enlace.evaluate((el) => getComputedStyle(el).borderLeftColor);
+  expect(await borde(aside.locator('a[aria-current="page"]'))).not.toBe("rgba(0, 0, 0, 0)");
+  for (const otro of await mainNav(page).locator('a:not([aria-current="page"])').all()) {
+    expect(await borde(otro)).toBe("rgba(0, 0, 0, 0)");
   }
 }
 
 const logo = (zona: Locator) => zona.getByRole("img", { name: copy.app.logoAlt });
 const titulo = (page: Page) => page.getByRole("heading", { level: 1, name: copy.miLegajo.title });
 
-test("wide screens: the logo is centered and the hamburger hides and shows the menu, remembered", async ({ page }) => {
+test("wide screens: the menu is left-aligned and the hamburger hides and shows it, remembered", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await loginAs(page, await usuario("menu-ancho"));
   const aside = page.locator("aside#app-sidebar");
@@ -58,7 +59,7 @@ test("wide screens: the logo is centered and the hamburger hides and shows the m
   const mostrar = page.getByRole("button", { name: copy.common.mostrarMenu });
 
   await expect(nav).toBeVisible();
-  await contenidoCentrado(page);
+  await contenidoAlineado(page);
   await expect(ocultar).toHaveAttribute("aria-expanded", "true");
   // Shown: the button is at the right of the menu's top row.
   const [menu, enMenu] = [await aside.boundingBox(), await ocultar.boundingBox()];
@@ -91,7 +92,7 @@ test("wide screens: the logo is centered and the hamburger hides and shows the m
   await expect(ocultar).toBeVisible();
 });
 
-test("below 900px: the logo is centered in the top bar and the hamburger, at its right end, opens the menu", async ({ page }) => {
+test("below 900px: the logo is centered in the top bar and the hamburger, at its right end, opens a left-aligned menu", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loginAs(page, await usuario("menu-movil"));
   const barra = page.locator("div.sticky").first();
@@ -105,7 +106,7 @@ test("below 900px: the logo is centered in the top bar and the hamburger, at its
   expect(abrirBox!.x + abrirBox!.width).toBeGreaterThan(barraBox!.x + barraBox!.width - 30);
   await abrir.click();
   await expect(mainNav(page)).toBeVisible();
-  await contenidoCentrado(page);
+  await contenidoAlineado(page);
   await screenshotBoth(page, "menu-movil-abierto");
 });
 
