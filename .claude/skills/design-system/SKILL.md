@@ -62,10 +62,10 @@ In `globals.css` the element rules (`body`, headings, `a`, `:focus-visible`, `::
 Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink`, `ink-soft`, `line`, `line-soft`, `rail`, `rail-ink`, `accent`, `accent-deep`, `accent-soft`, `overlay` (behind modals and the mobile menu; darkens in both themes), `accent-100` to `accent-900`; fonts `font-heading`, `font-body`; radii `rounded-sm`, `rounded-md`, `rounded-lg`; shadow `shadow-panel`. Breakpoint `nav` = 900px (sidebar collapses below it).
 
 ## Style rules
-- **Layout:** fixed left sidebar 234px wide (`--rail` background, `--rail-ink` text, right border `--line`, vertical padding 26px, horizontal 22px). Main area: header with bottom border `--line`, padding `26px 34px 16px`; content padding `26px 34px 40px`. Below 900px the sidebar collapses behind a menu button in a top bar, with the same items and footer.
+- **Layout:** fixed left sidebar 234px wide (`--rail` background, `--rail-ink` text, right border `--line`, vertical padding 26px, horizontal 22px). Main area: header with bottom border `--line`, padding `26px 34px 16px`; content padding `26px 34px 40px`. Below 900px the sidebar collapses behind a hamburger (`MenuButton`) in a top bar, with the same items and footer; the top bar has the hamburger on the left, the logo centered and the bell on the right. From 900px a fixed hamburger at the top left hides and shows the sidebar (the page then keeps a 60px left gutter); the choice is remembered per browser in the `tsm-menu` cookie and rendered by the server.
 - **Page header:** kicker above title. Kicker: 10.5px, uppercase, letter-spacing .20em, `--ink-soft`. Title: heading font, weight 400, 38px, line-height 1.08, margin-top 6px.
 - **Sidebar nav item:** 14.5px, padding `11px 22px`, left border 2px (transparent; `--accent` when active), a small number before the label (10px, letter-spacing .14em, opacity .5, tabular numbers: "01", "02"…). Hover background `--accent-soft`. Active label color `--accent-deep`.
-- **Sidebar top:** only the TSM logo (`public/logotsm.png`). No tagline or subtitle.
+- **Sidebar top:** only the TSM logo (`public/logotsm.png`), centered horizontally. No tagline or subtitle.
 - **Panels:** border 1px `--line`, radius `--radius-md`, background `--surface`, padding 22px.
 - **Buttons:** primary = transparent background, 1px `--accent` border, `--accent-deep` text, 13px, padding `8px 16px`, radius `--radius-md`, hover background `--accent-soft`. Secondary = 1px `--line` border, `--ink` text, hover border `--accent` and text `--accent-deep`. Disabled opacity .45.
 - **Inputs:** transparent background, 1px `--line` border, radius `--radius-md`, padding `9px 12px`, 14px; focus border `--accent`. Labels: 10.5px uppercase, letter-spacing .16em, `--accent-deep` (field names stand apart from their values).
@@ -99,5 +99,6 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 | `KpiStrip` | KPI cards (label + number) in one bordered strip, cells separated by `--line-soft` | `label` (accessible name), `items: { key, label, value }[]` |
 | `TextArea` | Label + multi-line input, styled like `Field`, with optional hint and error | `label`, `hint?`, `error?`, textarea props |
 | `BellLink` | Bell icon link with an optional count badge (`--accent` border, `--accent-deep` text on `--rail`); neutral without a badge | `href`, `label` (accessible name), `badge: string \| null` |
+| `MenuButton` | Hamburger button that shows or hides a menu; same square, border and ink as `BellLink` | `label` (accessible name), `expanded`, `controls` (menu id), `onClick` |
 
 Helpers: `cx` joins class names; `buttonClassName(variant)` gives the `Button` look to a link.

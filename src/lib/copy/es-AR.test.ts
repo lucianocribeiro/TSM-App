@@ -25,6 +25,8 @@ describe("es-AR copy", () => {
       copy.common.comingSoon,
       copy.common.openMenu,
       copy.common.closeMenu,
+      copy.common.ocultarMenu,
+      copy.common.mostrarMenu,
       copy.auth.login.title,
       copy.auth.login.emailLabel,
       copy.auth.login.passwordLabel,

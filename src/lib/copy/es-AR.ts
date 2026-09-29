@@ -7,6 +7,9 @@ export type Copy = {
     comingSoon: string;
     openMenu: string;
     closeMenu: string;
+    // Wide screens: hide or show the side menu.
+    ocultarMenu: string;
+    mostrarMenu: string;
   };
   auth: {
     login: {
@@ -611,6 +614,8 @@ export const copy = {
     comingSoon: "Esta sección va a estar disponible próximamente.",
     openMenu: "Abrir menú",
     closeMenu: "Cerrar menú",
+    ocultarMenu: "Ocultar menú",
+    mostrarMenu: "Mostrar menú",
   },
   auth: {
     login: {
