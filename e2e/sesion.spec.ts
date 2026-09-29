@@ -144,6 +144,34 @@ test.describe("inactivity", () => {
     await expect(page).toHaveURL(/\/login\?volver=%2Fmi-legajo$/);
   });
 
+  test("the warning ignores Escape and a backdrop click; the countdown goes on to sign-out", async ({ page }) => {
+    await page.clock.install();
+    await loginAs(page, await usuario("inactividad-escape"));
+    await page.clock.fastForward("13:00");
+    await expect(aviso(page)).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(aviso(page)).toBeVisible();
+    // The backdrop: outside the centered dialog.
+    await page.mouse.click(5, 5);
+    await expect(aviso(page)).toBeVisible();
+    await page.clock.fastForward("01:00");
+    await expect(page.getByTestId("aviso-inactividad")).toContainText(/1:00|0:5\d/);
+
+    await page.clock.fastForward("01:00");
+    await expect(page).toHaveURL(/\/login\?sesion=inactividad$/);
+  });
+
+  test("other dialogs still close with Escape", async ({ page }) => {
+    await loginAs(page, await usuario("dialogo-escape", "admin"));
+    await page.goto("/usuarios");
+    await page.getByRole("button", { name: copy.usuarios.nuevoUsuario }).click();
+    const dialogo = page.getByRole("dialog", { name: copy.usuarios.crear.title });
+    await expect(dialogo).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialogo).toBeHidden();
+  });
+
   test("'Cerrar sesión' in the warning signs out", async ({ page }) => {
     await page.clock.install();
     await loginAs(page, await usuario("inactividad-salir"));

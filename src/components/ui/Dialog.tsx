@@ -5,18 +5,22 @@ import { cx } from "./cx";
 
 export type DialogProps = {
   open: boolean;
-  // Called on Escape, on the backdrop and by the caller's own buttons.
+  // Called on Escape, on the backdrop (both only when dismissible) and by the
+  // caller's own buttons.
   onClose: () => void;
   title: string;
   children: ReactNode;
   // Buttons, right-aligned below the content.
   footer?: ReactNode;
   className?: string;
+  // False: Escape and a backdrop click do nothing; only the dialog's own
+  // buttons close it. Focus stays trapped either way (native modal).
+  dismissible?: boolean;
 };
 
 // Modal dialog on the native <dialog> element: the browser traps focus, makes
 // the rest of the page inert and closes it on Escape.
-export function Dialog({ open, onClose, title, children, footer, className }: DialogProps) {
+export function Dialog({ open, onClose, title, children, footer, className, dismissible = true }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -32,12 +36,13 @@ export function Dialog({ open, onClose, title, children, footer, className }: Di
       ref={ref}
       aria-labelledby={titleId}
       onCancel={(event) => {
+        // Escape. Always prevented, so the browser never closes it on its own.
         event.preventDefault();
-        onClose();
+        if (dismissible) onClose();
       }}
       onClick={(event) => {
         // A click on the backdrop lands on the dialog element itself.
-        if (event.target === event.currentTarget) onClose();
+        if (dismissible && event.target === event.currentTarget) onClose();
       }}
       className={cx(
         "m-auto w-[calc(100%-32px)] max-w-[480px] rounded-md border border-line bg-surface p-0 text-ink shadow-panel backdrop:bg-overlay",
