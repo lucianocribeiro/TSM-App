@@ -52,8 +52,26 @@ async function comprobarYCapturar(page: Page, nombre: string, ancho: number, tem
   }));
   expect(aplicado, combinacion).toEqual(FONDO[tema]);
   if (ancho === 390) {
-    const scroll = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
-    expect(scroll.scroll, `${combinacion}: horizontal scroll`).toBeLessThanOrEqual(scroll.client);
+    const scroll = await page.evaluate(() => {
+      const client = document.documentElement.clientWidth;
+      // On failure, name the innermost elements that stick out of the page
+      // and are not inside a horizontally scrolling or clipping box.
+      const culpables: string[] = [];
+      for (const el of Array.from(document.body.querySelectorAll<HTMLElement>("*"))) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.right <= client + 1) continue;
+        let recortado = false;
+        for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+          if (getComputedStyle(p).overflowX !== "visible") recortado = true;
+        }
+        if (recortado) continue;
+        if (Array.from(el.children).some((hijo) => hijo.getBoundingClientRect().right > client + 1)) continue;
+        const id = el.dataset.testid ? `[data-testid=${el.dataset.testid}]` : "";
+        culpables.push(`<${el.tagName.toLowerCase()}${id} class="${el.className}"> right=${Math.round(rect.right)}`);
+      }
+      return { scroll: document.documentElement.scrollWidth, client, culpables: culpables.slice(0, 6) };
+    });
+    expect(scroll.scroll, `${combinacion}: horizontal scroll; ${scroll.culpables.join(" | ")}`).toBeLessThanOrEqual(scroll.client);
   }
   await assertNoSecretOnPage(page);
   await page.addStyleTag({ content: "*, *::before, *::after, *::backdrop { transition: none !important; }" });
