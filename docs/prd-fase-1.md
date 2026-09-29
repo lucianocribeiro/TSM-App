@@ -205,3 +205,7 @@ While a legajo has a pending change request, the database refuses direct changes
 - Codex audit clean (blocking findings resolved).
 - Migrations applied through the `db push` runbook with Local = Remote confirmed.
 - Repo state checked before merge.
+
+## Ajustes post-deploy
+Adjustments after the F1-12 deploy (user testing), before F1-13. The version is bumped in F1-13.
+- Menú: botón de menú a la derecha; logo e ítems centrados en la barra lateral y el cajón móvil.

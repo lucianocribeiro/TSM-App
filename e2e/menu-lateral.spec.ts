@@ -26,6 +26,26 @@ async function centrado(elemento: Locator, contenedor: Locator) {
   return Math.abs(a.x + a.width / 2 - (b.x + b.width / 2));
 }
 
+// The sidebar/drawer content is centered: the logo, each nav item (number
+// and label as a unit) and the footer controls. The active item is
+// underlined in the accent color; the others are not.
+async function contenidoCentrado(page: Page) {
+  const aside = page.locator("aside#app-sidebar");
+  expect(await centrado(logo(aside), aside)).toBeLessThanOrEqual(1.5);
+  const items = aside.getByTestId("nav-item");
+  expect(await items.count()).toBeGreaterThan(0);
+  for (const item of await items.all()) expect(await centrado(item, aside)).toBeLessThanOrEqual(1.5);
+  for (const control of [aside.getByRole("button", { name: copy.auth.logout }), aside.getByText(copy.auth.roles.empleado, { exact: true })]) {
+    expect(await centrado(control, aside)).toBeLessThanOrEqual(1.5);
+  }
+  const subrayado = (item: Locator) => item.evaluate((el) => getComputedStyle(el).borderBottomColor);
+  const activo = aside.locator('a[aria-current="page"]').getByTestId("nav-item");
+  expect(await subrayado(activo)).not.toBe("rgba(0, 0, 0, 0)");
+  for (const otro of await aside.locator('a:not([aria-current="page"])').getByTestId("nav-item").all()) {
+    expect(await subrayado(otro)).toBe("rgba(0, 0, 0, 0)");
+  }
+}
+
 const logo = (zona: Locator) => zona.getByRole("img", { name: copy.app.logoAlt });
 const titulo = (page: Page) => page.getByRole("heading", { level: 1, name: copy.miLegajo.title });
 
@@ -38,7 +58,7 @@ test("wide screens: the logo is centered and the hamburger hides and shows the m
   const mostrar = page.getByRole("button", { name: copy.common.mostrarMenu });
 
   await expect(nav).toBeVisible();
-  expect(await centrado(logo(aside), aside)).toBeLessThanOrEqual(1);
+  await contenidoCentrado(page);
   await expect(ocultar).toHaveAttribute("aria-expanded", "true");
   // Shown: the button is at the right of the menu's top row.
   const [menu, enMenu] = [await aside.boundingBox(), await ocultar.boundingBox()];
@@ -85,8 +105,7 @@ test("below 900px: the logo is centered in the top bar and the hamburger, at its
   expect(abrirBox!.x + abrirBox!.width).toBeGreaterThan(barraBox!.x + barraBox!.width - 30);
   await abrir.click();
   await expect(mainNav(page)).toBeVisible();
-  const aside = page.locator("aside#app-sidebar");
-  expect(await centrado(logo(aside), aside)).toBeLessThanOrEqual(1);
+  await contenidoCentrado(page);
   await screenshotBoth(page, "menu-movil-abierto");
 });
 

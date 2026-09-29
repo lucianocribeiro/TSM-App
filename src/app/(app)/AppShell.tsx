@@ -149,19 +149,27 @@ export function AppShell({
                       aria-current={active ? "page" : undefined}
                       onClick={() => setMenuOpen(false)}
                       className={cx(
-                        "flex items-baseline gap-3 border-l-2 px-[22px] py-[11px] text-[14.5px] no-underline transition-colors hover:bg-accent-soft",
-                        active
-                          ? "border-accent text-accent-deep"
-                          : "border-transparent text-rail-ink",
+                        "flex justify-center px-[22px] py-[11px] text-[14.5px] no-underline transition-colors hover:bg-accent-soft",
+                        active ? "text-accent-deep" : "text-rail-ink",
                       )}
                     >
+                      {/* Number and label centered as a unit; the active
+                          item is underlined in the accent color. */}
                       <span
-                        aria-hidden="true"
-                        className="text-[10px] tracking-[.14em] tabular-nums opacity-50"
+                        data-testid="nav-item"
+                        className={cx(
+                          "inline-flex items-baseline gap-3 border-b-2 pb-0.5",
+                          active ? "border-accent" : "border-transparent",
+                        )}
                       >
-                        {item.number}
+                        <span
+                          aria-hidden="true"
+                          className="text-[10px] tracking-[.14em] tabular-nums opacity-50"
+                        >
+                          {item.number}
+                        </span>
+                        <span>{item.label}</span>
                       </span>
-                      <span>{item.label}</span>
                     </Link>
                   </li>
                 );
@@ -170,7 +178,7 @@ export function AppShell({
           </nav>
         ) : null}
 
-        <div className="mt-auto flex flex-col items-start gap-3 px-[22px] pt-8">
+        <div className="mt-auto flex flex-col items-center gap-3 px-[22px] pt-8 text-center">
           <p
             className="max-w-full break-all text-[12.5px] text-ink-soft"
             data-testid="user-email"
