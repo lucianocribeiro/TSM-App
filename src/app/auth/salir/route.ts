@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { HOME_PATH, LOGIN_PATH, loginConMotivo, motivoSalida } from "@/lib/auth/gate";
 import { getSessionUser } from "@/lib/auth/session";
+import { MARCA_COOKIE } from "@/lib/sesion/marca";
 import { createClient } from "@/lib/supabase/server";
 
 // Auth session cookie names of @supabase/ssr (including chunked cookies).
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
   const store = await cookies();
   store
     .getAll()
-    .filter(({ name }) => name.startsWith(SESSION_COOKIE_PREFIX))
+    .filter(({ name }) => name.startsWith(SESSION_COOKIE_PREFIX) || name === MARCA_COOKIE)
     .forEach(({ name }) => store.delete(name));
 
   return NextResponse.redirect(new URL(loginConMotivo(motivo), request.url));

@@ -91,7 +91,7 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 | `Logo` | TSM logo via `next/image` | `alt`, `size?`, `preload?` |
 | `Table`, `Th`, `Td`, `rowClassName` | Bordered surface table with horizontal scroll; header and body cells; row hover (pointer when clickable) | native table props; `rowClassName(clickable)` |
 | `SegmentedFilter` | Mutually exclusive filter buttons (`aria-pressed`) | `label`, `options`, `value`, `onChange` |
-| `Dialog` | Modal on the native `<dialog>` (focus trap, Escape, backdrop click close) | `open`, `onClose`, `title`, `children`, `footer?` |
+| `Dialog` | Modal on the native `<dialog>` (focus trap, Escape, backdrop click close) | `open`, `onClose`, `title`, `children`, `footer?`, `dismissible?` (false: Escape and backdrop do nothing) |
 | `Select` | Label + native select, styled like `Field` | `label`, `options`, `placeholder?`, `error?`, select props |
 | `LabelValueGrid` | Label/value grid (auto-fit, min 150px), with an optional note line per item | `items: { key, label, value, note? }[]` |
 | `Banner` | Page-level notice (role=status); `attention` uses accent border and tint | `tone?: "info" \| "attention"`, `actions?` |

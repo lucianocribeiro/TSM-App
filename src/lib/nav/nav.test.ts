@@ -9,11 +9,12 @@ describe("getNavItems", () => {
     ]);
   });
 
-  it("shows Mi Legajo, Legajos and Usuarios to an admin, numbered in order", () => {
+  it("shows Mi Legajo, Legajos, Aprobaciones and Usuarios to an admin, numbered in order", () => {
     expect(getNavItems("admin")).toEqual([
       { href: "/mi-legajo", label: copy.nav.miLegajo, number: "01" },
       { href: "/legajos", label: copy.nav.legajos, number: "02" },
-      { href: "/usuarios", label: copy.nav.usuarios, number: "03" },
+      { href: "/aprobaciones", label: copy.nav.aprobaciones, number: "03" },
+      { href: "/usuarios", label: copy.nav.usuarios, number: "04" },
     ]);
   });
 });

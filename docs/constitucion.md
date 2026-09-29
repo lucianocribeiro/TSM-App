@@ -1,5 +1,6 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.4 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Version: 0.5 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6).
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -40,6 +41,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 ## 6. Menu (Fase 1)
 - Mi Legajo (Empleado and Admin).
 - Legajos (Admin only).
+- Aprobaciones (Admin only): the approvals inbox; also reached from the pending-approvals indicator.
 - Usuarios (Admin only).
 - Later phases add: Mis Recibos / Recibos, Licencias, Comunicados.
 

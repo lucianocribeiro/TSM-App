@@ -15,6 +15,8 @@ import { CAMBIAR_PASSWORD_PATH } from "@/lib/auth/gate";
 import { copy } from "@/lib/copy/es-AR";
 import { isActivePath, type NavItem } from "@/lib/nav/nav";
 import type { Theme } from "@/lib/theme/theme";
+import { anunciarSalida } from "@/lib/sesion/salida";
+import { SesionInactividad } from "./SesionInactividad";
 import { usePendientesAprobacion } from "./usePendientesAprobacion";
 
 type AppShellProps = {
@@ -26,6 +28,9 @@ type AppShellProps = {
   initialTheme: Theme;
   // The Admin's pending approvals, for the bell. Null: no bell (not an Admin).
   pendientes: number | null;
+  // A forced password change is pending (the inactivity limit then counts
+  // only page loads).
+  cambioPendiente: boolean;
   children: ReactNode;
 };
 
@@ -40,6 +45,7 @@ export function AppShell({
   roleLabel,
   initialTheme,
   pendientes,
+  cambioPendiente,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -152,7 +158,8 @@ export function AppShell({
               {copy.nav.cambiarPassword}
             </Link>
           ) : null}
-          <form action={logoutAction}>
+          {/* The other open tabs leave too. */}
+          <form action={logoutAction} onSubmit={() => anunciarSalida("manual")}>
             <Button type="submit" variant="secondary" disabled={logoutPending}>
               {copy.auth.logout}
             </Button>
@@ -168,6 +175,7 @@ export function AppShell({
       <div className="nav:pl-[234px]">
         <main>{children}</main>
       </div>
+      <SesionInactividad cambioPendiente={cambioPendiente} />
     </div>
   );
 }

@@ -124,7 +124,7 @@ test.describe("voluntary password change", () => {
       await expect(page.getByText(copy.password.introVoluntaria)).toBeVisible();
       await expect(page.getByLabel(copy.password.actualLabel, { exact: true })).toBeVisible();
       await expect(page.locator('form input:not([type="hidden"])')).toHaveCount(3);
-      await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.usuarios]);
+      await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.aprobaciones, copy.nav.usuarios]);
 
       const html = page.locator("html");
       await expect(html).toHaveAttribute("data-theme", "light");
@@ -194,7 +194,7 @@ test.describe("inactive accounts", () => {
       // The session is gone.
       for (const path of ["/mi-legajo", "/cambiar-password"]) {
         await page.goto(path);
-        await expect(page, path).toHaveURL(/\/login$/);
+        await expect(page, path).toHaveURL(new RegExp(`/login\\?volver=${encodeURIComponent(path)}$`));
       }
     } finally {
       await deleteE2EUser(user.id);
@@ -216,7 +216,7 @@ test.describe("inactive accounts", () => {
 
       // The session is gone.
       await page.goto("/mi-legajo");
-      await expect(page).toHaveURL(/\/login$/);
+      await expect(page).toHaveURL(/\/login\?volver=%2Fmi-legajo$/);
     } finally {
       await deleteE2EUser(user.id);
     }

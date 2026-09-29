@@ -2,7 +2,12 @@
 
 import { redirect } from "next/navigation";
 import type { ActionResult } from "@/lib/action-result";
-import { CAMBIAR_PASSWORD_PATH, HOME_PATH } from "@/lib/auth/gate";
+import { CAMBIAR_PASSWORD_PATH, HOME_PATH, LOGIN_PATH } from "@/lib/auth/gate";
+import { LOGIN_INACTIVIDAD } from "@/lib/auth/guardia";
+import { rutaRetornoSegura, VOLVER_PARAM } from "@/lib/auth/retorno";
+import { autorizarAccion, sesionParaCerrar } from "@/lib/auth/require-role";
+import { borrarActividad, sellarActividad } from "@/lib/sesion/marca-servidor";
+import { sesionIdDeToken } from "@/lib/sesion/marca";
 import { parseLoginInput } from "@/lib/auth/login-input";
 import { parseCambioPassword } from "@/lib/auth/password";
 import { verifyCurrentPassword } from "@/lib/auth/verify-password";
@@ -52,10 +57,23 @@ export async function login(
         await supabase.auth.signOut();
         outcome = CUENTA_INACTIVA;
       } else {
-        outcome = {
-          ok: true,
-          destination: profile.debe_cambiar_password ? CAMBIAR_PASSWORD_PATH : HOME_PATH,
-        };
+        // The activity marker starts with the session (server-side
+        // inactivity limit, src/lib/sesion/marca.ts).
+        const sesionId = sesionIdDeToken(data.session.access_token);
+        // Without a session id, or without a usable SESSION_SECRET (fail
+        // closed), the session could not pass the guard: end it here.
+        if (!sesionId || !(await sellarActividad(sesionId))) {
+          await supabase.auth.signOut();
+          outcome = LOGIN_FAILED;
+        } else {
+          // Back to the page that asked for the sign-in, when it is a safe,
+          // known route; a pending password change comes first.
+          const volver = rutaRetornoSegura(formData.get(VOLVER_PARAM));
+          outcome = {
+            ok: true,
+            destination: profile.debe_cambiar_password ? CAMBIAR_PASSWORD_PATH : (volver ?? HOME_PATH),
+          };
+        }
       }
     }
   } catch {
@@ -71,21 +89,69 @@ export async function login(
   redirect(outcome.destination);
 }
 
+// Clears the activity marker whatever happened: without it the proxy refuses
+// the session anyway.
+async function borrarMarcaSiempre() {
+  try {
+    await borrarActividad();
+  } catch {
+    // Nothing else to do: the marker expires on its own.
+  }
+}
+
 export async function logout(): Promise<ActionResult> {
   let signedOut = false;
   try {
+    // Sign-out path: allowed for any session (explicit exemption).
+    await sesionParaCerrar();
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut();
     signedOut = !error;
   } catch {
     signedOut = false;
+  } finally {
+    await borrarMarcaSiempre();
   }
 
   if (!signedOut) {
     return { ok: false, error: copy.auth.errors.logoutFailed };
   }
 
-  redirect("/login");
+  redirect(LOGIN_PATH);
+}
+
+// The explicit "Seguir conectado" and the throttled report of real input
+// (src/app/(app)/SesionInactividad.tsx). The proxy has already checked the
+// activity marker and re-stamped it for this request; an expired session
+// arrives here without a session and gets ok: false.
+// sesionTerminada: there is no usable session any more (the client goes to
+// the login page). A pending password change is refused too, but the session
+// stays: the proxy has already renewed the marker for this request.
+export async function mantenerSesion(): Promise<ActionResult & { sesionTerminada?: boolean }> {
+  const acceso = await autorizarAccion();
+  if (!acceso.ok) {
+    return {
+      ok: false,
+      error: copy.auth.errors.sesionInactividad,
+      sesionTerminada: acceso.motivo === "sin-sesion" || acceso.motivo === "inactiva",
+    };
+  }
+  return { ok: true };
+}
+
+// The client's inactivity limit was reached: end the session and show why.
+export async function cerrarSesionPorInactividad(): Promise<void> {
+  try {
+    // Sign-out path: allowed for any session (explicit exemption).
+    await sesionParaCerrar();
+    const supabase = await createClient();
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // The marker goes below either way, and the proxy refuses the session.
+  } finally {
+    await borrarMarcaSiempre();
+  }
+  redirect(LOGIN_INACTIVIDAD);
 }
 
 // Password change: forced (PRD US-9, temporary password) or voluntary.
@@ -103,6 +169,9 @@ export async function cambiarPassword(
 
   let result: ActionResult = generic;
   try {
+    // The one action a pending forced change allows (explicit exemption).
+    const acceso = await autorizarAccion({ permitirCambioPendiente: true });
+    if (!acceso.ok) return { ok: false, error: copy.cuentas.errors.noAutorizado };
     const supabase = await createClient();
     const {
       data: { user },
@@ -140,6 +209,10 @@ export async function cambiarPassword(
     } else {
       const { error: confirmError } = await supabase.rpc("confirmar_cambio_password");
       result = confirmError ? generic : { ok: true };
+      // Keep the activity marker bound to the session the change leaves.
+      const { data: sesion } = await supabase.auth.getSession();
+      const sesionId = sesion.session ? sesionIdDeToken(sesion.session.access_token) : null;
+      if (sesionId) await sellarActividad(sesionId);
     }
   } catch {
     // Nothing is logged: the error may carry the request body.
