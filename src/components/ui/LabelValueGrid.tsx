@@ -21,7 +21,7 @@ export function LabelValueGrid({ items, className }: { items: LabelValueItem[]; 
     >
       {items.map((item) => (
         <div key={item.key} className="flex min-w-0 flex-col gap-1.5" data-campo={item.key}>
-          <dt className="text-[10.5px] uppercase tracking-[.16em] text-ink-soft">{item.label}</dt>
+          <dt className="text-[10.5px] uppercase tracking-[.16em] text-accent-deep">{item.label}</dt>
           <dd className="break-words text-[15px]">{item.value}</dd>
           {item.note ? <dd className="text-[12.5px] italic text-accent-deep">{item.note}</dd> : null}
         </div>

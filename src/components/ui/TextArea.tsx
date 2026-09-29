@@ -16,7 +16,7 @@ export function TextArea({ label, hint, error, className, rows = 4, ...props }: 
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[10.5px] uppercase tracking-[.16em] text-ink-soft">
+      <label htmlFor={id} className="text-[10.5px] uppercase tracking-[.16em] text-accent-deep">
         {label}
       </label>
       <textarea

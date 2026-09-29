@@ -13,7 +13,7 @@ export function Field({ label, error, ...inputProps }: FieldProps) {
     <div className="flex flex-col gap-1.5">
       <label
         htmlFor={id}
-        className="text-[10.5px] uppercase tracking-[.16em] text-ink-soft"
+        className="text-[10.5px] uppercase tracking-[.16em] text-accent-deep"
       >
         {label}
       </label>
