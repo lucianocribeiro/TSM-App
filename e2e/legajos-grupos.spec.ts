@@ -69,7 +69,8 @@ const SIMPLES = [
     completar: async (panel: ReturnType<typeof grupo>) => {
       await panel.getByLabel(campos.alergias, { exact: true }).fill("Maní");
       await panel.getByLabel(campos.obra_social, { exact: true }).fill("Obra Social E2E");
-      await panel.getByLabel(campos.emergencia_telefono, { exact: true }).fill("11 9999-0000");
+      // The short label is unambiguous inside the group named after the section.
+      await panel.getByRole("group", { name: ml.grupos.D }).getByLabel(campos.emergencia_telefono, { exact: true }).fill("11 9999-0000");
     },
     esperado: { alergias: "Maní", obra_social: "Obra Social E2E", emergencia_telefono: "11 9999-0000" },
   },

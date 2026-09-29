@@ -159,4 +159,13 @@ describe("es-AR copy", () => {
       "Email o contraseña incorrectos.",
     );
   });
+
+  // Post-deploy adjustment ADJ-01.3: the section title already says it.
+  it("group D field labels do not repeat that they are about the emergency contact", () => {
+    const campos = copy.aprobaciones.campos;
+    for (const campo of ["emergencia_nombre", "emergencia_parentesco", "emergencia_domicilio", "emergencia_telefono"] as const) {
+      expect(campos[campo].toLowerCase(), campo).not.toContain("emergencia");
+    }
+    expect(copy.miLegajo.grupos.D).toBe("Datos de emergencia");
+  });
 });

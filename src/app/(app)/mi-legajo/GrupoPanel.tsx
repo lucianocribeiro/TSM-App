@@ -145,11 +145,14 @@ function GrupoForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+      {/* The group title as the fields' group name for screen readers: short
+          labels such as "Teléfono" in Datos de emergencia stay unambiguous. */}
+      <fieldset className="relative grid min-w-0 gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+        <legend className="sr-only">{t.grupos[grupo]}</legend>
         {campos.map((campo) => (
           <CampoInput key={campo} campo={campo} form={form} errores={errores} set={set} />
         ))}
-      </div>
+      </fieldset>
       {grupo === "C" && form.campos.tiene_hijos === "si" ? (
         <HijosEditor form={form} setForm={setForm} errores={errores} />
       ) : null}
