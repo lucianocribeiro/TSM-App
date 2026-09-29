@@ -153,6 +153,14 @@ jobs:
           name: e2e-screenshots
           path: test-results/screenshots/
           retention-days: 14
+      # The visual matrix (e2e/matriz-visual.spec.ts): main screens, light and
+      # dark, 1280px and 390px, for review.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && steps.artifact-scan.outcome == 'success' }}
+        with:
+          name: e2e-visual-matrix
+          path: test-results/visual-matrix/
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         if: ${{ failure() && steps.artifact-scan.outcome == 'success' }}
         with:
