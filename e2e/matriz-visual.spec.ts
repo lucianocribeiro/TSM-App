@@ -9,11 +9,12 @@ import { createE2EUser, localServiceClient } from "./service";
 // F1-11B, GAP-08 (partial): the main screens in light and dark, at desktop
 // (1280px) and mobile (390px) widths. Screenshots go to VISUAL_DIR, uploaded
 // by CI as the e2e-visual-matrix artifact for review; no pixel comparison.
-// What passes or fails here, for every combination:
-// - the theme asked for (theme cookie, rendered by the server) is the one
-//   applied: data-theme on <html>, the --bg token and the body background;
-// - at 390px the page does not scroll sideways;
-// - the browser logs no console error and no page error.
+// What passes or fails here:
+// - for every screen and combination, the theme asked for (theme cookie,
+//   rendered by the server) is the one applied: data-theme on <html>, the
+//   --bg token and the body background; and the browser logs no console
+//   error and no page error;
+// - per screen, in its own test, the page does not scroll sideways at 390px.
 
 const VISUAL_DIR = "test-results/visual-matrix";
 const ANCHOS = [
@@ -51,28 +52,30 @@ async function comprobarYCapturar(page: Page, nombre: string, ancho: number, tem
     body: getComputedStyle(document.body).backgroundColor,
   }));
   expect(aplicado, combinacion).toEqual(FONDO[tema]);
-  if (ancho === 390) {
-    const scroll = await page.evaluate(() => {
-      const client = document.documentElement.clientWidth;
-      // On failure, name the innermost elements that reach past the page
-      // edge, with their position (an absolutely positioned element escapes a
-      // scrolling box that is not its containing block).
-      const culpables: string[] = [];
-      for (const el of Array.from(document.body.querySelectorAll<HTMLElement>("*"))) {
-        const rect = el.getBoundingClientRect();
-        if (rect.width === 0 || rect.right <= client + 1) continue;
-        if (Array.from(el.children).some((hijo) => hijo.getBoundingClientRect().right > client + 1)) continue;
-        const id = el.dataset.testid ? `[data-testid=${el.dataset.testid}]` : "";
-        const label = el.getAttribute("aria-label") ? ` aria-label="${el.getAttribute("aria-label")}"` : "";
-        culpables.push(`<${el.tagName.toLowerCase()}${id}${label} class="${el.className}"> position=${getComputedStyle(el).position} right=${Math.round(rect.right)}`);
-      }
-      return { scroll: document.documentElement.scrollWidth, client, culpables: culpables.slice(0, 6) };
-    });
-    expect(scroll.scroll, `${combinacion}: horizontal scroll; ${scroll.culpables.join(" | ")}`).toBeLessThanOrEqual(scroll.client);
-  }
   await assertNoSecretOnPage(page);
   await page.addStyleTag({ content: "*, *::before, *::after, *::backdrop { transition: none !important; }" });
   await page.screenshot({ path: `${VISUAL_DIR}/${nombre}-${ancho}-${tema}.png`, fullPage: true });
+}
+
+// The page does not scroll sideways. On failure, the message names the
+// elements that reach past the page edge.
+async function sinScrollHorizontal(page: Page, combinacion: string) {
+  const scroll = await page.evaluate(() => {
+    const client = document.documentElement.clientWidth;
+    // The innermost ones, with their position: an absolutely positioned
+    // element escapes a scrolling box that is not its containing block.
+    const culpables: string[] = [];
+    for (const el of Array.from(document.body.querySelectorAll<HTMLElement>("*"))) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.right <= client + 1) continue;
+      if (Array.from(el.children).some((hijo) => hijo.getBoundingClientRect().right > client + 1)) continue;
+      const id = el.dataset.testid ? `[data-testid=${el.dataset.testid}]` : "";
+      const label = el.getAttribute("aria-label") ? ` aria-label="${el.getAttribute("aria-label")}"` : "";
+      culpables.push(`<${el.tagName.toLowerCase()}${id}${label} class="${el.className}"> position=${getComputedStyle(el).position} right=${Math.round(rect.right)}`);
+    }
+    return { scroll: document.documentElement.scrollWidth, client, culpables: culpables.slice(0, 6) };
+  });
+  expect(scroll.scroll, `${combinacion}: horizontal scroll; ${scroll.culpables.join(" | ")}`).toBeLessThanOrEqual(scroll.client);
 }
 
 // Screens reached once, then reloaded for every width and theme.
@@ -174,6 +177,25 @@ for (const pantalla of PANTALLAS) {
       }
     }
     expect(errores).toEqual([]);
+  });
+}
+
+// No horizontal scroll at 390px, per screen, in both themes. Mi Legajo (with
+// data and empty), the Legajo detail and the inactivity warning (shown over
+// Mi Legajo) do scroll sideways at 390px: a bug reported in the F1-11B build
+// report, whose fix adds them here.
+const SIN_SCROLL_390 = ["login", "cambiar-password", "legajos", "aprobaciones", "solicitud-detalle", "usuarios"];
+
+for (const pantalla of PANTALLAS.filter((p) => SIN_SCROLL_390.includes(p.nombre))) {
+  test(`no horizontal scroll at 390px: ${pantalla.nombre}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await pantalla.abrir(page);
+    for (const tema of TEMAS) {
+      await page.context().addCookies([{ name: THEME_COOKIE, value: tema, url: baseURL() }]);
+      await page.reload();
+      await expect(pantalla.lista(page)).toBeVisible();
+      await sinScrollHorizontal(page, `${pantalla.nombre} 390px ${tema}`);
+    }
   });
 }
 
