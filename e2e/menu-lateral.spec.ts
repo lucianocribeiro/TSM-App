@@ -130,9 +130,11 @@ for (const { ancho, alto } of [
     expect((await tema.innerText()).trim()).toBe("");
 
     const [t, c] = [await tema.boundingBox(), await campana.boundingBox()];
+    // In the corner: at the top, in the right half (below 900px the menu
+    // button takes the right end, so the switch may sit further left).
     for (const box of [t!, c!]) {
       expect(box.y).toBeLessThan(20);
-      expect(box.x + box.width).toBeGreaterThan(ancho - 100);
+      expect(box.x).toBeGreaterThan(ancho / 2);
     }
     // The switch, then the bell.
     expect(t!.x + t!.width).toBeLessThanOrEqual(c!.x);
