@@ -100,6 +100,34 @@ describe("RelojInactividad (fake timers)", () => {
     expect(vencido).not.toHaveBeenCalled();
   });
 
+  it("with contarEntrada: false (forced change), input neither resets nor is reported", () => {
+    reloj.detener();
+    const fases2: Fase[] = [];
+    const reportes2 = vi.fn<() => void>();
+    const vencido2 = vi.fn<() => void>();
+    store.clear();
+    const forzado = new RelojInactividad({
+      ahora: () => Date.now(),
+      almacen: { leer: (k) => store.get(k) ?? null, escribir: (k, v) => void store.set(k, v) },
+      alCambiar: (fase) => fases2.push(fase),
+      alVencer: vencido2,
+      alReportar: reportes2,
+      contarEntrada: false,
+    });
+    forzado.iniciar();
+    vi.advanceTimersByTime(10 * MIN);
+    forzado.actividad();
+    vi.advanceTimersByTime(3 * MIN);
+    expect(fases2.at(-1)?.fase).toBe("aviso");
+    // "Seguir conectado" still resets locally (the page refresh renews the server), without reporting.
+    forzado.continuar();
+    expect(fases2.at(-1)?.fase).toBe("activa");
+    vi.advanceTimersByTime(15 * MIN);
+    expect(vencido2).toHaveBeenCalledTimes(1);
+    expect(reportes2).not.toHaveBeenCalled();
+    forzado.detener();
+  });
+
   it("counts activity written by another tab", () => {
     vi.advanceTimersByTime(12 * MIN);
     store.set(ULTIMA_ACTIVIDAD_KEY, String(Date.now()));

@@ -39,6 +39,10 @@ export type RelojOpciones = {
   alVencer: () => void;
   // Real input was recorded: report it to the server (throttled).
   alReportar: () => void;
+  // False while a forced password change is pending: the server then renews
+  // the session only on page loads of /cambiar-password, so input neither
+  // resets the timer nor is reported. Default true.
+  contarEntrada?: boolean;
   intervaloMs?: number;
 };
 
@@ -78,16 +82,18 @@ export class RelojInactividad {
 
   // Real user input (pointer, keyboard, touch, scroll), throttled.
   actividad(): void {
+    if (this.o.contarEntrada === false) return;
     if (this.terminado || this.fase.fase !== "activa") return;
     const ahora = this.o.ahora();
     if (ahora - this.ultimoRegistro < ACTIVIDAD_THROTTLE_MS) return;
     this.registrar(ahora, true);
   }
 
-  // "Seguir conectado".
+  // "Seguir conectado". Without contarEntrada the caller renews the session
+  // with a navigation instead, so nothing is reported.
   continuar(): void {
     if (this.terminado) return;
-    this.registrar(this.o.ahora(), true);
+    this.registrar(this.o.ahora(), this.o.contarEntrada !== false);
     this.tick();
   }
 

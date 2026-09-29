@@ -54,6 +54,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       roleLabel={copy.auth.roles[user.role]}
       initialTheme={theme}
       pendientes={pendientes}
+      cambioPendiente={cuenta.debeCambiarPassword}
     >
       {children}
     </AppShell>

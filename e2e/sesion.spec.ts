@@ -162,6 +162,22 @@ test.describe("inactivity", () => {
     await expect(page).toHaveURL(/\/login\?sesion=inactividad$/);
   });
 
+  test("a pending password change: typing does not keep the session; signed out at 15 minutes", async ({ page }) => {
+    const user = await usuario("inactividad-forzado");
+    await localServiceClient().from("profiles").update({ debe_cambiar_password: true }).eq("id", user.id);
+    await page.clock.install();
+    await fillLogin(page, user.email, user.password);
+    await expect(page).toHaveURL(/\/cambiar-password$/);
+
+    await page.clock.fastForward("10:00");
+    // Input on the page does not count while the change is pending.
+    await page.getByLabel(copy.password.nuevaLabel, { exact: true }).fill("todavia-escribiendo");
+    await page.clock.fastForward("03:00");
+    await expect(aviso(page)).toBeVisible();
+    await page.clock.fastForward("02:00");
+    await expect(page).toHaveURL(/\/login\?sesion=inactividad$/);
+  });
+
   test("other dialogs still close with Escape", async ({ page }) => {
     await loginAs(page, await usuario("dialogo-escape", "admin"));
     await page.goto("/usuarios");

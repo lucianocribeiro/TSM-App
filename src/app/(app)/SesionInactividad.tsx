@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -40,7 +41,8 @@ function irAlLogin(destino: string) {
 // The inactivity limit for a signed-in user (PRD session rules): a warning
 // with a countdown 2 minutes before, "Seguir conectado" or "Cerrar sesión",
 // and the sign-out at 15 minutes. The server enforces the same limit.
-export function SesionInactividad() {
+export function SesionInactividad({ cambioPendiente = false }: { cambioPendiente?: boolean }) {
+  const router = useRouter();
   const reloj = useRef<RelojInactividad | null>(null);
   const [fase, setFase] = useState<Fase>({ fase: "activa" });
   const [pending, startTransition] = useTransition();
@@ -49,6 +51,8 @@ export function SesionInactividad() {
     const instancia = new RelojInactividad({
       ahora: () => Date.now(),
       almacen,
+      // During a forced password change only a page load keeps the session.
+      contarEntrada: !cambioPendiente,
       alCambiar: setFase,
       alVencer: () => {
         anunciarSalida("inactividad");
@@ -93,7 +97,14 @@ export function SesionInactividad() {
       window.removeEventListener("storage", alAlmacenar);
       reloj.current = null;
     };
-  }, []);
+  }, [cambioPendiente]);
+
+  function seguir() {
+    // With a pending password change the server renews the session only on a
+    // load of this page: refresh it (the form keeps what was typed).
+    if (cambioPendiente) router.refresh();
+    reloj.current?.continuar();
+  }
 
   function cerrar() {
     anunciarSalida("manual");
@@ -114,7 +125,7 @@ export function SesionInactividad() {
         <Button variant="secondary" onClick={cerrar} disabled={pending}>
           {t.cerrarSesion}
         </Button>
-        <Button onClick={() => reloj.current?.continuar()} disabled={pending}>
+        <Button onClick={seguir} disabled={pending}>
           {t.seguirConectado}
         </Button>
       </div>

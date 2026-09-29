@@ -28,6 +28,9 @@ type AppShellProps = {
   initialTheme: Theme;
   // The Admin's pending approvals, for the bell. Null: no bell (not an Admin).
   pendientes: number | null;
+  // A forced password change is pending (the inactivity limit then counts
+  // only page loads).
+  cambioPendiente: boolean;
   children: ReactNode;
 };
 
@@ -42,6 +45,7 @@ export function AppShell({
   roleLabel,
   initialTheme,
   pendientes,
+  cambioPendiente,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -171,7 +175,7 @@ export function AppShell({
       <div className="nav:pl-[234px]">
         <main>{children}</main>
       </div>
-      <SesionInactividad />
+      <SesionInactividad cambioPendiente={cambioPendiente} />
     </div>
   );
 }
