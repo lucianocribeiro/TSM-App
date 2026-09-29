@@ -65,20 +65,20 @@ export function AppShell({
   }
   const [logoutState, logoutAction, logoutPending] = useActionState(logout, null);
   const totalPendientes = usePendientesAprobacion(pendientes);
-  const campana = (className?: string) =>
+  const campana =
     totalPendientes === null ? null : (
       <BellLink
         href={APROBACIONES_PATH}
         label={etiquetaCampana(totalPendientes)}
         badge={textoCampana(totalPendientes)}
         onClick={() => setMenuOpen(false)}
-        className={className}
       />
     );
 
   return (
     <div className="min-h-screen">
-      {/* Top bar, below 900px only: menu button, logo in the center, bell. */}
+      {/* Top bar, below 900px only: menu button, logo in the center; the
+          right side is taken by the corner buttons below. */}
       <div className="sticky top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center border-b border-line bg-rail px-4 py-2 text-rail-ink nav:hidden">
         <div>
           <MenuButton
@@ -89,7 +89,18 @@ export function AppShell({
           />
         </div>
         <Logo alt={copy.app.logoAlt} size={40} />
-        <div className="flex justify-end">{campana()}</div>
+        <div />
+      </div>
+
+      {/* Top right corner, every width: the bell (Admin) and the theme
+          switch. Below 900px, inside the top bar's right side. */}
+      <div className="fixed right-4 top-2.5 z-40 flex items-center gap-2 nav:right-3 nav:top-3 nav:z-50">
+        {campana}
+        <ThemeToggle
+          initialTheme={initialTheme}
+          toDarkLabel={copy.theme.toDark}
+          toLightLabel={copy.theme.toLight}
+        />
       </div>
 
       {/* 900px and up: hides or shows the side menu. In the menu's corner
@@ -157,8 +168,6 @@ export function AppShell({
         ) : null}
 
         <div className="mt-auto flex flex-col items-start gap-3 px-[22px] pt-8">
-          {/* Below 900px the bell is in the top bar. */}
-          {campana("hidden nav:inline-flex")}
           <p
             className="max-w-full break-all text-[12.5px] text-ink-soft"
             data-testid="user-email"
@@ -166,11 +175,6 @@ export function AppShell({
             {userEmail}
           </p>
           <StatusBadge label={roleLabel} tone="active" />
-          <ThemeToggle
-            initialTheme={initialTheme}
-            toDarkLabel={copy.theme.toDark}
-            toLightLabel={copy.theme.toLight}
-          />
           {showCambiarPassword ? (
             <Link
               href={CAMBIAR_PASSWORD_PATH}

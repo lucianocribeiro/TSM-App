@@ -81,3 +81,43 @@ test("below 900px: the logo is centered in the top bar and the hamburger opens t
   expect(await centrado(logo(aside), aside)).toBeLessThanOrEqual(1);
   await screenshotBoth(page, "menu-movil-abierto");
 });
+
+// The theme switch (icon only) and the bell sit in the top right corner, at
+// every width, and no longer in the side menu.
+for (const { ancho, alto } of [
+  { ancho: 1280, alto: 800 },
+  { ancho: 390, alto: 844 },
+]) {
+  test(`${ancho}px: the theme switch and the bell are in the top right corner`, async ({ page }) => {
+    await page.setViewportSize({ width: ancho, height: alto });
+    const admin = await createE2EUser("menu-esquina", "admin");
+    creados.push(admin.id);
+    await loginAs(page, admin);
+
+    const tema = page.getByRole("button", { name: copy.theme.toDark });
+    const campana = page.getByTestId("campana").filter({ visible: true });
+    await expect(tema).toBeVisible();
+    await expect(campana).toHaveCount(1);
+    // Icon only: no visible text.
+    expect((await tema.innerText()).trim()).toBe("");
+
+    const [t, c] = [await tema.boundingBox(), await campana.boundingBox()];
+    for (const box of [t!, c!]) {
+      expect(box.y).toBeLessThan(20);
+      expect(box.x + box.width).toBeGreaterThan(ancho - 100);
+    }
+    // The switch is the outermost, the bell to its left.
+    expect(c!.x + c!.width).toBeLessThanOrEqual(t!.x);
+
+    // Not in the side menu any more.
+    const aside = page.locator("aside#app-sidebar");
+    await expect(aside.getByTestId("theme-toggle")).toHaveCount(0);
+    await expect(aside.getByTestId("campana")).toHaveCount(0);
+
+    // It still switches, and the icon's name follows.
+    await tema.click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.getByRole("button", { name: copy.theme.toLight })).toBeVisible();
+    await screenshotBoth(page, `esquina-${ancho}`);
+  });
+}
