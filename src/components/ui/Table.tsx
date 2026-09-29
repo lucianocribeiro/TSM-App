@@ -2,10 +2,13 @@ import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 import { cx } from "./cx";
 
 // Bordered surface table with horizontal scroll on narrow screens (design
-// system spec). Compose with the native thead, tbody and tr elements.
+// system spec). Compose with the native thead, tbody and tr elements. The
+// scroll box is positioned so absolutely positioned content in a cell (a
+// visually hidden file input, for example) scrolls with the table instead of
+// widening the page.
 export function Table({ className, children, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="overflow-x-auto rounded-md border border-line bg-surface">
+    <div className="relative overflow-x-auto rounded-md border border-line bg-surface">
       <table className={cx("w-full border-collapse text-left text-[14px]", className)} {...props}>
         {children}
       </table>
