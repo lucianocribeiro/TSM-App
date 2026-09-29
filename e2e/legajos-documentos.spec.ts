@@ -55,6 +55,8 @@ for (const tipo of TIPOS) {
   const documento = copy.documentos.tipos[tipo];
 
   test(`${tipo}: upload, replace keeping history, replace for good, download and delete`, async ({ page }) => {
+    // The whole cycle, with a database check after every step.
+    test.setTimeout(90_000);
     const emp = await empleadoCompleto(`documentos-${tipo}`, cuentas.add);
     await loginAs(page, await adminNuevo(`documentos-${tipo}-admin`, cuentas.add));
     await page.goto(`/legajos/${emp.id}`);
@@ -107,7 +109,9 @@ for (const tipo of TIPOS) {
     await expect.poll(() => existe(v2)).toBe(false);
     await expect(historial.getByTestId("historial-version")).toHaveCount(1);
 
-    // Download the current document.
+    // Download the current document, once the row shows it.
+    await expect(fila.getByRole("button", { name: ml.documentos.descargar })).toBeEnabled();
+    await expect(fila.getByRole("button", { name: r.reemplazar })).toBeEnabled();
     await comprobarDescarga(
       await descargar(page, fila.getByRole("button", { name: ml.documentos.descargar })),
       `v3-${tipo}.pdf`,
