@@ -77,10 +77,25 @@ export function AppShell({
 
   return (
     <div className="min-h-screen">
-      {/* Top bar, below 900px only: menu button, logo in the center; the
-          right side is taken by the corner buttons below. */}
+      {/* Top bar, below 900px only: the logo in the center; the right side
+          is taken by the corner buttons below. */}
       <div className="sticky top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center border-b border-line bg-rail px-4 py-2 text-rail-ink nav:hidden">
-        <div>
+        <div />
+        <Logo alt={copy.app.logoAlt} size={40} />
+        <div />
+      </div>
+
+      {/* Top right corner, every width, left to right: the theme switch, the
+          bell (Admin) and, below 900px, the menu button at the right end
+          (inside the top bar). */}
+      <div className="fixed right-4 top-2.5 z-40 flex items-center gap-2 nav:right-3 nav:top-3 nav:z-50">
+        <ThemeToggle
+          initialTheme={initialTheme}
+          toDarkLabel={copy.theme.toDark}
+          toLightLabel={copy.theme.toLight}
+        />
+        {campana}
+        <div className="nav:hidden">
           <MenuButton
             label={menuOpen ? copy.common.closeMenu : copy.common.openMenu}
             expanded={menuOpen}
@@ -88,24 +103,12 @@ export function AppShell({
             onClick={() => setMenuOpen((open) => !open)}
           />
         </div>
-        <Logo alt={copy.app.logoAlt} size={40} />
-        <div />
       </div>
 
-      {/* Top right corner, every width: the bell (Admin) and the theme
-          switch. Below 900px, inside the top bar's right side. */}
-      <div className="fixed right-4 top-2.5 z-40 flex items-center gap-2 nav:right-3 nav:top-3 nav:z-50">
-        {campana}
-        <ThemeToggle
-          initialTheme={initialTheme}
-          toDarkLabel={copy.theme.toDark}
-          toLightLabel={copy.theme.toLight}
-        />
-      </div>
-
-      {/* 900px and up: hides or shows the side menu. In the menu's corner
-          while it is shown; alone at the page's corner while it is hidden. */}
-      <div className="fixed left-3 top-3 z-50 hidden nav:block">
+      {/* 900px and up: hides or shows the side menu. At the right of the
+          menu's top row while it is shown (234px menu - 12px - 36px button);
+          at the page's top left corner while it is hidden. */}
+      <div className={cx("fixed top-3 z-50 hidden nav:block", menuOculto ? "left-3" : "left-[186px]")}>
         <MenuButton
           label={menuOculto ? copy.common.mostrarMenu : copy.common.ocultarMenu}
           expanded={!menuOculto}

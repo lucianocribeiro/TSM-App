@@ -40,6 +40,10 @@ test("wide screens: the logo is centered and the hamburger hides and shows the m
   await expect(nav).toBeVisible();
   expect(await centrado(logo(aside), aside)).toBeLessThanOrEqual(1);
   await expect(ocultar).toHaveAttribute("aria-expanded", "true");
+  // Shown: the button is at the right of the menu's top row.
+  const [menu, enMenu] = [await aside.boundingBox(), await ocultar.boundingBox()];
+  expect(enMenu!.x).toBeGreaterThan(menu!.x + menu!.width / 2);
+  expect(enMenu!.x + enMenu!.width).toBeLessThanOrEqual(menu!.x + menu!.width);
   await screenshotBoth(page, "menu-visible");
 
   await ocultar.click();
@@ -49,6 +53,8 @@ test("wide screens: the logo is centered and the hamburger hides and shows the m
   const box = await titulo(page).boundingBox();
   expect(box!.x).toBeLessThan(234);
   const boton = await mostrar.boundingBox();
+  // Hidden: the button is at the page's top left corner.
+  expect(boton!.x).toBeLessThan(20);
   expect(box!.x).toBeGreaterThan(boton!.x + boton!.width);
   await screenshotBoth(page, "menu-oculto");
 
@@ -65,7 +71,7 @@ test("wide screens: the logo is centered and the hamburger hides and shows the m
   await expect(ocultar).toBeVisible();
 });
 
-test("below 900px: the logo is centered in the top bar and the hamburger opens the menu", async ({ page }) => {
+test("below 900px: the logo is centered in the top bar and the hamburger, at its right end, opens the menu", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loginAs(page, await usuario("menu-movil"));
   const barra = page.locator("div.sticky").first();
@@ -75,6 +81,8 @@ test("below 900px: the logo is centered in the top bar and the hamburger opens t
 
   const abrir = page.getByRole("button", { name: copy.common.openMenu });
   await expect(abrir).toHaveAttribute("aria-expanded", "false");
+  const [barraBox, abrirBox] = [await barra.boundingBox(), await abrir.boundingBox()];
+  expect(abrirBox!.x + abrirBox!.width).toBeGreaterThan(barraBox!.x + barraBox!.width - 30);
   await abrir.click();
   await expect(mainNav(page)).toBeVisible();
   const aside = page.locator("aside#app-sidebar");
@@ -83,12 +91,13 @@ test("below 900px: the logo is centered in the top bar and the hamburger opens t
 });
 
 // The theme switch (icon only) and the bell sit in the top right corner, at
-// every width, and no longer in the side menu.
+// every width, and no longer in the side menu. Left to right: the switch, the
+// bell and, below 900px, the menu button at the right end.
 for (const { ancho, alto } of [
   { ancho: 1280, alto: 800 },
   { ancho: 390, alto: 844 },
 ]) {
-  test(`${ancho}px: the theme switch and the bell are in the top right corner`, async ({ page }) => {
+  test(`${ancho}px: the theme switch, the bell (and the menu button below 900px) are in the top right corner`, async ({ page }) => {
     await page.setViewportSize({ width: ancho, height: alto });
     const admin = await createE2EUser("menu-esquina", "admin");
     creados.push(admin.id);
@@ -106,8 +115,15 @@ for (const { ancho, alto } of [
       expect(box.y).toBeLessThan(20);
       expect(box.x + box.width).toBeGreaterThan(ancho - 100);
     }
-    // The switch is the outermost, the bell to its left.
-    expect(c!.x + c!.width).toBeLessThanOrEqual(t!.x);
+    // The switch, then the bell.
+    expect(t!.x + t!.width).toBeLessThanOrEqual(c!.x);
+    if (ancho < 900) {
+      // The menu button at the right end, the bell immediately to its left.
+      const m = await page.getByRole("button", { name: copy.common.openMenu }).boundingBox();
+      expect(c!.x + c!.width).toBeLessThanOrEqual(m!.x);
+      expect(m!.x - (c!.x + c!.width)).toBeLessThanOrEqual(12);
+      expect(m!.x + m!.width).toBeGreaterThan(ancho - 30);
+    }
 
     // Not in the side menu any more.
     const aside = page.locator("aside#app-sidebar");
