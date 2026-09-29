@@ -446,6 +446,7 @@ export type Database = {
         Args: { p_items: Json; p_legajo_id: string }
         Returns: string
       }
+      cuenta_activa: { Args: never; Returns: boolean }
       current_app_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
