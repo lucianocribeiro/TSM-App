@@ -1,6 +1,6 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.5 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
-Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6).
+Version: 0.6 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6). v0.6 — Security contract for account state (§4, §10): an inactive account is refused by the database, except reading its own profile; a pending forced password change is enforced by the app, not the database, by design.
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -30,6 +30,9 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Feature reads and writes use the server client bound to the user session. The service-role client (`src/lib/supabase/admin.ts`) is confined to server-only modules that verify the caller is an active Admin before any privileged call (today, the account-management module `src/lib/admin/cuentas.ts`), plus system jobs and seeds. It is never reachable from a page, layout, client component or any other action. Lint enforces the restriction.
 - Role checks exist both in RLS and in server-side guards (`requireRole`). App-level filters are layered on top of RLS where RLS is broader than the view's intent.
 - Storage buckets are private. Access through signed URLs only.
+- Account state is part of the security contract:
+  - An inactive account is refused by the database, not only by the app: with an access token that has not expired yet, it reaches no table row, no storage object and no function, except reading its own profile (so the app can show why the session ended). An inactive Admin has no Admin rights left.
+  - A pending forced password change is enforced by the app (the route guard and every Server Action), not by the database, by design: that user is the legitimate owner of the data, and the database treats them as any active user.
 
 ## 5. Core patterns
 - Server Actions return `{ ok: true, data? } | { ok: false, error }`. Never throw user-facing errors across a Server Action boundary.
@@ -68,7 +71,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 ## 10. Accounts: status and history
 - Every account has an Estado de la cuenta: Activa or Inactiva.
 - Accounts are never deleted as part of normal operation. They are deactivated, with a reason recorded (free text for now). Deactivating sets Estado de la cuenta to Inactiva.
-- A user whose account is Inactiva cannot log in.
+- A user whose account is Inactiva cannot log in, and the database refuses any session of theirs that is still open (§4).
 - History keeps naming who uploaded, changed, approved or rejected each item, including users whose account is Inactiva.
 - Purge (permanent removal of the account, its legajo, documents and approval history) is an Admin action intended for test data. It requires typing the account's email to confirm.
 - No user can deactivate or purge their own account.

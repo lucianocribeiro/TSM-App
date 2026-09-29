@@ -1,6 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.8 (draft) | Governed by: `docs/constitucion.md`
-Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu.
+Version: 0.9 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation.
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -31,6 +31,7 @@ As a user, I log in with email and password.
 As the system, I restrict every view and every row by role.
 - An Empleado cannot open Admin routes (redirected).
 - RLS tests prove an Empleado cannot read or write another employee's rows or files.
+- RLS tests cover every table and bucket for every actor (anonymous, Empleado on own and on another employee's data, Admin, an inactive account and a pending forced password change) and every operation (read, create, change, delete), including the ones no role may do.
 
 ### US-3 Mi Legajo
 As an Empleado, I see my legajo and submit changes to my personal data (groups A to D in section 5).
@@ -82,6 +83,7 @@ As Admin, I create an employee account and assign a role.
 ### US-8 Estado de la cuenta
 - Estado de la cuenta is Activa or Inactiva. Deactivating sets it to Inactiva.
 - An Admin deactivates an account with a reason; the user can no longer log in.
+- Deactivating ends the user's sessions. A session still open at that moment (an access token not yet expired) is refused by the database as well: it can read only its own profile, to show why the session ended, and nothing else. An inactive Admin loses Admin rights at once.
 - Deactivated employees are hidden from the Legajos list by default, with a filter to show them.
 - History keeps showing deactivated users by name.
 - An Admin can purge an account, typing its email to confirm; this removes the account, legajo, documents and approval history permanently.
@@ -101,8 +103,8 @@ As the system, I protect every route and end idle sessions.
 - Every page and route is classified in one route map: **public** (login, sign-out, static assets), **authenticated** (any signed-in user: Mi Legajo, the password change, home) or **Admin only** (Legajos, Usuarios, Aprobaciones and everything below them). A route not in the map is denied (anonymous users go to login; signed-in users go to Mi Legajo).
 - On every request, in this order:
   1. no session: login, remembering the requested page;
-  2. account inactive (or it cannot be verified): the session ends and login shows why;
-  3. password change pending: only the password-change page is reachable (and signing out). A forced password change blocks every action except changing the password and signing out, also when an action is called directly; while it is pending, only navigating the change page or completing the change keeps the session alive;
+  2. account inactive (or it cannot be verified): the session ends and login shows why. The database also refuses an inactive account on its own (US-8);
+  3. password change pending: only the password-change page is reachable (and signing out). A forced password change blocks every action except changing the password and signing out, also when an action is called directly; while it is pending, only navigating the change page or completing the change keeps the session alive. This is enforced by the app (this check and every Server Action), not by the database, by design: the user owns the data and the database treats them as an active user;
   4. role: an Empleado on an Admin route goes to Mi Legajo;
   5. inactivity limit reached: the session ends and login shows "Tu sesión se cerró por inactividad".
 - After signing in, the user returns to the page that asked for it, only when it is a same-site path to a known route. Anything else (external addresses, `//`, backslashes, encoded variants) is ignored: no open redirect.
