@@ -178,6 +178,21 @@ describe("proxy route guard", () => {
     });
   });
 
+  describe("forced change: marker renewal", () => {
+    it("never re-stamps on a Server Action; re-stamps on a page load of /cambiar-password", async () => {
+      state.profile = perfil({ debe_cambiar_password: true });
+      const vieja = await marca(60_000);
+      const accion = await updateSession(await request("/cambiar-password", { method: "POST", marcaValor: vieja }));
+      expect(locationOf(accion)).toBeNull();
+      expect(setsMarker(accion)).toBeNull();
+      const otra = await updateSession(await request("/mi-legajo", { method: "POST", marcaValor: vieja }));
+      expect(setsMarker(otra)).toBeNull();
+      const pagina = await updateSession(await request("/cambiar-password", { marcaValor: vieja }));
+      expect(locationOf(pagina)).toBeNull();
+      expect(setsMarker(pagina)).not.toBeNull();
+    });
+  });
+
   describe("4. role and default deny", () => {
     it("sends an Empleado away from Admin routes and anyone away from unmapped ones", async () => {
       for (const path of ["/legajos", "/legajos/abc", "/usuarios", "/usuarios/abc", "/aprobaciones", "/aprobaciones/solicitudes/x", "/aprobaciones/cualquiera/x/y"]) {

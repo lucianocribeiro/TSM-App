@@ -56,7 +56,8 @@ describe("decidirAcceso: order of checks", () => {
 
   it("public routes stay reachable with a session; the account and inactivity checks still apply", () => {
     const forzado = sesion({ cuenta: { estadoCuenta: "activa", debeCambiarPassword: true } });
-    expect(decidirAcceso(input("/auth/salir", forzado))).toEqual({ accion: "seguir", contarActividad: true });
+    // Reachable, but it does not keep a forced-change session alive.
+    expect(decidirAcceso(input("/auth/salir", forzado))).toEqual({ accion: "seguir", contarActividad: false });
     expect(decidirAcceso(input("/login", sesion({ actividadVigente: false })))).toEqual({
       accion: "cerrar",
       a: "/login?sesion=inactividad",
@@ -65,5 +66,35 @@ describe("decidirAcceso: order of checks", () => {
       accion: "cerrar",
       a: null,
     });
+  });
+});
+
+describe("decidirAcceso: activity renewal during a forced password change", () => {
+  const forzado = (over: Partial<SesionGuardia> = {}) =>
+    sesion({ cuenta: { estadoCuenta: "activa", debeCambiarPassword: true }, ...over });
+
+  it("a non-navigation request goes through (the action refuses it) but never renews the marker", () => {
+    for (const path of ["/cambiar-password", "/mi-legajo", "/legajos", "/login"]) {
+      expect(decidirAcceso(input(path, forzado(), "POST")), path).toEqual({ accion: "seguir", contarActividad: false });
+    }
+  });
+
+  it("only a page load of /cambiar-password renews it", () => {
+    expect(decidirAcceso(input("/cambiar-password", forzado()))).toEqual({ accion: "seguir", contarActividad: true });
+    expect(decidirAcceso(input("/cambiar-password", forzado(), "HEAD"))).toEqual({ accion: "seguir", contarActividad: true });
+    expect(decidirAcceso(input("/login", forzado()))).toEqual({ accion: "seguir", contarActividad: false });
+  });
+
+  it("an expired marker signs out on any request", () => {
+    const vencida = forzado({ actividadVigente: false });
+    expect(decidirAcceso(input("/cambiar-password", vencida))).toEqual({ accion: "cerrar", a: "/login?sesion=inactividad" });
+    expect(decidirAcceso(input("/cambiar-password", vencida, "POST"))).toEqual({ accion: "cerrar", a: null });
+    expect(decidirAcceso(input("/mi-legajo", vencida, "POST"))).toEqual({ accion: "cerrar", a: null });
+  });
+
+  it("a session without a pending change is unaffected", () => {
+    expect(decidirAcceso(input("/mi-legajo", sesion(), "POST"))).toEqual({ accion: "seguir", contarActividad: true });
+    expect(decidirAcceso(input("/mi-legajo", sesion()))).toEqual({ accion: "seguir", contarActividad: true });
+    expect(decidirAcceso(input("/login", sesion()))).toEqual({ accion: "seguir", contarActividad: true });
   });
 });

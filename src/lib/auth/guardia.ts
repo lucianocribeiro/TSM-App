@@ -92,10 +92,17 @@ export function decidirAcceso(input: GuardiaInput): GuardiaDecision {
   const motivo = motivoSalida(sesion.cuenta);
   if (motivo) return cerrarHacia(input, loginConMotivo(motivo));
 
+  // While a forced password change is pending, only a page load of
+  // /cambiar-password renews the activity marker (and cambiarPassword
+  // re-stamps it once the change is done). Refused requests, public pages
+  // and background requests never keep such a session alive.
+  const cambioPendiente = sesion.cuenta?.debeCambiarPassword === true;
+  const contarActividad = !cambioPendiente || (navegacion && input.pathname === CAMBIAR_PASSWORD_PATH);
+
   // 5 (for requests that are not navigations): an expired session is cleared
   // before the action runs; nothing else is decided here for them.
   if (!navegacion) {
-    return sesion.actividadVigente ? { accion: "seguir", contarActividad: true } : { accion: "cerrar", a: null };
+    return sesion.actividadVigente ? { accion: "seguir", contarActividad } : { accion: "cerrar", a: null };
   }
 
   if (clase !== "publica") {
@@ -112,5 +119,5 @@ export function decidirAcceso(input: GuardiaInput): GuardiaDecision {
   // 5. Inactivity.
   if (!sesion.actividadVigente) return cerrarHacia(input, LOGIN_INACTIVIDAD);
 
-  return { accion: "seguir", contarActividad: true };
+  return { accion: "seguir", contarActividad };
 }
