@@ -63,6 +63,12 @@ for (const tipo of TIPOS) {
     const fila = page.getByTestId(`documento-${tipo}`);
     const historial = page.getByTestId(`historial-${tipo}`);
     await expect(fila).toContainText(ml.documentos.estados.faltante);
+    // The page is hydrated before the first upload: a file set on the
+    // server-rendered input earlier would never reach its change handler.
+    const grupoA = page.getByTestId("grupo-A");
+    await grupoA.getByRole("button", { name: ml.editar }).click();
+    await grupoA.getByRole("button", { name: ml.cancelar }).click();
+    await expect(grupoA.getByRole("button", { name: ml.editar })).toBeVisible();
 
     // Upload: approved at once.
     await page.getByLabel(formatCopy(ml.documentos.archivoLabel, { documento }), { exact: true }).setInputFiles(pdf(`v1-${tipo}`));

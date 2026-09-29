@@ -15,7 +15,7 @@ export function Select({ label, options, placeholder, error, className, ...props
   const errorId = `${id}-error`;
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[10.5px] uppercase tracking-[.16em] text-ink-soft">
+      <label htmlFor={id} className="text-[10.5px] uppercase tracking-[.16em] text-accent-deep">
         {label}
       </label>
       <select

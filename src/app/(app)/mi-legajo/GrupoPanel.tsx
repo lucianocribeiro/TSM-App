@@ -259,7 +259,7 @@ function HijosEditor({
 
   return (
     <fieldset className="flex flex-col gap-3 rounded-md border border-line-soft p-4">
-      <legend className="px-1 text-[10.5px] uppercase tracking-[.16em] text-ink-soft">{labels.hijos}</legend>
+      <legend className="px-1 text-[10.5px] uppercase tracking-[.16em] text-accent-deep">{labels.hijos}</legend>
       {form.hijos.map((hijo, index) => (
         <div
           key={index}

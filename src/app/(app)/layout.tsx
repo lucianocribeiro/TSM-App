@@ -5,6 +5,7 @@ import { contarPendientes } from "@/lib/aprobaciones/bandeja-datos";
 import { decideAccountGate, PATHNAME_HEADER, SALIR_PATH } from "@/lib/auth/gate";
 import { getSessionUser } from "@/lib/auth/session";
 import { copy } from "@/lib/copy/es-AR";
+import { MENU_COOKIE, parseEstadoMenu } from "@/lib/nav/menu";
 import { getNavItems } from "@/lib/nav/nav";
 import { parseTheme, THEME_COOKIE } from "@/lib/theme/theme";
 import { AppShell } from "./AppShell";
@@ -39,7 +40,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect(decision.to);
   }
 
-  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const cookieStore = await cookies();
+  const theme = parseTheme(cookieStore.get(THEME_COOKIE)?.value);
+  const menu = parseEstadoMenu(cookieStore.get(MENU_COOKIE)?.value);
   // The approvals bell: an active Admin past the forced password change only.
   // pendientes_admin() refuses anyone else, so the count never reaches them.
   const conBell = user.role === "admin" && cuenta.estadoCuenta === "activa" && !cuenta.debeCambiarPassword;
@@ -53,6 +56,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       userEmail={user.email}
       roleLabel={copy.auth.roles[user.role]}
       initialTheme={theme}
+      initialMenu={menu}
       pendientes={pendientes}
       cambioPendiente={cuenta.debeCambiarPassword}
     >

@@ -7,12 +7,14 @@ import { BellLink } from "@/components/ui/BellLink";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { Logo } from "@/components/ui/Logo";
+import { MenuButton } from "@/components/ui/MenuButton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { etiquetaCampana, textoCampana } from "@/lib/aprobaciones/campana";
 import { logout } from "@/lib/auth/actions";
 import { CAMBIAR_PASSWORD_PATH } from "@/lib/auth/gate";
 import { copy } from "@/lib/copy/es-AR";
+import { menuCookieString, type EstadoMenu } from "@/lib/nav/menu";
 import { isActivePath, type NavItem } from "@/lib/nav/nav";
 import type { Theme } from "@/lib/theme/theme";
 import { anunciarSalida } from "@/lib/sesion/salida";
@@ -26,6 +28,8 @@ type AppShellProps = {
   userEmail: string;
   roleLabel: string;
   initialTheme: Theme;
+  // Wide screens: the side menu shown or hidden (remembered per browser).
+  initialMenu: EstadoMenu;
   // The Admin's pending approvals, for the bell. Null: no bell (not an Admin).
   pendientes: number | null;
   // A forced password change is pending (the inactivity limit then counts
@@ -44,41 +48,70 @@ export function AppShell({
   userEmail,
   roleLabel,
   initialTheme,
+  initialMenu,
   pendientes,
   cambioPendiente,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
+  // Below 900px: the menu opened from the top bar.
   const [menuOpen, setMenuOpen] = useState(false);
+  // 900px and up: the side menu hidden with the hamburger.
+  const [menuOculto, setMenuOculto] = useState(initialMenu === "oculto");
+  function alternarMenu() {
+    const oculto = !menuOculto;
+    document.cookie = menuCookieString(oculto ? "oculto" : "visible");
+    setMenuOculto(oculto);
+  }
   const [logoutState, logoutAction, logoutPending] = useActionState(logout, null);
   const totalPendientes = usePendientesAprobacion(pendientes);
-  const campana = (className?: string) =>
+  const campana =
     totalPendientes === null ? null : (
       <BellLink
         href={APROBACIONES_PATH}
         label={etiquetaCampana(totalPendientes)}
         badge={textoCampana(totalPendientes)}
         onClick={() => setMenuOpen(false)}
-        className={className}
       />
     );
 
   return (
     <div className="min-h-screen">
-      {/* Top bar, below 900px only. */}
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-rail px-4 py-2 text-rail-ink nav:hidden">
-        <Logo alt={copy.app.logoAlt} size={40} />
-        <div className="flex items-center gap-3">
-          {campana()}
-          <Button
-            variant="secondary"
-            aria-expanded={menuOpen}
-            aria-controls={SIDEBAR_ID}
+      {/* Top bar, below 900px only: menu button, logo in the center; the
+          right side is taken by the corner buttons below. */}
+      <div className="sticky top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center border-b border-line bg-rail px-4 py-2 text-rail-ink nav:hidden">
+        <div>
+          <MenuButton
+            label={menuOpen ? copy.common.closeMenu : copy.common.openMenu}
+            expanded={menuOpen}
+            controls={SIDEBAR_ID}
             onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? copy.common.closeMenu : copy.common.openMenu}
-          </Button>
+          />
         </div>
+        <Logo alt={copy.app.logoAlt} size={40} />
+        <div />
+      </div>
+
+      {/* Top right corner, every width: the bell (Admin) and the theme
+          switch. Below 900px, inside the top bar's right side. */}
+      <div className="fixed right-4 top-2.5 z-40 flex items-center gap-2 nav:right-3 nav:top-3 nav:z-50">
+        {campana}
+        <ThemeToggle
+          initialTheme={initialTheme}
+          toDarkLabel={copy.theme.toDark}
+          toLightLabel={copy.theme.toLight}
+        />
+      </div>
+
+      {/* 900px and up: hides or shows the side menu. In the menu's corner
+          while it is shown; alone at the page's corner while it is hidden. */}
+      <div className="fixed left-3 top-3 z-50 hidden nav:block">
+        <MenuButton
+          label={menuOculto ? copy.common.mostrarMenu : copy.common.ocultarMenu}
+          expanded={!menuOculto}
+          controls={SIDEBAR_ID}
+          onClick={alternarMenu}
+        />
       </div>
 
       {menuOpen ? (
@@ -94,10 +127,10 @@ export function AppShell({
         className={cx(
           "fixed inset-y-0 left-0 z-40 w-[234px] flex-col overflow-y-auto border-r border-line bg-rail py-[26px] text-rail-ink",
           menuOpen ? "flex" : "hidden",
-          "nav:flex",
+          menuOculto ? "nav:hidden" : "nav:flex",
         )}
       >
-        <div className="px-[22px]">
+        <div className="flex justify-center px-[22px]">
           <Logo alt={copy.app.logoAlt} size={72} preload />
         </div>
 
@@ -135,8 +168,6 @@ export function AppShell({
         ) : null}
 
         <div className="mt-auto flex flex-col items-start gap-3 px-[22px] pt-8">
-          {/* Below 900px the bell is in the top bar. */}
-          {campana("hidden nav:inline-flex")}
           <p
             className="max-w-full break-all text-[12.5px] text-ink-soft"
             data-testid="user-email"
@@ -144,11 +175,6 @@ export function AppShell({
             {userEmail}
           </p>
           <StatusBadge label={roleLabel} tone="active" />
-          <ThemeToggle
-            initialTheme={initialTheme}
-            toDarkLabel={copy.theme.toDark}
-            toLightLabel={copy.theme.toLight}
-          />
           {showCambiarPassword ? (
             <Link
               href={CAMBIAR_PASSWORD_PATH}
@@ -172,7 +198,8 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="nav:pl-[234px]">
+      {/* With the menu hidden, a gutter keeps the page clear of the button. */}
+      <div className={menuOculto ? "nav:pl-[60px]" : "nav:pl-[234px]"}>
         <main>{children}</main>
       </div>
       <SesionInactividad cambioPendiente={cambioPendiente} />
