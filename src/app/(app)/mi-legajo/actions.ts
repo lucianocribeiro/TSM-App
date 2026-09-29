@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { buildSolicitudItemsDe, type LegajoActual } from "@/lib/aprobaciones/solicitudes";
-import { sessionWithRole } from "@/lib/auth/require-role";
-import { getSessionUser, type SessionUser } from "@/lib/auth/session";
+import { sessionWithRole, usuarioActivo } from "@/lib/auth/require-role";
 import { copy } from "@/lib/copy/es-AR";
 import { descartarObjeto, prepararRuta, registrarObjeto } from "@/lib/documentos/registro";
 import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
@@ -24,12 +23,6 @@ const MI_LEGAJO_PATH = "/mi-legajo";
 const t = copy.miLegajo;
 const aprobacionErrors = copy.aprobaciones.errors;
 const noAutorizado: ActionResult = { ok: false, error: copy.cuentas.errors.noAutorizado };
-
-// The signed-in user, when their account was read and is active.
-async function usuarioActivo(): Promise<SessionUser | null> {
-  const user = await getSessionUser();
-  return user && user.cuenta?.estadoCuenta === "activa" ? user : null;
-}
 
 // ---------------------------------------------------------------------------
 // Change requests (Empleado)
