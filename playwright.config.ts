@@ -12,7 +12,17 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     trace: "on-first-retry",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: /\.serial\.spec\.ts$/ },
+    // Tests that read global state (the pending count behind the Admin's
+    // bell) run alone, after every other test has finished.
+    {
+      name: "serial",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /\.serial\.spec\.ts$/,
+      dependencies: ["chromium"],
+    },
+  ],
   // Runs against a production build. `npm run build` must run first.
   webServer: {
     command: `npm run start -- --port ${port}`,
