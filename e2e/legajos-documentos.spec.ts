@@ -63,13 +63,18 @@ for (const tipo of TIPOS) {
     const fila = page.getByTestId(`documento-${tipo}`);
     const historial = page.getByTestId(`historial-${tipo}`);
     await expect(fila).toContainText(ml.documentos.estados.faltante);
+    // The page is hydrated before the first upload: a file set on the
+    // server-rendered input earlier would never reach its change handler.
+    const grupoA = page.getByTestId("grupo-A");
+    await grupoA.getByRole("button", { name: ml.editar }).click();
+    await grupoA.getByRole("button", { name: ml.cancelar }).click();
+    await expect(grupoA.getByRole("button", { name: ml.editar })).toBeVisible();
 
     // Upload: approved at once.
     await page.getByLabel(formatCopy(ml.documentos.archivoLabel, { documento }), { exact: true }).setInputFiles(pdf(`v1-${tipo}`));
-    // Three steps (prepare, upload straight to Storage, register): allow for a slow runner.
-    await expect(page.getByRole("status").filter({ hasText: ml.documentos.exito.subidoAdmin })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("status").filter({ hasText: ml.documentos.exito.subidoAdmin })).toBeVisible();
     await expect(fila).toContainText(ml.documentos.estados.aprobado);
-    await expect.poll(() => estados(emp.legajoId, tipo), { timeout: 15_000 }).toEqual([[`v1-${tipo}.pdf`, "aprobado"]]);
+    await expect.poll(() => estados(emp.legajoId, tipo)).toEqual([[`v1-${tipo}.pdf`, "aprobado"]]);
 
     // Replace keeping history: one approved, one replaced; the history
     // version is listed and downloads.
@@ -79,7 +84,7 @@ for (const tipo of TIPOS) {
     let chooser = page.waitForEvent("filechooser");
     await dialog.getByRole("button", { name: r.elegirArchivo }).click();
     await (await chooser).setFiles(pdf(`v2-${tipo}`));
-    await expect.poll(() => estados(emp.legajoId, tipo), { timeout: 15_000 }).toEqual([
+    await expect.poll(() => estados(emp.legajoId, tipo)).toEqual([
       [`v1-${tipo}.pdf`, "reemplazado"],
       [`v2-${tipo}.pdf`, "aprobado"],
     ]);
@@ -103,7 +108,7 @@ for (const tipo of TIPOS) {
     chooser = page.waitForEvent("filechooser");
     await confirmacion.getByRole("button", { name: r.confirmar }).click();
     await (await chooser).setFiles(pdf(`v3-${tipo}`));
-    await expect.poll(() => estados(emp.legajoId, tipo), { timeout: 15_000 }).toEqual([
+    await expect.poll(() => estados(emp.legajoId, tipo)).toEqual([
       [`v1-${tipo}.pdf`, "reemplazado"],
       [`v3-${tipo}.pdf`, "aprobado"],
     ]);
@@ -127,7 +132,7 @@ for (const tipo of TIPOS) {
     await expect(eliminar).toContainText(r.eliminarVigenteBody);
     await eliminar.getByRole("button", { name: ml.documentos.eliminar }).click();
     await expect(fila).toContainText(ml.documentos.estados.faltante);
-    await expect.poll(() => estados(emp.legajoId, tipo), { timeout: 15_000 }).toEqual([[`v1-${tipo}.pdf`, "reemplazado"]]);
+    await expect.poll(() => estados(emp.legajoId, tipo)).toEqual([[`v1-${tipo}.pdf`, "reemplazado"]]);
     await expect.poll(() => existe(v3)).toBe(false);
   });
 }
