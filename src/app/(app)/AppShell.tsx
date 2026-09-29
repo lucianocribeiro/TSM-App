@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { Logo } from "@/components/ui/Logo";
 import { MenuButton } from "@/components/ui/MenuButton";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { etiquetaCampana, textoCampana } from "@/lib/aprobaciones/campana";
 import { logout } from "@/lib/auth/actions";
 import { CAMBIAR_PASSWORD_PATH } from "@/lib/auth/gate";
 import { copy } from "@/lib/copy/es-AR";
+import { formatCopy } from "@/lib/copy/format";
 import { menuCookieString, type EstadoMenu } from "@/lib/nav/menu";
 import { isActivePath, type NavItem } from "@/lib/nav/nav";
 import type { Theme } from "@/lib/theme/theme";
@@ -72,29 +72,43 @@ export function AppShell({
         label={etiquetaCampana(totalPendientes)}
         badge={textoCampana(totalPendientes)}
         onClick={() => setMenuOpen(false)}
+        className="shrink-0"
       />
     );
 
   return (
     <div className="min-h-screen">
-      {/* Top bar, below 900px only: the logo in the center; the right side
-          is taken by the corner buttons below. */}
-      <div className="sticky top-0 z-30 grid grid-cols-[1fr_auto_1fr] items-center border-b border-line bg-rail px-4 py-2 text-rail-ink nav:hidden">
-        <div />
+      {/* Top bar, below 900px only: the logo at the left; the rest of the
+          bar is taken by the corner group below. */}
+      <div className="sticky top-0 z-30 flex items-center border-b border-line bg-rail px-4 py-2 text-rail-ink nav:hidden">
         <Logo alt={copy.app.logoAlt} size={40} />
-        <div />
       </div>
 
       {/* Top right corner, every width, left to right: the theme switch, the
-          bell (Admin) and, below 900px, the menu button at the right end
-          (inside the top bar). */}
-      <div className="fixed right-4 top-2.5 z-40 flex items-center gap-2 nav:right-3 nav:top-3 nav:z-50">
+          bell (Admin), the account (email and role) and, below 900px, the
+          menu button at the right end. Below 900px it fills the top bar right
+          of the logo (left 64px), so a long email is truncated there. */}
+      <div className="fixed left-16 right-4 top-2.5 z-40 flex items-center justify-end gap-2 nav:left-auto nav:right-3 nav:top-3 nav:z-50">
         <ThemeToggle
           initialTheme={initialTheme}
           toDarkLabel={copy.theme.toDark}
           toLightLabel={copy.theme.toLight}
         />
         {campana}
+        {/* Plain text, not a control. The full email is in the title and in
+            the group's accessible name; it is truncated on screen. */}
+        <div
+          role="group"
+          aria-label={formatCopy(copy.auth.cuenta, { email: userEmail, rol: roleLabel })}
+          title={userEmail}
+          data-testid="cuenta"
+          className="flex min-w-0 flex-col leading-tight nav:max-w-[240px]"
+        >
+          <span className="truncate text-[12.5px] text-ink" data-testid="user-email">
+            {userEmail}
+          </span>
+          <span className="text-[11px] text-ink-soft">{roleLabel}</span>
+        </div>
         <div className="nav:hidden">
           <MenuButton
             label={menuOpen ? copy.common.closeMenu : copy.common.openMenu}
@@ -171,13 +185,6 @@ export function AppShell({
         ) : null}
 
         <div className="mt-auto flex flex-col items-start gap-3 px-[22px] pt-8">
-          <p
-            className="max-w-full break-all text-[12.5px] text-ink-soft"
-            data-testid="user-email"
-          >
-            {userEmail}
-          </p>
-          <StatusBadge label={roleLabel} tone="active" />
           {showCambiarPassword ? (
             <Link
               href={CAMBIAR_PASSWORD_PATH}

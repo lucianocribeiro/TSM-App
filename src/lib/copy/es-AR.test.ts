@@ -35,6 +35,7 @@ describe("es-AR copy", () => {
       copy.auth.errors.invalidCredentials,
       copy.auth.errors.logoutFailed,
       copy.auth.logout,
+      copy.auth.cuenta,
       copy.auth.roles.empleado,
       copy.auth.roles.admin,
       copy.nav.label,

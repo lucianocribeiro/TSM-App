@@ -27,6 +27,8 @@ export type Copy = {
       sesionInactividad: string;
     };
     logout: string;
+    // The signed-in account (top right corner), for screen readers.
+    cuenta: string;
     roles: {
       empleado: string;
       admin: string;
@@ -634,6 +636,7 @@ export const copy = {
       sesionInactividad: "Tu sesión se cerró por inactividad. Ingresá de nuevo para seguir.",
     },
     logout: "Cerrar sesión",
+    cuenta: "Cuenta: {email} ({rol})",
     roles: {
       empleado: "Empleado",
       admin: "Administrador",

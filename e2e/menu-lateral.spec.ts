@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
+import { formatCopy } from "../src/lib/copy/format";
 import { loginAs, mainNav } from "./helpers";
 import { screenshotBoth } from "./screens";
 import { createE2EUser, deleteE2EUser } from "./service";
@@ -17,13 +18,6 @@ async function usuario(label: string) {
   const user = await createE2EUser(label);
   creados.push(user.id);
   return user;
-}
-
-// Horizontal center of an element, and of its container.
-async function centrado(elemento: Locator, contenedor: Locator) {
-  const [a, b] = await Promise.all([elemento.boundingBox(), contenedor.boundingBox()]);
-  if (!a || !b) throw new Error("element not rendered");
-  return Math.abs(a.x + a.width / 2 - (b.x + b.width / 2));
 }
 
 // The sidebar/drawer content is left-aligned: the logo and each nav item
@@ -92,11 +86,11 @@ test("wide screens: the menu is left-aligned and the hamburger hides and shows i
   await expect(ocultar).toBeVisible();
 });
 
-test("below 900px: the logo is centered in the top bar and the hamburger, at its right end, opens a left-aligned menu", async ({ page }) => {
+test("below 900px: the logo at the left of the top bar, and the hamburger, at its right end, opens a left-aligned menu", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loginAs(page, await usuario("menu-movil"));
   const barra = page.locator("div.sticky").first();
-  expect(await centrado(logo(barra), barra)).toBeLessThanOrEqual(1);
+  expect((await logo(barra).boundingBox())!.x - (await barra.boundingBox())!.x).toBeLessThanOrEqual(20);
   // The wide-screen button is not shown here.
   await expect(page.getByRole("button", { name: copy.common.ocultarMenu })).toBeHidden();
 
@@ -110,14 +104,14 @@ test("below 900px: the logo is centered in the top bar and the hamburger, at its
   await screenshotBoth(page, "menu-movil-abierto");
 });
 
-// The theme switch (icon only) and the bell sit in the top right corner, at
-// every width, and no longer in the side menu. Left to right: the switch, the
-// bell and, below 900px, the menu button at the right end.
+// The top right corner, at every width, left to right: the theme switch
+// (icon only), the bell (Admin only), the account (email and role) and, below
+// 900px, the menu button at the right end. None of them is in the side menu.
 for (const { ancho, alto } of [
   { ancho: 1280, alto: 800 },
   { ancho: 390, alto: 844 },
 ]) {
-  test(`${ancho}px: the theme switch, the bell (and the menu button below 900px) are in the top right corner`, async ({ page }) => {
+  test(`${ancho}px: the theme switch, the bell, the account (and the menu button below 900px) are in the top right corner`, async ({ page }) => {
     await page.setViewportSize({ width: ancho, height: alto });
     const admin = await createE2EUser("menu-esquina", "admin");
     creados.push(admin.id);
@@ -125,37 +119,84 @@ for (const { ancho, alto } of [
 
     const tema = page.getByRole("button", { name: copy.theme.toDark });
     const campana = page.getByTestId("campana").filter({ visible: true });
+    const cuenta = page.getByRole("group", { name: formatCopy(copy.auth.cuenta, { email: admin.email, rol: copy.auth.roles.admin }) });
     await expect(tema).toBeVisible();
     await expect(campana).toHaveCount(1);
+    await expect(cuenta).toBeVisible();
     // Icon only: no visible text.
     expect((await tema.innerText()).trim()).toBe("");
 
-    const [t, c] = [await tema.boundingBox(), await campana.boundingBox()];
-    // In the corner: at the top, in the right half (below 900px the menu
-    // button takes the right end, so the switch may sit further left).
-    for (const box of [t!, c!]) {
+    const [t, c, a] = [(await tema.boundingBox())!, (await campana.boundingBox())!, (await cuenta.boundingBox())!];
+    // At the top; on wide screens in the right half, below 900px right of the
+    // logo (the group fills the rest of the top bar).
+    const desde = ancho < 900 ? (await logo(page.locator("div.sticky").first()).boundingBox())!.x + 40 : ancho / 2;
+    for (const box of [t, c, a]) {
       expect(box.y).toBeLessThan(20);
-      expect(box.x).toBeGreaterThan(ancho / 2);
+      expect(box.x).toBeGreaterThanOrEqual(desde);
     }
-    // The switch, then the bell.
-    expect(t!.x + t!.width).toBeLessThanOrEqual(c!.x);
+    // The switch, the bell, then the account immediately to its right.
+    expect(t.x + t.width).toBeLessThanOrEqual(c.x);
+    expect(c.x + c.width).toBeLessThanOrEqual(a.x);
+    expect(a.x - (c.x + c.width)).toBeLessThanOrEqual(12);
     if (ancho < 900) {
-      // The menu button at the right end, the bell immediately to its left.
-      const m = await page.getByRole("button", { name: copy.common.openMenu }).boundingBox();
-      expect(c!.x + c!.width).toBeLessThanOrEqual(m!.x);
-      expect(m!.x - (c!.x + c!.width)).toBeLessThanOrEqual(12);
-      expect(m!.x + m!.width).toBeGreaterThan(ancho - 30);
+      // The menu button at the right end, the account immediately to its left.
+      const m = (await page.getByRole("button", { name: copy.common.openMenu }).boundingBox())!;
+      expect(a.x + a.width).toBeLessThanOrEqual(m.x);
+      expect(m.x - (a.x + a.width)).toBeLessThanOrEqual(12);
+      expect(m.x + m.width).toBeGreaterThan(ancho - 30);
+    } else {
+      expect(a.x + a.width).toBeGreaterThan(ancho - 30);
     }
 
-    // Not in the side menu any more.
+    // None of them in the side menu.
     const aside = page.locator("aside#app-sidebar");
     await expect(aside.getByTestId("theme-toggle")).toHaveCount(0);
     await expect(aside.getByTestId("campana")).toHaveCount(0);
+    await expect(aside.getByTestId("user-email")).toHaveCount(0);
+    await expect(aside.getByText(copy.auth.roles.admin, { exact: true })).toHaveCount(0);
 
     // It still switches, and the icon's name follows.
     await tema.click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("button", { name: copy.theme.toLight })).toBeVisible();
     await screenshotBoth(page, `esquina-${ancho}`);
+  });
+}
+
+// The Empleado sees no bell; the account sits alone in the same corner. With
+// a long email (the e2e accounts' are well over 40 characters), the email is
+// truncated with an ellipsis at 390px and the page does not scroll sideways.
+for (const { ancho, alto } of [
+  { ancho: 1280, alto: 800 },
+  { ancho: 390, alto: 844 },
+]) {
+  test(`${ancho}px: an Empleado's account is at the top right with no bell; a long email is truncated`, async ({ page }) => {
+    await page.setViewportSize({ width: ancho, height: alto });
+    const user = await usuario("menu-cuenta-con-un-email-bastante-largo");
+    expect(user.email.length).toBeGreaterThanOrEqual(40);
+    await loginAs(page, user);
+
+    const cuenta = page.getByRole("group", { name: formatCopy(copy.auth.cuenta, { email: user.email, rol: copy.auth.roles.empleado }) });
+    await expect(cuenta).toBeVisible();
+    await expect(cuenta).toHaveAttribute("title", user.email);
+    await expect(cuenta.getByText(copy.auth.roles.empleado, { exact: true })).toBeVisible();
+    await expect(page.getByTestId("campana")).toHaveCount(0);
+    const a = (await cuenta.boundingBox())!;
+    expect(a.y).toBeLessThan(20);
+    const t = (await page.getByRole("button", { name: copy.theme.toDark }).boundingBox())!;
+    expect(t.x + t.width).toBeLessThanOrEqual(a.x);
+    await expect(page.locator("aside#app-sidebar").getByTestId("user-email")).toHaveCount(0);
+
+    const email = page.getByTestId("user-email");
+    // The full email is in the page (for screen readers), even when truncated on screen.
+    await expect(email).toHaveText(user.email);
+    if (ancho < 900) {
+      const medida = await email.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, overflow: getComputedStyle(el).textOverflow }));
+      expect(medida.overflow).toBe("ellipsis");
+      expect(medida.scroll).toBeGreaterThan(medida.client);
+      const pagina = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+      expect(pagina.scroll).toBeLessThanOrEqual(pagina.client);
+    }
+    await screenshotBoth(page, `cuenta-empleado-${ancho}`);
   });
 }
