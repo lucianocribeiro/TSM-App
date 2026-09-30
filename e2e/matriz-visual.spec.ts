@@ -25,7 +25,7 @@ const TEMAS: Theme[] = ["light", "dark"];
 // The --bg token of src/app/globals.css and its computed body background.
 const FONDO: Record<Theme, { token: string; body: string }> = {
   light: { token: "#f3f2f2", body: "rgb(243, 242, 242)" },
-  dark: { token: "#00072e", body: "rgb(0, 7, 46)" },
+  dark: { token: "#000418", body: "rgb(0, 4, 24)" },
 };
 
 const cuentas = registro();
