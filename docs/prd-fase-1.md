@@ -1,6 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.9 (draft) | Governed by: `docs/constitucion.md`
-Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation.
+Version: 0.10 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation. v0.10 — Configuración (section 8, client change request CR-1): Admin-maintained lists (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) with add, rename, reorder, deactivate, reactivate and delete-if-never-used, a change history and initial values; Configuración in the menu. The legajo fields keep their current form until CR-2.
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -18,6 +18,7 @@ Deliver the Legajo module plus the auth, roles and data-isolation foundation tha
 10. Approval flow: personal data changes (groups A to D) and document uploads made by an Empleado require Admin approval before they take effect. Rejections carry a reason.
 11. Estado de la cuenta (Activa / Inactiva): Admin deactivates an account with a reason instead of deleting it; deactivated users cannot log in and remain visible in history. Purge is a separate Admin action for test data.
 12. First password: Admin sets a temporary password; the user must change it at first login. Password resets by Admin are always temporary passwords.
+13. Configuración: Admin-maintained lists for the legajo's work data, with their change history (section 8).
 
 ## 3. User stories and acceptance criteria
 
@@ -186,7 +187,7 @@ While a legajo has a pending change request, the database refuses direct changes
 - DNI: digits only.
 - Email personal: valid email format.
 - Teléfonos (celular and emergency): 8 to 20 characters, digits plus optional spaces, hyphens, parentheses and a leading `+`. No country-specific format enforced.
-- Grupo sanguíneo, Sede, Área, Puesto, Convenio: free text for now. They may become fixed lists later.
+- Grupo sanguíneo, Sede, Área, Puesto, Convenio: free text for now. The Configuración lists (section 8) exist; the legajo fields move to them in CR-2.
 - Fecha de nacimiento and Fecha de ingreso: valid dates, not in the future.
 - Bruto mensual: non-negative number.
 
@@ -205,6 +206,40 @@ While a legajo has a pending change request, the database refuses direct changes
 - Codex audit clean (blocking findings resolved).
 - Migrations applied through the `db push` runbook with Local = Remote confirmed.
 - Repo state checked before merge.
+
+## 8. Configuración
+Client change request CR-1. A menu section for Admin only, numbered like the other entries, to maintain the lists the legajo uses. This section defines the lists and their rules; which legajo fields use them, and how, is CR-2.
+
+### 8.1 Lists
+Área, Puesto, Sucursal, Convenio, Tarea and Categoría. Each Puesto belongs to one Área. Only an active Admin can read or change the lists (database and server guards); an Empleado never reaches them.
+
+### 8.2 Rules
+- The Admin can add, rename, reorder, deactivate and reactivate items, and delete an item that was never used.
+- Add: a new item goes to the end of its list (of its Área, for a Puesto).
+- Name: required, trimmed, repeated spaces collapsed, at most 60 characters. Unique per list ignoring case, accents and spaces; for a Puesto, unique within its Área (the same Puesto name is allowed in different Áreas). The server validates with the same rules the screen shows, and the database enforces them.
+- Rename: records reference the item, not its text, so the new name shows everywhere the item is used.
+- Order: the Admin moves an item one place up or down (keyboard accessible); the order is the one dropdowns use.
+- Deactivate: the item no longer appears for new selections; records that already have it keep it. Deactivating an Área hides its Puestos from new selections too, without changing their own state; reactivating the Área shows them again. Deactivation asks for confirmation.
+- Delete: only for an item never used, and it asks for confirmation. An item in use (today, an Área with Puestos; from CR-2, any item a legajo references) is refused by the database with a message suggesting deactivation, and the screen does not offer it.
+- A change made from a stale screen (another Admin changed the item in between) is refused with a message, and the list reloads.
+
+### 8.3 History
+Every change (add, rename, reorder, deactivate, reactivate, delete) is recorded by the database with date, user, list, item, action, and the value before and after (names, positions or state). Admin only, read only; nobody can write or change it from the app. The Historial view lists the changes newest first, with the date in Argentina time. The values loaded initially are not recorded as changes. An Admin named in this history cannot be purged (US-8).
+
+### 8.4 Initial values
+In this order:
+
+| List | Items |
+|---|---|
+| Área | Ventas, Administración, Logística, Gerencia |
+| Puesto — Ventas | Cuentas corrientes, Mostrador (SM), Mostrador (PA), Mostrador (SJ) |
+| Puesto — Administración | Cobranzas, Proveedores, Otros |
+| Puesto — Logística | Depósito, Distribución |
+| Puesto — Gerencia | Gerencia |
+| Sucursal | Casa Central, San Martín, Pacheco, San Justo |
+| Convenio | Comercio |
+| Tarea | Administrativo, Ventas, Maestranza y Servicios, Cajero |
+| Categoría | A, B, C, D, E, F |
 
 ## Ajustes post-deploy
 Adjustments after the F1-12 deploy (user testing), before F1-13. The version is bumped in F1-13.
