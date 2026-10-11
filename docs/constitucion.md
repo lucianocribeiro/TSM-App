@@ -1,6 +1,6 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.7 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
-Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6). v0.6 — Security contract for account state (§4, §10): an inactive account is refused by the database, except reading its own profile; a pending forced password change is enforced by the app, not the database, by design. v0.7 — Configuración (Admin only) added to the Fase 1 menu (§6): the Admin-maintained lists used by the legajo, with their change history.
+Version: 0.8 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6). v0.6 — Security contract for account state (§4, §10): an inactive account is refused by the database, except reading its own profile; a pending forced password change is enforced by the app, not the database, by design. v0.7 — Configuración (Admin only) added to the Fase 1 menu (§6): the Admin-maintained lists used by the legajo, with their change history. v0.8 — Datos laborales (group E) are Admin only, at the database level (§3, §4): the Empleado no longer reads any group E value, their own included.
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -19,7 +19,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Repo: https://github.com/lucianocribeiro/TSM-App
 
 ## 3. Roles
-- **Empleado**: reads own legajo and own documents; submits changes to own personal data (groups A to D) and uploads own documents, both of which take effect only after Admin approval; reads own work data (group E, including Bruto mensual) without editing it. Never sees any other employee's data, rows or files.
+- **Empleado**: reads own legajo (groups A to D) and own documents; submits changes to own personal data (groups A to D) and uploads own documents, both of which take effect only after Admin approval. Does not see work data (group E, Datos laborales) at all, their own included. Never sees any other employee's data, rows or files.
 - **Admin**: sees and manages all data; manages users and roles; edits all legajo data of any employee; uploads documents.
 - No other roles exist. Adding one requires a Constitution change.
 
@@ -27,6 +27,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Email + password only. No magic link, OAuth or SSO.
 - Every table has RLS enabled. Default deny.
 - Data isolation: an Empleado can never read or write another employee's rows or files (tables and storage).
+- Work data (group E) is Admin only in the database: it is stored apart from groups A to D, and only an active Admin reads or writes it, so no table, view or function returns a group E value to an Empleado, not even their own. The lists it takes its values from (Configuración) are Admin only too.
 - Feature reads and writes use the server client bound to the user session. The service-role client (`src/lib/supabase/admin.ts`) is confined to server-only modules that verify the caller is an active Admin before any privileged call (today, the account-management module `src/lib/admin/cuentas.ts`), plus system jobs and seeds. It is never reachable from a page, layout, client component or any other action. Lint enforces the restriction.
 - Role checks exist both in RLS and in server-side guards (`requireRole`). App-level filters are layered on top of RLS where RLS is broader than the view's intent.
 - Storage buckets are private. Access through signed URLs only.
