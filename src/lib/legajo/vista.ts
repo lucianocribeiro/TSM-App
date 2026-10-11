@@ -2,18 +2,19 @@ import { parseHijosValor, serializeValor, type HijoValor, type LegajoActual } fr
 import type { CampoSolicitud } from "@/lib/aprobaciones/campos";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
-import { formatearFecha, formatearPesos } from "@/lib/format/fecha";
-import type { Database } from "@/lib/supabase/database.types";
+import type { CatalogoItem } from "@/lib/configuracion/listas";
+import { formatearFecha } from "@/lib/format/fecha";
 import { calcularAntiguedad, type Antiguedad } from "./antiguedad";
 import { hoyEnArgentina } from "./fechas";
 import type { GrupoEditable } from "./grupos";
+import { nombreItem, type ActualLaboral } from "./laborales";
 import { ESTADOS_CIVILES } from "./options";
 
 // Display and form helpers for /mi-legajo and /legajos. Pure (antigüedad is
 // as of today in Argentina).
 
 const t = copy.miLegajo;
-const DATE_FIELDS = new Set<string>(["fecha_nacimiento", "fecha_ingreso"]);
+const DATE_FIELDS = new Set<string>(["fecha_nacimiento"]);
 
 // A stored or proposed value, as text for the page. Values are in the same
 // text form the change requests use (dates YYYY-MM-DD, booleans "true" /
@@ -50,25 +51,33 @@ export function textoAntiguedad(antiguedad: Antiguedad | null): string {
 
 export type DatoLaboral = { key: keyof typeof t.camposLaborales; value: string };
 
-// Group E for display, in page order, with antigüedad calculated.
-export function datosLaboralesVista(legajo: Database["public"]["Tables"]["legajos"]["Row"]): DatoLaboral[] {
-  const sinDato = (value: string) => value || t.sinDato;
+// Group E for display (Admin only), in page order, with antigüedad
+// calculated and list items by name (an inactive one marked).
+export function datosLaboralesVista(laboral: ActualLaboral | null, items: readonly CatalogoItem[]): DatoLaboral[] {
+  const sinDato = (value: string | null | undefined) => value || t.sinDato;
+  const item = (id: string | null | undefined) => {
+    const encontrado = id ? items.find((candidato) => candidato.id === id) : undefined;
+    return encontrado ? nombreItem(encontrado) : t.sinDato;
+  };
+  const fechaIngreso = laboral?.fecha_ingreso ?? null;
+  const estado = laboral?.estado_laboral;
   return [
-    { key: "numero_legajo", value: sinDato(legajo.numero_legajo ?? "") },
-    { key: "area", value: sinDato(legajo.area ?? "") },
-    { key: "puesto", value: sinDato(legajo.puesto ?? "") },
-    { key: "fecha_ingreso", value: sinDato(formatearFecha(legajo.fecha_ingreso)) },
+    { key: "numero_legajo", value: sinDato(laboral?.numero_legajo) },
+    { key: "area", value: item(laboral?.area_id) },
+    { key: "puesto", value: item(laboral?.puesto_id) },
+    { key: "fecha_ingreso", value: sinDato(formatearFecha(fechaIngreso)) },
     {
       key: "antiguedad",
-      value: legajo.fecha_ingreso
-        ? textoAntiguedad(calcularAntiguedad(legajo.fecha_ingreso, hoyEnArgentina()))
-        : t.sinDato,
+      value: fechaIngreso ? textoAntiguedad(calcularAntiguedad(fechaIngreso, hoyEnArgentina())) : t.sinDato,
     },
-    { key: "estado_laboral", value: legajo.estado_laboral ? t.estadosLaborales[legajo.estado_laboral] : t.sinDato },
-    { key: "sede", value: sinDato(legajo.sede ?? "") },
-    { key: "modalidad", value: sinDato(legajo.modalidad ?? "") },
-    { key: "convenio", value: sinDato(legajo.convenio ?? "") },
-    { key: "bruto_mensual", value: sinDato(formatearPesos(legajo.bruto_mensual)) },
+    {
+      key: "estado_laboral",
+      value: estado === "activo" || estado === "en_prueba" ? t.estadosLaborales[estado] : t.sinDato,
+    },
+    { key: "sucursal", value: item(laboral?.sucursal_id) },
+    { key: "tarea", value: item(laboral?.tarea_id) },
+    { key: "convenio", value: item(laboral?.convenio_id) },
+    { key: "categoria", value: item(laboral?.categoria_id) },
   ];
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatearFecha, formatearFechaHora, formatearPesos } from "./fecha";
+import { formatearFecha, formatearFechaHora } from "./fecha";
 
 describe("formatearFechaHora", () => {
   it("formats in es-AR and in Argentina's time zone", () => {
@@ -19,13 +19,5 @@ describe("formatearFecha", () => {
     expect(formatearFecha("1990-12-31")).toBe("31/12/1990");
     expect(formatearFecha(null)).toBe("");
     expect(formatearFecha("2026-1-1")).toBe("");
-  });
-});
-
-describe("formatearPesos", () => {
-  it("formats pesos in es-AR", () => {
-    expect(formatearPesos(1234567.89).replace(/\s/g, " ")).toBe("$ 1.234.567,89");
-    expect(formatearPesos(0).replace(/\s/g, " ")).toBe("$ 0,00");
-    expect(formatearPesos(null)).toBe("");
   });
 });

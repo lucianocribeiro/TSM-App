@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
-import { LabelValueGrid } from "@/components/ui/LabelValueGrid";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import type { LegajoActual } from "@/lib/aprobaciones/solicitudes";
@@ -13,7 +12,6 @@ import { formatCopy } from "@/lib/copy/format";
 import type { ResumenDocumento } from "@/lib/documentos/resumen";
 import { GRUPOS_EDITABLES } from "@/lib/legajo/grupos";
 import type { SolicitudActual } from "@/lib/legajo/mi-legajo";
-import type { DatoLaboral } from "@/lib/legajo/vista";
 import {
   cancelarSolicitud,
   descartarSubida,
@@ -39,13 +37,12 @@ const ACCIONES_DOCUMENTOS: AccionesDocumentos = {
 type MiLegajoScreenProps = {
   actual: LegajoActual;
   solicitud: SolicitudActual | null;
-  laborales: DatoLaboral[];
   documentos: ResumenDocumento[];
   esAdmin: boolean;
   vacio: boolean;
 };
 
-export function MiLegajoScreen({ actual, solicitud, laborales, documentos, esAdmin, vacio }: MiLegajoScreenProps) {
+export function MiLegajoScreen({ actual, solicitud, documentos, esAdmin, vacio }: MiLegajoScreenProps) {
   const [aviso, setAviso] = useState<string | null>(null);
   const [confirmarCancelacion, setConfirmarCancelacion] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -119,15 +116,6 @@ export function MiLegajoScreen({ actual, solicitud, laborales, documentos, esAdm
             onGuardado={setAviso}
           />
         ))}
-
-        <Panel data-testid="grupo-E">
-          <h2 className="text-[24px] font-normal leading-[1.1]">{t.grupos.E}</h2>
-          <p className="mt-1 text-[12.5px] italic text-ink-soft">{t.laboralesNota}</p>
-          <LabelValueGrid
-            className="mt-4"
-            items={laborales.map((dato) => ({ key: dato.key, label: t.camposLaborales[dato.key], value: dato.value }))}
-          />
-        </Panel>
 
         <DocumentosSection
           documentos={documentos}

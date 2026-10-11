@@ -65,10 +65,11 @@ export function mover(grupo: readonly CatalogoItem[], id: string, direccion: Dir
     .sort((a, b) => a.posicion - b.posicion);
 }
 
-// An item is in use while something references it. Today only Puestos
-// reference an Área; from CR-2, legajos reference every list (the database
-// refuses the deletion either way, ON DELETE RESTRICT).
-export function enUso(items: readonly CatalogoItem[], item: CatalogoItem): boolean {
+// An item is in use while something references it: an Área its Puestos,
+// and any item a legajo's group E (referenciados: the item ids the legajos
+// hold). The database refuses the deletion either way (ON DELETE RESTRICT).
+export function enUso(items: readonly CatalogoItem[], item: CatalogoItem, referenciados: ReadonlySet<string>): boolean {
+  if (referenciados.has(item.id)) return true;
   return item.lista === "area" && items.some((otro) => otro.lista === "puesto" && otro.areaId === item.id);
 }
 

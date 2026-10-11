@@ -16,7 +16,7 @@ type CuentaEstado = Database["public"]["Enums"]["cuenta_estado"];
 type SolicitudEstado = Database["public"]["Enums"]["solicitud_estado"];
 type DocumentoEstado = Database["public"]["Enums"]["documento_estado"];
 
-const EMPLEADO = "profile_id, nombres, apellido, numero_legajo, profiles!inner(estado_cuenta)";
+const EMPLEADO = "profile_id, nombres, apellido, legajos_laborales(numero_legajo), profiles!inner(estado_cuenta)";
 
 export async function cargarBandeja(adminId: string): Promise<ItemBandeja[] | null> {
   const supabase = await createClient();
@@ -60,7 +60,7 @@ function empleadoDe(fila: EmpleadoFila): Empleado {
     profileId: fila.profile_id,
     nombres: fila.nombres,
     apellido: fila.apellido,
-    numeroLegajo: fila.numero_legajo,
+    numeroLegajo: fila.legajos_laborales?.numero_legajo ?? null,
     estadoCuenta: fila.profiles.estado_cuenta,
   };
 }
@@ -88,7 +88,7 @@ export async function cargarSolicitud(id: string): Promise<SolicitudBandeja | "n
   if (!data) return "no-encontrado";
 
   const [legajo, hijos] = await Promise.all([
-    supabase.from("legajos").select(`*, profiles!inner(estado_cuenta)`).eq("id", data.legajo_id).maybeSingle(),
+    supabase.from("legajos").select(`*, legajos_laborales(numero_legajo), profiles!inner(estado_cuenta)`).eq("id", data.legajo_id).maybeSingle(),
     supabase
       .from("legajo_hijos")
       .select("nombre_completo, fecha_nacimiento")
@@ -98,13 +98,13 @@ export async function cargarSolicitud(id: string): Promise<SolicitudBandeja | "n
   ]);
   if (legajo.error || !legajo.data || hijos.error) return null;
 
-  const { profiles, ...fila } = legajo.data;
+  const { profiles, legajos_laborales, ...fila } = legajo.data;
   return {
     id: data.id,
     estado: data.estado,
     enviadoEn: data.created_at,
     items: data.solicitudes_cambio_items.map((item) => ({ campo: item.campo, valorPropuesto: item.valor_propuesto })),
-    empleado: empleadoDe({ ...fila, profiles }),
+    empleado: empleadoDe({ ...fila, legajos_laborales, profiles }),
     actual: { ...fila, hijos: hijos.data ?? [] },
   };
 }

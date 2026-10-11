@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
+import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { Button, buttonClassName } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Field } from "@/components/ui/Field";
@@ -35,12 +35,15 @@ type Aviso = { ok: boolean; texto: string } | null;
 
 type ConfiguracionScreenProps = {
   items: CatalogoItem[];
+  // Ids of the items some legajo references: in use, so not deletable.
+  enUsoIds: string[];
   listaFallo: boolean;
   listaInicial: CatalogoLista;
 };
 
-export function ConfiguracionScreen({ items, listaFallo, listaInicial }: ConfiguracionScreenProps) {
+export function ConfiguracionScreen({ items, enUsoIds, listaFallo, listaInicial }: ConfiguracionScreenProps) {
   const router = useRouter();
+  const referenciados = useMemo(() => new Set(enUsoIds), [enUsoIds]);
   const [lista, setLista] = useState<CatalogoLista>(listaInicial);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [aviso, setAviso] = useState<Aviso>(null);
@@ -127,7 +130,7 @@ export function ConfiguracionScreen({ items, listaFallo, listaInicial }: Configu
                         {area.activo ? null : <StatusBadge label={t.estados.inactivo} tone="secondary" />}
                       </div>
                       {area.activo ? null : <p className="text-[12.5px] italic text-ink-soft">{t.areaInactiva}</p>}
-                      <ListaItems items={items} grupo={itemsDeGrupo(items, "puesto", area.id)} vacio={t.areaVacia} acciones={acciones} />
+                      <ListaItems items={items} referenciados={referenciados} grupo={itemsDeGrupo(items, "puesto", area.id)} vacio={t.areaVacia} acciones={acciones} />
                       <AgregarForm
                         key={`puesto-${area.id}`}
                         items={items}
@@ -147,7 +150,7 @@ export function ConfiguracionScreen({ items, listaFallo, listaInicial }: Configu
                 </>
               ) : (
                 <>
-                  <ListaItems items={items} grupo={itemsDeGrupo(items, lista)} vacio={t.vacio} acciones={acciones} />
+                  <ListaItems items={items} referenciados={referenciados} grupo={itemsDeGrupo(items, lista)} vacio={t.vacio} acciones={acciones} />
                   <AgregarForm
                     key={lista}
                     items={items}
@@ -216,11 +219,13 @@ type AccionesItem = {
 
 function ListaItems({
   items,
+  referenciados,
   grupo,
   vacio,
   acciones,
 }: {
   items: CatalogoItem[];
+  referenciados: ReadonlySet<string>;
   grupo: CatalogoItem[];
   vacio: string;
   acciones: AccionesItem;
@@ -253,7 +258,7 @@ function ListaItems({
                 {t.acciones.reactivar}
               </Button>
             )}
-            {enUso(items, item) ? null : (
+            {enUso(items, item, referenciados) ? null : (
               <Button variant="secondary" disabled={acciones.pending} onClick={() => acciones.abrir("eliminar", item)}>
                 {t.acciones.eliminar}
               </Button>

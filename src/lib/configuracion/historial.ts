@@ -55,14 +55,20 @@ export function nombresDeActores(cuentas: readonly { id: string; nombre: string 
   return nombres;
 }
 
-// nombres: from nombresDeActores. An actor it cannot name is shown with the
-// fallback copy, never with their id.
+// The actor as a page shows them (Configuración and Usuarios histories): an
+// actor that nombres cannot name is shown with the fallback copy, never with
+// their id.
+export function nombreDeActor(nombres: ReadonlyMap<string, string>, actorId: string): string {
+  return nombres.get(actorId) ?? t.usuarioNoDisponible;
+}
+
+// nombres: from nombresDeActores.
 export function filaHistorial(evento: EventoCatalogo, nombres: ReadonlyMap<string, string>): FilaHistorial {
   const lista = copy.configuracion.listas[evento.lista];
   return {
     id: evento.id,
     fecha: formatearFechaHora(evento.fecha),
-    usuario: nombres.get(evento.actorId) ?? t.usuarioNoDisponible,
+    usuario: nombreDeActor(nombres, evento.actorId),
     lista: evento.areaNombre ? formatCopy(t.listaConArea, { lista, area: evento.areaNombre }) : lista,
     item: evento.itemNombre,
     accion: t.acciones[evento.accion],

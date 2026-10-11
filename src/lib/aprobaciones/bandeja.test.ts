@@ -6,7 +6,7 @@ const empleado = (id: string, estado: "activa" | "inactiva" = "activa"): Emplead
   profile_id: id,
   nombres: "Prueba",
   apellido: id,
-  numero_legajo: `L-${id}`,
+  legajos_laborales: { numero_legajo: `L-${id}` },
   profiles: { estado_cuenta: estado },
 });
 

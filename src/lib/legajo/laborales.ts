@@ -1,59 +1,139 @@
+import { copy } from "@/lib/copy/es-AR";
+import { formatCopy } from "@/lib/copy/format";
+import { disponibleParaSeleccion, opcionesDisponibles, type CatalogoItem, type CatalogoLista } from "@/lib/configuracion/listas";
 import type { Database } from "@/lib/supabase/database.types";
+import { datosLaboralesSchema, fieldErrors, type DatosLaborales } from "./validation";
 
-// Group E form helpers for /legajos (PRD 5.5). Pure. The server validates
-// with datosLaboralesSchema (./validation.ts); these only turn form text
-// into the values that schema reads. Antigüedad is calculated, never a field.
+// Group E (PRD 5.5), Admin only: the form of /legajos/[id] and the shared
+// validator its action and form both run. Pure. Área, Puesto, Sucursal,
+// Tarea, Convenio and Categoría are items of the Configuración lists, stored
+// by id. Antigüedad is calculated, never a field.
 
-type LegajoRow = Database["public"]["Tables"]["legajos"]["Row"];
+export type LaboralRow = Database["public"]["Tables"]["legajos_laborales"]["Row"];
 
 export const CAMPOS_LABORALES = [
   "numero_legajo",
-  "area",
-  "puesto",
+  "area_id",
+  "puesto_id",
   "fecha_ingreso",
   "estado_laboral",
-  "sede",
-  "modalidad",
-  "convenio",
-  "bruto_mensual",
+  "sucursal_id",
+  "tarea_id",
+  "convenio_id",
+  "categoria_id",
 ] as const;
 export type CampoLaboral = (typeof CAMPOS_LABORALES)[number];
 
+// The list behind each dropdown field.
+export const LISTA_DE_CAMPO = {
+  area_id: "area",
+  puesto_id: "puesto",
+  sucursal_id: "sucursal",
+  tarea_id: "tarea",
+  convenio_id: "convenio",
+  categoria_id: "categoria",
+} as const satisfies Partial<Record<CampoLaboral, CatalogoLista>>;
+export type CampoLista = keyof typeof LISTA_DE_CAMPO;
+export const CAMPOS_LISTA = Object.keys(LISTA_DE_CAMPO) as CampoLista[];
+
+export function esCampoLista(campo: CampoLaboral): campo is CampoLista {
+  return campo in LISTA_DE_CAMPO;
+}
+
+// PRD 5.7. The database refuses a group E write without them
+// (legajos_laborales_validar).
+export const CAMPOS_OBLIGATORIOS: ReadonlySet<CampoLaboral> = new Set([
+  "numero_legajo",
+  "area_id",
+  "puesto_id",
+  "fecha_ingreso",
+  "estado_laboral",
+  "sucursal_id",
+]);
+
+// The current values of a legajo's group E (null fields as nothing chosen).
+export type ActualLaboral = Partial<Record<CampoLaboral, string | null>>;
+
 export type FormLaboral = Record<CampoLaboral, string>;
 
-export function formLaboralInicial(legajo: Pick<LegajoRow, CampoLaboral>): FormLaboral {
+export function formLaboralInicial(actual: ActualLaboral | null): FormLaboral {
   const form = {} as FormLaboral;
-  for (const campo of CAMPOS_LABORALES) {
-    const valor = legajo[campo];
-    form[campo] = valor === null || valor === undefined ? "" : String(valor);
-  }
+  for (const campo of CAMPOS_LABORALES) form[campo] = actual?.[campo] ?? "";
   return form;
 }
 
-// "850000", "850000.50", "850.000", "850.000,50" or "850000,5" -> a number.
-// Empty -> undefined (the schema says it is required); anything else -> NaN
-// (the schema says it is not a valid number). A leading "-" is kept so the
-// schema can say it cannot be negative.
-export function parseMonto(texto: string): number | undefined {
-  const limpio = texto.replace(/[\s$]/g, "");
-  if (!limpio) return undefined;
-  let normal: string;
-  if (limpio.includes(",")) {
-    normal = limpio.replace(/\./g, "").replace(",", ".");
-  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(limpio)) {
-    // es-AR thousands separators.
-    normal = limpio.replace(/\./g, "");
-  } else {
-    normal = limpio;
-  }
-  return /^-?\d+(\.\d+)?$/.test(normal) ? Number(normal) : Number.NaN;
+// The values datosLaboralesSchema validates: a select left empty is null.
+export function valoresLaborales(form: FormLaboral): Record<string, unknown> {
+  const valores: Record<string, unknown> = { ...form };
+  for (const campo of CAMPOS_LISTA) valores[campo] = form[campo] || null;
+  valores.estado_laboral = form.estado_laboral || undefined;
+  return valores;
 }
 
-// The values datosLaboralesSchema validates.
-export function valoresLaborales(form: FormLaboral): Record<string, unknown> {
-  return {
-    ...form,
-    estado_laboral: form.estado_laboral || undefined,
-    bruto_mensual: parseMonto(form.bruto_mensual),
-  };
+// A name as the Admin reads it: an inactive item is marked.
+export function nombreItem(item: CatalogoItem): string {
+  return item.activo ? item.nombre : formatCopy(copy.legajos.laborales.inactivo, { nombre: item.nombre });
+}
+
+export type Opcion = { value: string; label: string };
+
+// A dropdown's options: the items offered for a new selection, in
+// Configuración order (for Puesto, of the chosen Área), plus the legajo's
+// current item when it is no longer offered, marked "(inactivo)".
+export function opcionesCampo(
+  items: readonly CatalogoItem[],
+  campo: CampoLista,
+  { actual, areaId }: { actual: string | null | undefined; areaId?: string | null },
+): Opcion[] {
+  const lista = LISTA_DE_CAMPO[campo];
+  if (lista === "puesto" && !areaId) return [];
+  const opciones = opcionesDisponibles(items, lista, lista === "puesto" ? (areaId ?? null) : null).map((item) => ({
+    value: item.id,
+    label: item.nombre,
+  }));
+  const vigente = actual ? items.find((item) => item.id === actual && item.lista === lista) : undefined;
+  if (vigente && !opciones.some((opcion) => opcion.value === vigente.id)) {
+    // A Puesto only within its own Área.
+    if (lista !== "puesto" || vigente.areaId === areaId) {
+      opciones.push({ value: vigente.id, label: formatCopy(copy.legajos.laborales.inactivo, { nombre: vigente.nombre }) });
+    }
+  }
+  return opciones;
+}
+
+export type ValidacionLaboral =
+  | { ok: true; datos: DatosLaborales }
+  | { ok: false; fieldErrors: Record<string, string> };
+
+const v = copy.legajo.validation;
+
+// The shared validator (PRD 5.7) of the Admin form and its action: the field
+// rules, then the lists. Each id must be an item of its own list, and the
+// Puesto one of the chosen Área. An item may be newly chosen only while it
+// is offered (active; for a Puesto, its Área active too). The legajo's
+// current item stays valid on a save that keeps it.
+export function validarDatosLaborales(
+  valores: unknown,
+  items: readonly CatalogoItem[],
+  actual: ActualLaboral | null,
+): ValidacionLaboral {
+  const parsed = datosLaboralesSchema.safeParse(valores);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error) };
+  const datos = parsed.data;
+  const errores: Record<string, string> = {};
+
+  for (const campo of CAMPOS_LISTA) {
+    const id = datos[campo];
+    if (!id) continue;
+    const item = items.find((candidato) => candidato.id === id);
+    if (!item || item.lista !== LISTA_DE_CAMPO[campo]) {
+      errores[campo] = v.optionInvalid;
+    } else if (campo === "puesto_id" && item.areaId !== datos.area_id) {
+      errores[campo] = v.puestoFueraDeArea;
+    } else if (id !== actual?.[campo] && !disponibleParaSeleccion(items, item)) {
+      errores[campo] = v.itemInactivo;
+    }
+  }
+
+  return Object.keys(errores).length > 0 ? { ok: false, fieldErrors: errores } : { ok: true, datos };
 }

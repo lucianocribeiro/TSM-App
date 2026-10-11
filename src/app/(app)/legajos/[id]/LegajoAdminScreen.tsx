@@ -6,12 +6,13 @@ import { Banner } from "@/components/ui/Banner";
 import { buttonClassName } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import type { LegajoActual } from "@/lib/aprobaciones/solicitudes";
+import type { CatalogoItem } from "@/lib/configuracion/listas";
 import { copy } from "@/lib/copy/es-AR";
 import type { HistorialTipo } from "@/lib/documentos/historial";
 import type { ResumenDocumento } from "@/lib/documentos/resumen";
 import { grupoBloqueado } from "@/lib/legajo/bloqueo";
 import { GRUPOS_EDITABLES, type GrupoEditable } from "@/lib/legajo/grupos";
-import type { FormLaboral } from "@/lib/legajo/laborales";
+import type { ActualLaboral, FormLaboral } from "@/lib/legajo/laborales";
 import type { SolicitudActual } from "@/lib/legajo/mi-legajo";
 import type { DatoLaboral } from "@/lib/legajo/vista";
 import type { Database } from "@/lib/supabase/database.types";
@@ -40,6 +41,9 @@ type LegajoAdminScreenProps = {
   solicitud: SolicitudActual | null;
   laborales: DatoLaboral[];
   formLaboral: FormLaboral;
+  actualLaboral: ActualLaboral | null;
+  // The Configuración lists, for the group E dropdowns.
+  items: CatalogoItem[];
   documentos: ResumenDocumento[];
   // Replaced versions, by type (Admin only).
   historial: HistorialTipo[];
@@ -54,6 +58,8 @@ export function LegajoAdminScreen({
   solicitud,
   laborales,
   formLaboral,
+  actualLaboral,
+  items,
   documentos,
   historial,
 }: LegajoAdminScreenProps) {
@@ -131,7 +137,14 @@ export function LegajoAdminScreen({
           />
         ))}
 
-        <GrupoLaboralPanel profileId={profileId} laborales={laborales} inicial={formLaboral} onGuardado={setAviso} />
+        <GrupoLaboralPanel
+          profileId={profileId}
+          laborales={laborales}
+          inicial={formLaboral}
+          actual={actualLaboral}
+          items={items}
+          onGuardado={setAviso}
+        />
 
         <DocumentosSection
           documentos={documentos}

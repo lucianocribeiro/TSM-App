@@ -183,19 +183,27 @@ export const legajoPersonalSchema = z
 // ---------------------------------------------------------------------------
 // Group E: Datos laborales (Admin only)
 // ---------------------------------------------------------------------------
+// Área, Puesto, Sucursal, Tarea, Convenio and Categoría are list item ids;
+// that each one is an item of its list (and the Puesto of the Área) is
+// checked against the lists by validarDatosLaborales (./laborales.ts).
+const requiredId = () => requiredText().pipe(z.uuid({ error: messages.optionInvalid }));
+const optionalId = () =>
+  z
+    .string({ error: messages.optionInvalid })
+    .nullish()
+    .transform((value) => value || null)
+    .pipe(z.uuid({ error: messages.optionInvalid }).nullable());
+
 export const datosLaboralesSchema = z.object({
   numero_legajo: requiredText(),
-  area: requiredText(),
-  puesto: requiredText(),
+  area_id: requiredId(),
+  puesto_id: requiredId(),
   fecha_ingreso: requiredPastDate(),
   estado_laboral: option(ESTADOS_LABORALES),
-  sede: requiredText(),
-  modalidad: requiredText(),
-  convenio: requiredText(),
-  bruto_mensual: z
-    .number({ error: (issue) => (issue.input === undefined || issue.input === null ? messages.required : messages.numberInvalid) })
-    .refine(Number.isFinite, { error: messages.numberInvalid })
-    .min(0, { error: messages.brutoMensualNegative }),
+  sucursal_id: requiredId(),
+  tarea_id: optionalId(),
+  convenio_id: optionalId(),
+  categoria_id: optionalId(),
 });
 
 export type LegajoPersonalInput = z.input<typeof legajoPersonalSchema>;

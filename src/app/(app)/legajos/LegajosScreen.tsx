@@ -14,10 +14,12 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { rowClassName, Table, Td, Th } from "@/components/ui/Table";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
+import type { CatalogoItem } from "@/lib/configuracion/listas";
+import type { Opcion } from "@/lib/legajo/laborales";
 import {
   filtrarLegajos,
   FILTROS_INICIALES,
-  opcionesDistintas,
+  opcionesFiltro,
   type FiltrosLegajos,
   type LegajoListItem,
 } from "@/lib/legajo/listado";
@@ -28,24 +30,26 @@ const t = copy.legajos;
 
 type LegajosScreenProps = {
   legajos: LegajoListItem[];
+  // The Configuración lists, for the filter options.
+  items: CatalogoItem[];
   listaFallo: boolean;
   // Whole workforce, from the server; null when the list could not be read.
   kpis: KpisLegajos | null;
 };
 
-export function LegajosScreen({ legajos, listaFallo, kpis }: LegajosScreenProps) {
+export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScreenProps) {
   const router = useRouter();
   const [filtros, setFiltros] = useState<FiltrosLegajos>(FILTROS_INICIALES);
 
   const visibles = useMemo(() => filtrarLegajos(legajos, filtros), [legajos, filtros]);
-  // Options from the values present (free text today).
+  // Options from Configuración (plus inactive items still in use).
   const opciones = useMemo(
     () => ({
-      area: opcionesDistintas(legajos, "area"),
-      sede: opcionesDistintas(legajos, "sede"),
-      modalidad: opcionesDistintas(legajos, "modalidad"),
+      area: opcionesFiltro(items, legajos, "area"),
+      sucursal: opcionesFiltro(items, legajos, "sucursal"),
+      tarea: opcionesFiltro(items, legajos, "tarea"),
     }),
-    [legajos],
+    [items, legajos],
   );
   // The total the count refers to: deactivated accounts only when shown.
   const total = filtros.mostrarBajas ? legajos.length : legajos.filter((item) => item.estadoCuenta === "activa").length;
@@ -88,14 +92,14 @@ export function LegajosScreen({ legajos, listaFallo, kpis }: LegajosScreenProps)
               }}
               options={ESTADOS_LABORALES.map((estado) => ({ value: estado, label: copy.miLegajo.estadosLaborales[estado] }))}
             />
-            <FiltroTexto label={t.filtros.area} opciones={opciones.area} value={filtros.area} onChange={(v) => set("area", v)} />
-            <FiltroTexto label={t.filtros.sede} opciones={opciones.sede} value={filtros.sede} onChange={(v) => set("sede", v)} />
-            <FiltroTexto
-              label={t.filtros.modalidad}
-              opciones={opciones.modalidad}
-              value={filtros.modalidad}
-              onChange={(v) => set("modalidad", v)}
+            <FiltroLista label={t.filtros.area} opciones={opciones.area} value={filtros.areaId} onChange={(v) => set("areaId", v)} />
+            <FiltroLista
+              label={t.filtros.sucursal}
+              opciones={opciones.sucursal}
+              value={filtros.sucursalId}
+              onChange={(v) => set("sucursalId", v)}
             />
+            <FiltroLista label={t.filtros.tarea} opciones={opciones.tarea} value={filtros.tareaId} onChange={(v) => set("tareaId", v)} />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Checkbox
@@ -136,8 +140,8 @@ export function LegajosScreen({ legajos, listaFallo, kpis }: LegajosScreenProps)
                 <Th>{t.columnas.cuil}</Th>
                 <Th>{t.columnas.area}</Th>
                 <Th>{t.columnas.puesto}</Th>
-                <Th>{t.columnas.sede}</Th>
-                <Th>{t.columnas.modalidad}</Th>
+                <Th>{t.columnas.sucursal}</Th>
+                <Th>{t.columnas.tarea}</Th>
                 <Th>{t.columnas.estadoLaboral}</Th>
               </tr>
             </thead>
@@ -153,14 +157,14 @@ export function LegajosScreen({ legajos, listaFallo, kpis }: LegajosScreenProps)
   );
 }
 
-function FiltroTexto({
+function FiltroLista({
   label,
   opciones,
   value,
   onChange,
 }: {
   label: string;
-  opciones: string[];
+  opciones: Opcion[];
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -170,7 +174,7 @@ function FiltroTexto({
       placeholder={t.filtros.todas}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      options={opciones.map((opcion) => ({ value: opcion, label: opcion }))}
+      options={opciones}
     />
   );
 }
@@ -208,8 +212,8 @@ function LegajoRow({ item, onOpen }: { item: LegajoListItem; onOpen: (href: stri
       <Td className="whitespace-nowrap tabular-nums text-ink-soft">{dato(item.cuil)}</Td>
       <Td className="text-ink-soft">{dato(item.area)}</Td>
       <Td className="text-ink-soft">{dato(item.puesto)}</Td>
-      <Td className="text-ink-soft">{dato(item.sede)}</Td>
-      <Td className="text-ink-soft">{dato(item.modalidad)}</Td>
+      <Td className="text-ink-soft">{dato(item.sucursal)}</Td>
+      <Td className="text-ink-soft">{dato(item.tarea)}</Td>
       <Td>
         {item.estadoLaboral ? (
           <StatusBadge

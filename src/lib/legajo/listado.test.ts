@@ -1,12 +1,28 @@
 import { describe, expect, it } from "vitest";
+import type { CatalogoItem, CatalogoLista } from "@/lib/configuracion/listas";
 import {
   coincideBusqueda,
   filtrarLegajos,
   FILTROS_INICIALES,
   itemDesdeFila,
-  opcionesDistintas,
+  opcionesFiltro,
   type LegajoListItem,
 } from "./listado";
+
+function catalogo(id: string, lista: CatalogoLista, nombre: string, extra: Partial<CatalogoItem> = {}): CatalogoItem {
+  return { id, lista, nombre, areaId: null, posicion: 1, activo: true, version: 1, ...extra };
+}
+const ITEMS = [
+  catalogo("area-ops", "area", "Operaciones", { posicion: 1 }),
+  catalogo("area-adm", "area", "Administración", { posicion: 2 }),
+  catalogo("area-vieja", "area", "Taller", { posicion: 3, activo: false }),
+  catalogo("area-sin-uso", "area", "Sin uso", { posicion: 4, activo: false }),
+  catalogo("puesto-chofer", "puesto", "Chofer", { areaId: "area-ops" }),
+  catalogo("suc-sm", "sucursal", "San Martín", { posicion: 1 }),
+  catalogo("suc-pilar", "sucursal", "Pilar", { posicion: 2 }),
+  catalogo("tarea-adm", "tarea", "Administrativo", { posicion: 1 }),
+  catalogo("tarea-caj", "tarea", "Cajero", { posicion: 2 }),
+];
 
 function item(overrides: Partial<LegajoListItem> = {}): LegajoListItem {
   return {
@@ -17,10 +33,13 @@ function item(overrides: Partial<LegajoListItem> = {}): LegajoListItem {
     dni: "30111222",
     cuil: "20-30111222-4",
     numeroLegajo: "L-0042",
+    areaId: "area-ops",
     area: "Operaciones",
     puesto: "Chofer",
-    sede: "San Martín",
-    modalidad: "Presencial",
+    sucursalId: "suc-sm",
+    sucursal: "San Martín",
+    tareaId: "tarea-adm",
+    tarea: "Administrativo",
     estadoLaboral: "activo",
     fechaIngreso: "2020-03-01",
     estadoCuenta: "activa",
@@ -29,24 +48,46 @@ function item(overrides: Partial<LegajoListItem> = {}): LegajoListItem {
 }
 
 describe("itemDesdeFila", () => {
-  it("builds the full name and keeps the account state", () => {
-    const fila = {
-      profile_id: "p9",
-      nombres: " Ana ",
-      apellido: "Gómez",
-      dni: null,
-      cuil: null,
-      numero_legajo: null,
-      area: null,
-      puesto: null,
-      sede: null,
-      modalidad: null,
-      estado_laboral: null,
-      fecha_ingreso: null,
-      estado_cuenta: "inactiva" as const,
-    };
-    expect(itemDesdeFila(fila)).toMatchObject({ profileId: "p9", nombre: "Ana Gómez", nombres: "Ana", estadoCuenta: "inactiva" });
-    expect(itemDesdeFila({ ...fila, nombres: null, apellido: "  " }).nombre).toBeNull();
+  const fila = {
+    profile_id: "p9",
+    nombres: " Ana ",
+    apellido: "Gómez",
+    dni: null,
+    cuil: null,
+    laboral: {
+      numero_legajo: "L-9",
+      area_id: "area-vieja",
+      puesto_id: "puesto-chofer",
+      sucursal_id: "suc-pilar",
+      tarea_id: null,
+      estado_laboral: "en_prueba" as const,
+      fecha_ingreso: "2024-01-02",
+    },
+    estado_cuenta: "inactiva" as const,
+  };
+
+  it("builds the full name, keeps the account state and names the list items (inactive marked)", () => {
+    expect(itemDesdeFila(fila, ITEMS)).toMatchObject({
+      profileId: "p9",
+      nombre: "Ana Gómez",
+      nombres: "Ana",
+      estadoCuenta: "inactiva",
+      numeroLegajo: "L-9",
+      areaId: "area-vieja",
+      area: "Taller (inactivo)",
+      puesto: "Chofer",
+      sucursalId: "suc-pilar",
+      sucursal: "Pilar",
+      tareaId: null,
+      tarea: null,
+      estadoLaboral: "en_prueba",
+      fechaIngreso: "2024-01-02",
+    });
+    expect(itemDesdeFila({ ...fila, nombres: null, apellido: "  " }, ITEMS).nombre).toBeNull();
+  });
+
+  it("leaves group E empty when the row is missing", () => {
+    expect(itemDesdeFila({ ...fila, laboral: null }, ITEMS)).toMatchObject({ numeroLegajo: null, areaId: null, area: null, estadoLaboral: null });
   });
 });
 
@@ -85,8 +126,8 @@ describe("coincideBusqueda", () => {
 
 describe("filtrarLegajos", () => {
   const items = [
-    item({ profileId: "a", nombre: "Ana Gómez", nombres: "Ana", apellido: "Gómez", area: "Administración", estadoLaboral: "en_prueba" }),
-    item({ profileId: "b", nombre: "Bruno Álvarez", nombres: "Bruno", apellido: "Álvarez", sede: "Pilar", modalidad: "Remota" }),
+    item({ profileId: "a", nombre: "Ana Gómez", nombres: "Ana", apellido: "Gómez", areaId: "area-adm", estadoLaboral: "en_prueba" }),
+    item({ profileId: "b", nombre: "Bruno Álvarez", nombres: "Bruno", apellido: "Álvarez", sucursalId: "suc-pilar", tareaId: "tarea-caj" }),
     item({ profileId: "c", nombre: "Carla Díaz", nombres: "Carla", apellido: "Díaz", estadoCuenta: "inactiva" }),
     item({ profileId: "d", nombre: null, nombres: null, apellido: null, numeroLegajo: null, estadoLaboral: null }),
   ];
@@ -97,12 +138,12 @@ describe("filtrarLegajos", () => {
     expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, mostrarBajas: true }))).toEqual(["b", "c", "a", "d"]);
   });
 
-  it("filters by estado laboral, área, sede and modalidad (text compared without case or accents)", () => {
+  it("filters by estado laboral, and by Área, Sucursal and Tarea item", () => {
     expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, estadoLaboral: "en_prueba" }))).toEqual(["a"]);
-    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, area: "administracion" }))).toEqual(["a"]);
-    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, sede: "Pilar" }))).toEqual(["b"]);
-    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, modalidad: "Remota" }))).toEqual(["b"]);
-    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, modalidad: "Remota", sede: "San Martín" }))).toEqual([]);
+    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, areaId: "area-adm" }))).toEqual(["a"]);
+    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, sucursalId: "suc-pilar" }))).toEqual(["b"]);
+    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, tareaId: "tarea-caj" }))).toEqual(["b"]);
+    expect(ids(filtrarLegajos(items, { ...FILTROS_INICIALES, tareaId: "tarea-caj", sucursalId: "suc-sm" }))).toEqual([]);
   });
 
   it("combines search, filters and the deactivated toggle", () => {
@@ -111,16 +152,15 @@ describe("filtrarLegajos", () => {
   });
 });
 
-describe("opcionesDistintas", () => {
-  it("returns trimmed distinct values, merging case and accents, sorted es-AR", () => {
-    const items = [
-      item({ area: "Operaciones" }),
-      item({ area: " operaciones " }),
-      item({ area: "Administración" }),
-      item({ area: "administracion" }),
-      item({ area: null }),
-      item({ area: "  " }),
-    ];
-    expect(opcionesDistintas(items, "area")).toEqual(["Administración", "Operaciones"]);
+describe("opcionesFiltro", () => {
+  it("offers the active items in Configuración order, plus inactive ones still in use, marked", () => {
+    const legajos = [item({ areaId: "area-vieja" }), item({ areaId: null })];
+    expect(opcionesFiltro(ITEMS, legajos, "area")).toEqual([
+      { value: "area-ops", label: "Operaciones" },
+      { value: "area-adm", label: "Administración" },
+      { value: "area-vieja", label: "Taller (inactivo)" },
+    ]);
+    expect(opcionesFiltro(ITEMS, legajos, "sucursal").map((o) => o.label)).toEqual(["San Martín", "Pilar"]);
+    expect(opcionesFiltro(ITEMS, legajos, "tarea").map((o) => o.label)).toEqual(["Administrativo", "Cajero"]);
   });
 });

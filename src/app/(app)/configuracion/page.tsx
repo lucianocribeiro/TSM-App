@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/auth/require-role";
-import { listarItems } from "@/lib/configuracion/datos";
+import { listarItems, listarItemsReferenciados } from "@/lib/configuracion/datos";
 import { esLista } from "@/lib/configuracion/listas";
 import { ConfiguracionScreen } from "./ConfiguracionScreen";
 
@@ -10,8 +10,14 @@ type ConfiguracionPageProps = { searchParams: Promise<{ lista?: string | string[
 // checks the role again. ?lista= picks the list shown.
 export default async function ConfiguracionPage({ searchParams }: ConfiguracionPageProps) {
   await requireRole("admin");
-  const [items, { lista }] = await Promise.all([listarItems(), searchParams]);
+  const [items, referenciados, { lista }] = await Promise.all([listarItems(), listarItemsReferenciados(), searchParams]);
+  const fallo = items === null || referenciados === null;
   return (
-    <ConfiguracionScreen items={items ?? []} listaFallo={items === null} listaInicial={esLista(lista) ? lista : "area"} />
+    <ConfiguracionScreen
+      items={fallo ? [] : items}
+      enUsoIds={fallo ? [] : [...referenciados]}
+      listaFallo={fallo}
+      listaInicial={esLista(lista) ? lista : "area"}
+    />
   );
 }

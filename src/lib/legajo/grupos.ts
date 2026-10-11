@@ -7,8 +7,8 @@ import {
 } from "./validation";
 
 // The editable groups of the legajo (PRD 5.1 to 5.4): their validation schema
-// and their fields, in page order. Group E (5.5) is read only for the
-// Empleado and has no entry here.
+// and their fields, in page order. Group E (5.5) is Admin only, in its own
+// table, and has no entry here (./laborales.ts).
 export type GrupoEditable = CampoGrupo;
 export const GRUPOS_EDITABLES: readonly GrupoEditable[] = ["A", "B", "C", "D"];
 

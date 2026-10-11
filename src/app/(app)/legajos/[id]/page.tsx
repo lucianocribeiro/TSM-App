@@ -68,8 +68,10 @@ export default async function LegajoPage({ params }: LegajoPageProps) {
       estadoCuenta={data.estadoCuenta}
       actual={{ ...legajo, hijos: data.hijos }}
       solicitud={data.solicitud}
-      laborales={datosLaboralesVista(legajo)}
-      formLaboral={formLaboralInicial(legajo)}
+      laborales={datosLaboralesVista(data.laboral, data.items)}
+      formLaboral={formLaboralInicial(data.laboral)}
+      actualLaboral={data.laboral}
+      items={data.items}
       documentos={resumirDocumentos(data.documentos)}
       historial={historialDocumentos(data.documentos, nombres)}
     />
