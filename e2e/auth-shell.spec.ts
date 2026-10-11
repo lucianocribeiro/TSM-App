@@ -89,10 +89,10 @@ test.describe("session and menu", () => {
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-empleado-dark.png`, fullPage: true });
   });
 
-  test("admin sees Mi Legajo, Legajos, Aprobaciones and Usuarios", async ({ page }) => {
+  test("admin sees Mi Legajo, Legajos, Aprobaciones, Usuarios and Configuración", async ({ page }) => {
     await loginAs(page, ADMIN);
 
-    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.aprobaciones, copy.nav.usuarios]);
+    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.aprobaciones, copy.nav.usuarios, copy.nav.configuracion]);
     const links = mainNav(page).getByRole("link");
     await expect(page.getByText(copy.auth.roles.admin, { exact: true })).toBeVisible();
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-light.png`, fullPage: true });
@@ -116,7 +116,7 @@ test.describe("session and menu", () => {
     await expect(nav).toBeHidden();
     await page.getByRole("button", { name: copy.common.openMenu }).click();
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveCount(4);
+    await expect(nav.getByRole("link")).toHaveCount(5);
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-mobile-menu.png` });
 
     await setThemeCookie(page, "dark");
