@@ -50,11 +50,21 @@ describe("route map", () => {
     expect(clasificarRuta("/")).toBe("autenticada");
     expect(clasificarRuta("/mi-legajo")).toBe("autenticada");
     expect(clasificarRuta("/cambiar-password")).toBe("autenticada");
-    for (const path of ["/legajos", "/legajos/", "/legajos/x", "/usuarios/x", "/aprobaciones/documentos/x", "/aprobaciones/otra/cosa"]) {
+    for (const path of [
+      "/legajos",
+      "/legajos/",
+      "/legajos/x",
+      "/usuarios/x",
+      "/aprobaciones/documentos/x",
+      "/aprobaciones/otra/cosa",
+      "/configuracion",
+      "/configuracion/historial",
+      "/configuracion/otra",
+    ]) {
       expect(clasificarRuta(path), path).toBe("admin");
     }
     // Default deny: anything else, including near misses.
-    for (const path of ["/legajos-x", "/mi-legajo/x", "/Login", "/login/x", "/api/x", "/aprobaciones-x"]) {
+    for (const path of ["/legajos-x", "/mi-legajo/x", "/Login", "/login/x", "/api/x", "/aprobaciones-x", "/configuracion-x"]) {
       expect(clasificarRuta(path), path).toBeNull();
     }
   });

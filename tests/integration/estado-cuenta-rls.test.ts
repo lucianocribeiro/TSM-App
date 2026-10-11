@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
 import type { Database } from "@/lib/supabase/database.types";
@@ -126,6 +127,8 @@ describe("account state at the database (GAP-01)", () => {
         c.from("solicitudes_cambio").select("id"),
         c.from("solicitudes_cambio_items").select("id"),
         c.from("cuenta_eventos").select("id"),
+        c.from("catalogo_items").select("id"),
+        c.from("catalogo_eventos").select("id"),
       ]);
       for (const listado of listados) {
         expect(listado.error).toBeNull();
@@ -226,6 +229,11 @@ describe("account state at the database (GAP-01)", () => {
       marcar_password_temporal: {
         esperado: "42501",
         llamar: (c, x) => c.rpc("marcar_password_temporal", { p_profile_id: x.victima.id }),
+      },
+      // The guard runs first, whatever the item.
+      mover_catalogo_item: {
+        esperado: "42501",
+        llamar: (c) => c.rpc("mover_catalogo_item", { p_item_id: randomUUID(), p_version: 1, p_direccion: "arriba" }),
       },
       pendientes_admin: { esperado: "42501", llamar: (c) => c.rpc("pendientes_admin") },
       purgar_cuenta: {

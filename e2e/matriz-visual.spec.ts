@@ -160,6 +160,23 @@ const PANTALLAS: Pantalla[] = [
     },
     lista: (page) => page.getByRole("heading", { level: 1, name: copy.usuarios.title }),
   },
+  // The longest list: Puestos, grouped by Área.
+  {
+    nombre: "configuracion",
+    abrir: async (page) => {
+      await loginAs(page, await adminNuevo("visual-configuracion", cuentas.add));
+      await page.goto("/configuracion?lista=puesto");
+    },
+    lista: (page) => page.getByRole("heading", { level: 2, name: copy.configuracion.titulos.puesto }),
+  },
+  {
+    nombre: "configuracion-historial",
+    abrir: async (page) => {
+      await loginAs(page, await adminNuevo("visual-configuracion-historial", cuentas.add));
+      await page.goto("/configuracion/historial");
+    },
+    lista: (page) => page.getByRole("heading", { level: 1, name: copy.configuracion.historial.title }),
+  },
 ];
 
 for (const pantalla of PANTALLAS) {

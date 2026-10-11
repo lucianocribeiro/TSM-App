@@ -50,6 +50,7 @@ const miLegajo = await import("@/app/(app)/mi-legajo/actions");
 const legajos = await import("@/app/(app)/legajos/actions");
 const aprobaciones = await import("@/app/(app)/aprobaciones/actions");
 const usuarios = await import("@/app/(app)/usuarios/actions");
+const configuracion = await import("@/app/(app)/configuracion/actions");
 const auth = await import("@/lib/auth/actions");
 
 const noAutorizado = { ok: false, error: copy.cuentas.errors.noAutorizado };
@@ -58,6 +59,7 @@ const fallo = (error: string) => ({ ok: false, error });
 const docErrors = copy.miLegajo.documentos.errors;
 const apErrors = copy.aprobaciones.errors;
 const cuentaErrors = copy.cuentas.errors;
+const configErrors = copy.configuracion.errors;
 const TEMPORAL = "Temporal-2026";
 
 const GRUPO_D = {
@@ -118,10 +120,27 @@ const SIN_ID = "takes no id: it acts on the caller's own legajo or folder, from 
 const GLOBAL = "an Admin reaches every employee's items by design";
 let emailIntento = "";
 
+// The Configuración lists are global: no employee owns an item, and an
+// Admin reaches every item by design. The fixture item, created in
+// beforeAll, must be exactly as it was after every refused call, with no
+// history; and a refused addition must leave no item behind.
+const CATALOGO = "the lists are global: no employee owns an item, and an Admin reaches every item by design";
+const MARCA_CATALOGO = `Frontera ${Date.now()}`;
+let itemFrontera = { id: "", version: 1 };
+let itemFronteraAntes: unknown = null;
+async function catalogoSinCambios() {
+  const service = serviceClient();
+  const { data: items } = await service.from("catalogo_items").select("*").like("nombre", `${MARCA_CATALOGO}%`);
+  expect(items).toEqual([itemFronteraAntes]);
+  const { data: eventos } = await service.from("catalogo_eventos").select("id").like("item_nombre", `${MARCA_CATALOGO}%`);
+  expect(eventos).toEqual([]);
+}
+
 const M = "app/(app)/mi-legajo/actions.ts#";
 const A = "app/(app)/aprobaciones/actions.ts#";
 const L = "app/(app)/legajos/actions.ts#";
 const U = "app/(app)/usuarios/actions.ts#";
+const C = "app/(app)/configuracion/actions.ts#";
 const S = "lib/auth/actions.ts#";
 
 const CASOS: Record<string, Caso> = {
@@ -377,6 +396,56 @@ const CASOS: Record<string, Caso> = {
     invalido: { llamar: () => usuarios.purgarCuentaAction({}), esperado: fallo(cuentaErrors.accionFallo) },
   },
 
+  // /configuracion
+  [`${C}agregarItem`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.agregarItem({ lista: "tarea", nombre: `${MARCA_CATALOGO} intento` }),
+    invalido: { llamar: () => configuracion.agregarItem({ lista: "otra", nombre: "Intento" }), esperado: fallo(configErrors.accionFallo) },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
+  [`${C}renombrarItem`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.renombrarItem({ ...itemFrontera, nombre: `${MARCA_CATALOGO} cambiado` }),
+    invalido: { llamar: () => configuracion.renombrarItem({ id: "x", version: 1, nombre: "Intento" }), esperado: fallo(configErrors.accionFallo) },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
+  [`${C}desactivarItem`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.desactivarItem(itemFrontera),
+    invalido: { llamar: () => configuracion.desactivarItem({ id: "x", version: 1 }), esperado: fallo(configErrors.accionFallo) },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
+  [`${C}reactivarItem`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.reactivarItem(itemFrontera),
+    invalido: { llamar: () => configuracion.reactivarItem({ id: "x", version: 0 }), esperado: fallo(configErrors.accionFallo) },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
+  [`${C}moverItem`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.moverItem({ ...itemFrontera, direccion: "arriba" }),
+    invalido: { llamar: () => configuracion.moverItem({ ...itemFrontera, direccion: "costado" }), esperado: fallo(configErrors.accionFallo) },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
+  [`${C}eliminarItem`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.eliminarItem(itemFrontera),
+    invalido: { llamar: () => configuracion.eliminarItem({ id: "x" }), esperado: fallo(configErrors.accionFallo) },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
+
   // Session and the intentional exceptions (their own describe blocks).
   [`${S}mantenerSesion`]: { clase: "sesion", llamar: () => auth.mantenerSesion() },
   [`${S}login`]: { clase: "publica", llamar: () => auth.login(null, form({})) },
@@ -410,10 +479,20 @@ describe("action boundary matrix (GAP-04)", () => {
     for (const user of [admin, empleado, victima, desactivado, adminDesactivado, forzado, adminForzado]) {
       semillas.set(user.id, await sembrar(service, user, admin.id));
     }
+    const { data: item, error } = await service
+      .from("catalogo_items")
+      .insert({ lista: "tarea", nombre: MARCA_CATALOGO })
+      .select("*")
+      .single();
+    if (error || !item) throw new Error(`catalog fixture failed: ${error?.message}`);
+    itemFrontera = { id: item.id, version: item.version };
+    itemFronteraAntes = item;
   }, 120_000);
 
   afterAll(async () => {
     session.client = null;
+    await service.from("catalogo_eventos").delete().like("item_nombre", `${MARCA_CATALOGO}%`);
+    await service.from("catalogo_items").delete().like("nombre", `${MARCA_CATALOGO}%`);
     await deleteTestUsers(service, [
       ...otros,
       empleado.id,
@@ -447,11 +526,11 @@ describe("action boundary matrix (GAP-04)", () => {
     return resultado;
   }
 
-  it("covers exactly the inventory's actions (31), each with every applicable column or a reason", () => {
+  it("covers exactly the inventory's actions (37), each with every applicable column or a reason", () => {
     const claves = inventarioAcciones()
       .map((accion) => accion.clave)
       .sort();
-    expect(claves).toHaveLength(31);
+    expect(claves).toHaveLength(37);
     expect(Object.keys(CASOS).sort()).toEqual(claves);
     for (const [clave, caso] of Object.entries(CASOS)) {
       if (caso.clase !== "empleado" && caso.clase !== "admin") continue;

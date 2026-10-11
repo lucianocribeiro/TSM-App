@@ -1,6 +1,6 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.6 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
-Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6). v0.6 — Security contract for account state (§4, §10): an inactive account is refused by the database, except reading its own profile; a pending forced password change is enforced by the app, not the database, by design.
+Version: 0.7 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6). v0.6 — Security contract for account state (§4, §10): an inactive account is refused by the database, except reading its own profile; a pending forced password change is enforced by the app, not the database, by design. v0.7 — Configuración (Admin only) added to the Fase 1 menu (§6): the Admin-maintained lists used by the legajo, with their change history.
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -46,6 +46,7 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - Legajos (Admin only).
 - Aprobaciones (Admin only): the approvals inbox; also reached from the pending-approvals indicator.
 - Usuarios (Admin only).
+- Configuración (Admin only): the lists used by the legajo (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) and their change history.
 - Later phases add: Mis Recibos / Recibos, Licencias, Comunicados.
 
 ## 7. Brand and UI

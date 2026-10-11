@@ -124,7 +124,7 @@ test.describe("voluntary password change", () => {
       await expect(page.getByText(copy.password.introVoluntaria)).toBeVisible();
       await expect(page.getByLabel(copy.password.actualLabel, { exact: true })).toBeVisible();
       await expect(page.locator('form input:not([type="hidden"])')).toHaveCount(3);
-      await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.aprobaciones, copy.nav.usuarios]);
+      await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.legajos, copy.nav.aprobaciones, copy.nav.usuarios, copy.nav.configuracion]);
 
       const html = page.locator("html");
       await expect(html).toHaveAttribute("data-theme", "light");

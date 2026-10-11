@@ -9,6 +9,106 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      catalogo_eventos: {
+        Row: {
+          accion: Database["public"]["Enums"]["catalogo_accion"]
+          actor_id: string
+          area_nombre: string | null
+          created_at: string
+          id: string
+          item_id: string
+          item_nombre: string
+          lista: Database["public"]["Enums"]["catalogo_lista"]
+          secuencia: number
+          valor_anterior: string | null
+          valor_nuevo: string | null
+        }
+        Insert: {
+          accion: Database["public"]["Enums"]["catalogo_accion"]
+          actor_id: string
+          area_nombre?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          item_nombre: string
+          lista: Database["public"]["Enums"]["catalogo_lista"]
+          secuencia?: never
+          valor_anterior?: string | null
+          valor_nuevo?: string | null
+        }
+        Update: {
+          accion?: Database["public"]["Enums"]["catalogo_accion"]
+          actor_id?: string
+          area_nombre?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          item_nombre?: string
+          lista?: Database["public"]["Enums"]["catalogo_lista"]
+          secuencia?: never
+          valor_anterior?: string | null
+          valor_nuevo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogo_eventos_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalogo_items: {
+        Row: {
+          activo: boolean
+          area_id: string | null
+          area_lista: Database["public"]["Enums"]["catalogo_lista"] | null
+          clave: string | null
+          created_at: string
+          id: string
+          lista: Database["public"]["Enums"]["catalogo_lista"]
+          nombre: string
+          posicion: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          activo?: boolean
+          area_id?: string | null
+          area_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          clave?: string | null
+          created_at?: string
+          id?: string
+          lista: Database["public"]["Enums"]["catalogo_lista"]
+          nombre: string
+          posicion?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          activo?: boolean
+          area_id?: string | null
+          area_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          clave?: string | null
+          created_at?: string
+          id?: string
+          lista?: Database["public"]["Enums"]["catalogo_lista"]
+          nombre?: string
+          posicion?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogo_items_area_fkey"
+            columns: ["area_id", "area_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
+          },
+        ]
+      }
       cuenta_eventos: {
         Row: {
           actor_id: string
@@ -474,6 +574,10 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: undefined
       }
+      mover_catalogo_item: {
+        Args: { p_direccion: string; p_item_id: string; p_version: number }
+        Returns: undefined
+      }
       pendientes_admin: {
         Args: never
         Returns: {
@@ -516,6 +620,20 @@ export type Database = {
     }
     Enums: {
       app_role: "empleado" | "admin"
+      catalogo_accion:
+        | "alta"
+        | "renombre"
+        | "reorden"
+        | "desactivacion"
+        | "reactivacion"
+        | "baja"
+      catalogo_lista:
+        | "area"
+        | "puesto"
+        | "sucursal"
+        | "convenio"
+        | "tarea"
+        | "categoria"
       cuenta_estado: "activa" | "inactiva"
       cuenta_evento_tipo:
         | "creacion"
@@ -661,6 +779,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["empleado", "admin"],
+      catalogo_accion: [
+        "alta",
+        "renombre",
+        "reorden",
+        "desactivacion",
+        "reactivacion",
+        "baja",
+      ],
+      catalogo_lista: [
+        "area",
+        "puesto",
+        "sucursal",
+        "convenio",
+        "tarea",
+        "categoria",
+      ],
       cuenta_estado: ["activa", "inactiva"],
       cuenta_evento_tipo: [
         "creacion",

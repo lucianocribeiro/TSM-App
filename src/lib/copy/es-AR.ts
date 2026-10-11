@@ -40,6 +40,7 @@ export type Copy = {
     legajos: string;
     usuarios: string;
     aprobaciones: string;
+    configuracion: string;
     cambiarPassword: string;
   };
   sesion: {
@@ -605,6 +606,108 @@ export type Copy = {
       accionFallo: string;
     };
   };
+  configuracion: {
+    kicker: string;
+    title: string;
+    intro: string;
+    loading: string;
+    listaFallo: string;
+    selectorLabel: string;
+    // Singular: a list's name (history).
+    listas: Record<"area" | "puesto" | "sucursal" | "convenio" | "tarea" | "categoria", string>;
+    // Plural: the selector and the panel heading.
+    titulos: Record<"area" | "puesto" | "sucursal" | "convenio" | "tarea" | "categoria", string>;
+    puestoHint: string;
+    estados: {
+      activo: string;
+      inactivo: string;
+    };
+    vacio: string;
+    areaVacia: string;
+    areaInactiva: string;
+    sinAreas: string;
+    nombreHint: string;
+    agregar: {
+      label: string;
+      labelPuesto: string;
+      submit: string;
+      submitting: string;
+    };
+    acciones: {
+      grupo: string;
+      subir: string;
+      bajar: string;
+      renombrar: string;
+      desactivar: string;
+      reactivar: string;
+      eliminar: string;
+      cancelar: string;
+      verHistorial: string;
+      volver: string;
+    };
+    renombrar: {
+      title: string;
+      label: string;
+      hint: string;
+      confirm: string;
+      saving: string;
+    };
+    desactivar: {
+      title: string;
+      body: string;
+      bodyArea: string;
+      confirm: string;
+    };
+    eliminar: {
+      title: string;
+      body: string;
+      confirm: string;
+    };
+    exito: {
+      agregado: string;
+      renombrado: string;
+      desactivado: string;
+      reactivado: string;
+      movido: string;
+      eliminado: string;
+    };
+    errors: {
+      nombreVacio: string;
+      nombreLargo: string;
+      nombreDuplicado: string;
+      nombreDuplicadoPuesto: string;
+      enUso: string;
+      cambioConcurrente: string;
+      noEncontrado: string;
+      extremo: string;
+      areaInvalida: string;
+      accionFallo: string;
+    };
+    historial: {
+      kicker: string;
+      title: string;
+      intro: string;
+      loading: string;
+      vacio: string;
+      fallo: string;
+      limite: string;
+      columnas: {
+        fecha: string;
+        usuario: string;
+        lista: string;
+        item: string;
+        accion: string;
+        antes: string;
+        despues: string;
+      };
+      acciones: Record<"alta" | "renombre" | "reorden" | "desactivacion" | "reactivacion" | "baja", string>;
+      listaConArea: string;
+      posicion: string;
+      sinValor: string;
+      // An actor who cannot be named (never an internal id).
+      usuarioNoDisponible: string;
+    };
+  };
 };
 
 export const copy = {
@@ -648,6 +751,7 @@ export const copy = {
     legajos: "Legajos",
     usuarios: "Usuarios",
     aprobaciones: "Aprobaciones",
+    configuracion: "Configuración",
     cambiarPassword: "Cambiar contraseña",
   },
   sesion: {
@@ -1234,6 +1338,128 @@ export const copy = {
       historialEnOtrasCuentas:
         "Esta cuenta figura en el historial de otras cuentas y no se puede purgar. Desactivala en su lugar.",
       accionFallo: "No pudimos completar la acción. Intentá de nuevo.",
+    },
+  },
+  configuracion: {
+    kicker: "Administración",
+    title: "Configuración",
+    intro:
+      "Mantené las listas que se usan en los legajos. Cada cambio queda registrado en el historial.",
+    loading: "Cargando las listas…",
+    listaFallo: "No pudimos cargar las listas. Actualizá la página para volver a intentar.",
+    selectorLabel: "Lista",
+    listas: {
+      area: "Área",
+      puesto: "Puesto",
+      sucursal: "Sucursal",
+      convenio: "Convenio",
+      tarea: "Tarea",
+      categoria: "Categoría",
+    },
+    titulos: {
+      area: "Áreas",
+      puesto: "Puestos",
+      sucursal: "Sucursales",
+      convenio: "Convenios",
+      tarea: "Tareas",
+      categoria: "Categorías",
+    },
+    puestoHint: "Cada puesto pertenece a un área.",
+    estados: {
+      activo: "Activo",
+      inactivo: "Inactivo",
+    },
+    vacio: "Esta lista todavía no tiene ítems.",
+    areaVacia: "Esta área todavía no tiene puestos.",
+    areaInactiva: "Área inactiva: sus puestos no aparecen en nuevas selecciones.",
+    sinAreas: "Primero agregá un área para poder cargar puestos.",
+    nombreHint: "Hasta 60 caracteres.",
+    agregar: {
+      label: "Nuevo ítem",
+      labelPuesto: "Nuevo puesto en {area}",
+      submit: "Agregar",
+      submitting: "Agregando…",
+    },
+    acciones: {
+      grupo: "Acciones para {nombre}",
+      subir: "Subir {nombre}",
+      bajar: "Bajar {nombre}",
+      renombrar: "Renombrar",
+      desactivar: "Desactivar",
+      reactivar: "Reactivar",
+      eliminar: "Eliminar",
+      cancelar: "Cancelar",
+      verHistorial: "Ver historial",
+      volver: "Volver a Configuración",
+    },
+    renombrar: {
+      title: "Renombrar «{nombre}»",
+      label: "Nuevo nombre",
+      hint: "El nuevo nombre se va a ver en todos los registros que usan este ítem.",
+      confirm: "Guardar",
+      saving: "Guardando…",
+    },
+    desactivar: {
+      title: "Desactivar «{nombre}»",
+      body: "No va a aparecer en nuevas selecciones. Los registros que ya lo tienen lo conservan. Podés reactivarlo cuando quieras.",
+      bodyArea:
+        "No va a aparecer en nuevas selecciones, y sus puestos tampoco, sin que cambie su estado. Los registros que ya los tienen los conservan. Podés reactivarla cuando quieras.",
+      confirm: "Desactivar",
+    },
+    eliminar: {
+      title: "Eliminar «{nombre}»",
+      body: "Nunca se usó, así que podés eliminarlo. Esta acción no se puede deshacer.",
+      confirm: "Eliminar",
+    },
+    exito: {
+      agregado: "Agregaste «{nombre}».",
+      renombrado: "Renombraste el ítem a «{nombre}».",
+      desactivado: "Desactivaste «{nombre}».",
+      reactivado: "Reactivaste «{nombre}».",
+      movido: "Cambiaste el orden de «{nombre}».",
+      eliminado: "Eliminaste «{nombre}».",
+    },
+    errors: {
+      nombreVacio: "Ingresá un nombre.",
+      nombreLargo: "El nombre puede tener hasta 60 caracteres.",
+      nombreDuplicado: "Ya existe un ítem con ese nombre en esta lista. Revisá mayúsculas, acentos y espacios.",
+      nombreDuplicadoPuesto: "Ya existe un puesto con ese nombre en esta área. Revisá mayúsculas, acentos y espacios.",
+      enUso: "Este ítem está en uso y no se puede eliminar. Desactivalo para que no aparezca en nuevas selecciones.",
+      cambioConcurrente: "Alguien cambió esta lista mientras la editabas. Actualizamos la lista: revisala y volvé a intentar.",
+      noEncontrado: "El ítem ya no existe. Actualizamos la lista.",
+      extremo: "El ítem ya está en esa punta de la lista.",
+      areaInvalida: "Elegí un área válida.",
+      accionFallo: "No pudimos guardar el cambio. Intentá de nuevo.",
+    },
+    historial: {
+      kicker: "Configuración",
+      title: "Historial de cambios",
+      intro: "Todos los cambios en las listas, del más reciente al más antiguo.",
+      loading: "Cargando el historial…",
+      vacio: "Todavía no hay cambios registrados.",
+      fallo: "No pudimos cargar el historial. Actualizá la página para volver a intentar.",
+      limite: "Se muestran los últimos {n} cambios.",
+      columnas: {
+        fecha: "Fecha",
+        usuario: "Usuario",
+        lista: "Lista",
+        item: "Ítem",
+        accion: "Acción",
+        antes: "Antes",
+        despues: "Después",
+      },
+      acciones: {
+        alta: "Alta",
+        renombre: "Cambio de nombre",
+        reorden: "Cambio de orden",
+        desactivacion: "Desactivación",
+        reactivacion: "Reactivación",
+        baja: "Eliminación",
+      },
+      listaConArea: "{lista} ({area})",
+      posicion: "Posición {n}",
+      sinValor: "—",
+      usuarioNoDisponible: "Usuario no disponible",
     },
   },
 } as const satisfies Copy;

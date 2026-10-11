@@ -28,11 +28,13 @@ export const RUTAS = [
   { patron: "/aprobaciones", clase: "admin" },
   { patron: "/aprobaciones/solicitudes/[id]", clase: "admin" },
   { patron: "/aprobaciones/documentos/[id]", clase: "admin" },
+  { patron: "/configuracion", clase: "admin" },
+  { patron: "/configuracion/historial", clase: "admin" },
 ] as const satisfies readonly EntradaRuta[];
 
 // Admin sections: anything below them is Admin only as well, even a path
 // with no page (it then gets the not-found page, but only for an Admin).
-const SECCIONES_ADMIN = ["/legajos", "/usuarios", "/aprobaciones"];
+const SECCIONES_ADMIN = ["/legajos", "/usuarios", "/aprobaciones", "/configuracion"];
 
 function coincide(patron: string, pathname: string): boolean {
   const a = patron.split("/");
