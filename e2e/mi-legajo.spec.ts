@@ -243,9 +243,13 @@ test("an Admin editing their own legajo saves directly, with no request", async 
   await expect(page.getByRole("status").filter({ hasText: t.exito.guardado })).toBeVisible();
   await expect(dato(page, "D", "alergias")).toContainText("Polen (directo)");
   await expect(page.getByTestId("banner-pendiente")).toHaveCount(0);
-  // Their own group E is edited from Legajos, not here.
+  // Their own group E is edited from Legajos, not here: no editable group E
+  // panel. Since CR-4 it is shown read only, with a link to Legajos.
   await expect(grupo(page, "E")).toHaveCount(0);
-  await expect(page.locator("main")).not.toContainText(user.numeroLegajo);
+  const propio = page.getByTestId("grupo-E-propio");
+  await expect(propio).toContainText(user.numeroLegajo);
+  await expect(propio.locator("input, select, textarea")).toHaveCount(0);
+  await expect(propio.getByRole("link", { name: copyLaborales.propio.editar })).toHaveAttribute("href", `/legajos/${user.id}`);
 
   const service = localServiceClient();
   const { data: legajo } = await service.from("legajos").select("id, alergias").eq("profile_id", user.id).single();
