@@ -5,6 +5,7 @@ import { barrerHuerfanos } from "@/lib/documentos/limpieza";
 import { buildDocumentoPath } from "@/lib/documentos/paths";
 import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
 import { createTestUser, deleteTestUsers, serviceClient, type TestUser } from "./helpers";
+import { itemId, laboralCompleto, type LaboralUpdate } from "./laborales";
 
 // The /legajos Server Actions (Admin) against the local stack. As in
 // mi-legajo-actions.test.ts, the session-bound server client is the signed-in
@@ -64,17 +65,9 @@ const GRUPO_D = {
   emergencia_domicilio: "Calle 2",
   emergencia_telefono: "11 5555-6666",
 };
-const laborales = (numero: string) => ({
-  numero_legajo: numero,
-  area: "Operaciones",
-  puesto: "Chofer",
-  fecha_ingreso: "2020-03-01",
-  estado_laboral: "activo",
-  sede: "San Martín",
-  modalidad: "Presencial",
-  convenio: "Camioneros",
-  bruto_mensual: 850000.5,
-});
+// Group E with list item ids (CR-2), set once the seeded lists are read.
+let BASE_E: LaboralUpdate;
+const laborales = (numero: string) => ({ ...BASE_E, numero_legajo: numero });
 
 function fakePdf(label: string) {
   return Buffer.from(`%PDF-1.4\n% FAKE TEST FILE - ${label}\n%%EOF\n`);
@@ -99,9 +92,15 @@ describe("/legajos Server Actions (Admin)", () => {
     const { data } = await service.from("legajos").select("*").eq("profile_id", id).single();
     return data!;
   }
+  // Group E, in its own table.
+  async function laboralOf(id: string) {
+    const { data } = await service.from("legajos").select("legajos_laborales(*)").eq("profile_id", id).single();
+    return data!.legajos_laborales!;
+  }
   const exists = async (path: string) => (await storage.download(path)).data !== null;
 
   beforeAll(async () => {
+    BASE_E = await laboralCompleto(service);
     empleado = await createTestUser(service, "legajos-empleado");
     otro = await createTestUser(service, "legajos-otro");
     admin = await createTestUser(service, "legajos-admin", "admin");
@@ -146,10 +145,8 @@ describe("/legajos Server Actions (Admin)", () => {
         estado_civil: "casado",
         tiene_hijos: true,
         grupo_sanguineo: "0+",
-        numero_legajo: `E-${run}`,
-        estado_laboral: "activo",
-        bruto_mensual: 850000.5,
       });
+      expect(await laboralOf(id)).toMatchObject({ ...laborales(`E-${run}`) });
       const { data: stored } = await service.from("legajo_hijos").select("nombre_completo, fecha_nacimiento").eq("legajo_id", legajo.id);
       expect(stored).toEqual(hijos);
       // No change request was created on the way.
@@ -158,7 +155,14 @@ describe("/legajos Server Actions (Admin)", () => {
 
       // The list reads it back, with the account state.
       const lista = await cargarListadoLegajos();
-      expect(lista?.find((item) => item.profileId === id)).toMatchObject({ numeroLegajo: `E-${run}`, estadoCuenta: "activa" });
+      expect(lista?.legajos.find((item) => item.profileId === id)).toMatchObject({
+        numeroLegajo: `E-${run}`,
+        area: "Ventas",
+        puesto: "Mostrador (SM)",
+        sucursal: "Casa Central",
+        tarea: "Ventas",
+        estadoCuenta: "activa",
+      });
     });
 
     it("validates with the shared rules: a stored CUIL with a disallowed prefix is corrected here", async () => {
@@ -171,8 +175,14 @@ describe("/legajos Server Actions (Admin)", () => {
       });
       expect((await legajoOf(otro.id)).cuil).toBe("27-90000002-8");
 
-      const e = await actions.actualizarDatosLaborales({ profileId: otro.id, valores: { ...laborales(`X-${run}`), bruto_mensual: -1 } });
-      expect(e).toMatchObject({ ok: false, fieldErrors: { bruto_mensual: copy.legajo.validation.brutoMensualNegative } });
+      // Group E against the lists: a Puesto of another Área, an incomplete
+      // group, an item that is not active.
+      const deposito = await itemId(service, "puesto", "Depósito", "Logística");
+      const otraArea = await actions.actualizarDatosLaborales({ profileId: otro.id, valores: { ...laborales(`X-${run}`), puesto_id: deposito } });
+      expect(otraArea).toMatchObject({ ok: false, fieldErrors: { puesto_id: copy.legajo.validation.puestoFueraDeArea } });
+      const incompleto = await actions.actualizarDatosLaborales({ profileId: otro.id, valores: { ...laborales(`X-${run}`), area_id: null, puesto_id: null } });
+      expect(incompleto).toMatchObject({ ok: false, fieldErrors: { area_id: copy.legajo.validation.required, puesto_id: copy.legajo.validation.required } });
+      expect((await laboralOf(otro.id)).numero_legajo).not.toBe(`X-${run}`);
     });
 
     it("a número de legajo already in use is refused on its field", async () => {
@@ -218,13 +228,14 @@ describe("/legajos Server Actions (Admin)", () => {
       expect((await legajoOf(empleado.id)).localidad).not.toBe("Bloqueada");
 
       expect(await actions.actualizarDatosLaborales({ profileId: empleado.id, valores: laborales(`P-${run}`) })).toEqual({ ok: true });
-      expect((await legajoOf(empleado.id)).numero_legajo).toBe(`P-${run}`);
+      expect((await laboralOf(empleado.id)).numero_legajo).toBe(`P-${run}`);
     });
   });
 
   describe("role boundary", () => {
     it("an Empleado is refused on every action, also with another employee's id, and nothing changes", async () => {
       const antes = await legajoOf(otro.id);
+      const laboralAntes = await laboralOf(otro.id);
       const doc = buildDocumentoPath({ profileId: otro.id, tipo: "dni_frente", fileId: randomUUID(), mimeType: "application/pdf" })!;
       for (const target of [otro.id, empleado.id]) {
         as(empleado, "empleado");
@@ -241,7 +252,7 @@ describe("/legajos Server Actions (Admin)", () => {
       }
       const despues = await legajoOf(otro.id);
       expect(despues.localidad).toBe(antes.localidad);
-      expect(despues.numero_legajo).toBe(antes.numero_legajo);
+      expect(await laboralOf(otro.id)).toEqual(laboralAntes);
     });
 
     it("without a session, everything is refused", async () => {

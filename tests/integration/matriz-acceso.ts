@@ -3,6 +3,7 @@ import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
 import type { Database } from "@/lib/supabase/database.types";
 import { fakePdf, rutaDocumento } from "./actores";
 import type { TypedClient } from "./helpers";
+import { escribirLaboral, laboralCompleto } from "./laborales";
 
 // The access matrix (F1-11A, GAP-01 and GAP-02): every table and the
 // legajo-docs bucket, every actor, every operation (SELECT, INSERT, UPDATE,
@@ -174,6 +175,36 @@ export const TABLAS: Record<Tabla | typeof BUCKET_DOCUMENTOS, EspecTabla> = {
       admin: e(P, "error:23505", P, N),
       ...inactivo(e(V, N, V, N)),
       "cambio-forzado-propio": e(P, N, V, N),
+    },
+  },
+
+  // Group E (CR-2): every operation is for an active Admin only; nobody else
+  // reads it, their own included. Every legajo already has its row: an
+  // Admin INSERT passes the policy and stops at the primary key (23505). No
+  // DELETE grant (the row goes with its legajo). The target is a complete
+  // group E with a fresh número de legajo.
+  legajos_laborales: {
+    preparar: async (service, titular) => {
+      const valores = await laboralCompleto(service, "MATRIZ");
+      await escribirLaboral(service, titular.legajoId, valores);
+      return { numero: valores.numero_legajo ?? "" };
+    },
+    estado: (service, titular) => filas(service.from("legajos_laborales").select("*").eq("legajo_id", titular.legajoId)),
+    ops: {
+      select: (c, _l, t) => r(c.from("legajos_laborales").select("legajo_id").eq("legajo_id", t.legajoId)),
+      insert: (c, _l, t) => r(c.from("legajos_laborales").insert({ legajo_id: t.legajoId }).select("legajo_id")),
+      update: (c, _l, t, o) =>
+        r(c.from("legajos_laborales").update({ numero_legajo: `${o.numero}-cambiado` }).eq("legajo_id", t.legajoId).select("legajo_id")),
+      delete: (c, _l, t) => r(c.from("legajos_laborales").delete().eq("legajo_id", t.legajoId).select("legajo_id")),
+    },
+    limpiar: async () => undefined,
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, V, N),
+      "empleado-ajeno": e(V, N, V, N),
+      admin: e(P, "error:23505", P, N),
+      ...inactivo(e(V, N, V, N)),
+      "cambio-forzado-propio": e(V, N, V, N),
     },
   },
 

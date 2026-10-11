@@ -3,6 +3,7 @@ import { copy } from "@/lib/copy/es-AR";
 import { hoyEnArgentina } from "@/lib/legajo/fechas";
 import { legajoIdDe } from "./actores";
 import { createTestUser, deleteTestUsers, serviceClient, type TestUser } from "./helpers";
+import { escribirLaboral, laboralCompleto, laboralDe, type LaboralUpdate } from "./laborales";
 
 // F1-11B, GAP-07: validation at the server boundary (PRD 5.7). Through the
 // real Server Actions, invalid values are rejected with the field error and
@@ -49,17 +50,9 @@ const GRUPO_D = {
   emergencia_domicilio: "Calle 2",
   emergencia_telefono: "11 5555-6666",
 };
-const laborales = (numero: string, fecha_ingreso: string) => ({
-  numero_legajo: numero,
-  area: "Operaciones",
-  puesto: "Chofer",
-  fecha_ingreso,
-  estado_laboral: "activo" as const,
-  sede: "San Martín",
-  modalidad: "Presencial",
-  convenio: "Camioneros",
-  bruto_mensual: 1000,
-});
+// Group E with list item ids (CR-2), set once the seeded lists are read.
+let BASE_E: LaboralUpdate;
+const laborales = (numero: string, fecha_ingreso: string) => ({ ...BASE_E, numero_legajo: numero, fecha_ingreso });
 
 // The day after today in Argentina (YYYY-MM-DD).
 function mananaEnArgentina(): string {
@@ -86,10 +79,12 @@ describe("validation at the server boundary (GAP-07)", () => {
     empleado = await createTestUser(service, "validacion-empleado");
     admin = await createTestUser(service, "validacion-admin", "admin");
     legajoId = await legajoIdDe(service, empleado.id);
+    BASE_E = await laboralCompleto(service);
     await service
       .from("legajos")
-      .update({ ...GRUPO_B, piso_depto: null, ...GRUPO_D, ...laborales(`V-${run}`, "2020-01-01") })
+      .update({ ...GRUPO_B, piso_depto: null, ...GRUPO_D })
       .eq("id", legajoId);
+    await escribirLaboral(service, legajoId, laborales(`V-${run}`, "2020-01-01"));
   }, 60_000);
 
   beforeEach(async () => {
@@ -179,19 +174,19 @@ describe("validation at the server boundary (GAP-07)", () => {
   describe("fecha_ingreso", () => {
     it("an Admin's group E edit with a future date is refused; the legajo is unchanged", async () => {
       as(admin, "admin");
-      const antes = await legajo();
+      const antes = await laboralDe(service, legajoId);
       for (const fecha of [mananaEnArgentina(), "2999-01-01"]) {
         const result = await legajos.actualizarDatosLaborales({ profileId: empleado.id, valores: laborales(`V-${run}`, fecha) });
         expect(result, fecha).toEqual(rechazo("fecha_ingreso", v.fechaFutura));
       }
-      expect(await legajo()).toEqual(antes);
+      expect(await laboralDe(service, legajoId)).toEqual(antes);
     });
 
     it("today in Argentina is accepted", async () => {
       as(admin, "admin");
       const hoy = hoyEnArgentina();
       expect(await legajos.actualizarDatosLaborales({ profileId: empleado.id, valores: laborales(`V-${run}`, hoy) })).toEqual({ ok: true });
-      expect((await legajo()).fecha_ingreso).toBe(hoy);
+      expect((await laboralDe(service, legajoId)).fecha_ingreso).toBe(hoy);
     });
   });
 });

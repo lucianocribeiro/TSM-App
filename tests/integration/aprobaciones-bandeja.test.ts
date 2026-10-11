@@ -4,6 +4,7 @@ import { copy } from "@/lib/copy/es-AR";
 import { buildDocumentoPath } from "@/lib/documentos/paths";
 import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "@/lib/documentos/tipos";
 import { anonClient, createTestUser, deleteTestUsers, serviceClient, type TestUser, type TypedClient } from "./helpers";
+import { laboralCompleto } from "./laborales";
 
 // F1-09B against the local stack: the database-enforced pending-request
 // lock, the Admin replacement function, the replaced history's visibility,
@@ -180,9 +181,11 @@ describe("F1-09B: lock, replacement, history and the approvals inbox", () => {
         expect(data).toBeNull();
       }
 
-      const laboral = await admin.client.from("legajos").update({ area: "Área F1-09B", puesto: "Puesto" }).eq("id", legajo).select("area");
+      // Group E (its own table since CR-2) is not locked.
+      const valores = await laboralCompleto(service, "F1-09B");
+      const laboral = await admin.client.from("legajos_laborales").update(valores).eq("legajo_id", legajo).select("numero_legajo");
       expect(laboral.error).toBeNull();
-      expect(laboral.data).toEqual([{ area: "Área F1-09B" }]);
+      expect(laboral.data).toEqual([{ numero_legajo: valores.numero_legajo }]);
 
       const [hijo] = await storedHijos(legajo);
       const insert = await admin.client.from("legajo_hijos").insert({ legajo_id: legajo, nombre_completo: "Nuevo", fecha_nacimiento: "2020-01-01" });
@@ -193,7 +196,7 @@ describe("F1-09B: lock, replacement, history and the approvals inbox", () => {
       expect(removed.error?.code).toBe(OBJECT_STATE);
 
       const despues = await storedLegajo(legajo);
-      expect({ ...despues, area: antes.area, puesto: antes.puesto, updated_at: antes.updated_at }).toEqual(antes);
+      expect(despues).toEqual(antes);
       expect(await storedHijos(legajo)).toEqual([hijo]);
 
       // Another employee's legajo, with nothing pending, is not affected.
