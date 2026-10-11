@@ -42,6 +42,7 @@ describe("es-AR copy", () => {
       copy.nav.miLegajo,
       copy.nav.legajos,
       copy.nav.usuarios,
+      copy.nav.configuracion,
       copy.theme.toDark,
       copy.theme.toLight,
       copy.miLegajo.kicker,

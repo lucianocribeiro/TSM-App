@@ -14,6 +14,7 @@ const entries: Array<{ href: string; label: string; roles: AppRole[] }> = [
   { href: "/legajos", label: copy.nav.legajos, roles: ["admin"] },
   { href: "/aprobaciones", label: copy.nav.aprobaciones, roles: ["admin"] },
   { href: "/usuarios", label: copy.nav.usuarios, roles: ["admin"] },
+  { href: "/configuracion", label: copy.nav.configuracion, roles: ["admin"] },
 ];
 
 // Menu items for a role (Constitution §6). Presentation only: the route guard

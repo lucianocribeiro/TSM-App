@@ -195,11 +195,11 @@ describe("proxy route guard", () => {
 
   describe("4. role and default deny", () => {
     it("sends an Empleado away from Admin routes and anyone away from unmapped ones", async () => {
-      for (const path of ["/legajos", "/legajos/abc", "/usuarios", "/usuarios/abc", "/aprobaciones", "/aprobaciones/solicitudes/x", "/aprobaciones/cualquiera/x/y"]) {
+      for (const path of ["/legajos", "/legajos/abc", "/usuarios", "/usuarios/abc", "/aprobaciones", "/aprobaciones/solicitudes/x", "/aprobaciones/cualquiera/x/y", "/configuracion", "/configuracion/historial"]) {
         expect(locationOf(await updateSession(await request(path))), path).toBe("/mi-legajo");
       }
       state.profile = perfil({ role: "admin" });
-      for (const path of ["/legajos", "/usuarios/abc", "/aprobaciones/documentos/x", "/mi-legajo"]) {
+      for (const path of ["/legajos", "/usuarios/abc", "/aprobaciones/documentos/x", "/configuracion", "/configuracion/historial", "/mi-legajo"]) {
         expect(locationOf(await updateSession(await request(path))), path).toBeNull();
       }
       expect(locationOf(await updateSession(await request("/no-existe")))).toBe("/mi-legajo");
