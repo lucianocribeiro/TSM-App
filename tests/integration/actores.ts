@@ -197,7 +197,7 @@ export async function sembrar(service: TypedClient, user: TestUser, revisorId: s
   };
 }
 
-const TIPOS: DocumentoTipo[] = ["dni_frente", "dni_dorso", "licencia_conducir"];
+const TIPOS: DocumentoTipo[] = ["dni_frente", "dni_dorso", "licencia_conducir", "alta_afip"];
 
 async function filas<T>(consulta: PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const { data, error } = await consulta;

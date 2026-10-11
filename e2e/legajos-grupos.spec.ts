@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
+import { copyLaborales } from "../src/lib/copy/laborales";
 import { formatCopy } from "../src/lib/copy/format";
 import { adminNuevo, empleadoCompleto, hijosDe, legajoDe, registro, solicitudPendiente } from "./datos";
 import { loginAs } from "./helpers";
@@ -159,7 +160,7 @@ test("with a pending request, groups A to D and the children are read-only, grou
   await expect(grupo(page, "C").getByRole("button", { name: ml.hijos.agregar })).toHaveCount(0);
 
   // Group E (its own table since CR-2): a required field, so its label is marked.
-  const puesto = formatCopy(copy.legajos.laborales.obligatorio, { campo: ml.camposLaborales.puesto });
+  const puesto = formatCopy(copyLaborales.form.obligatorio, { campo: copyLaborales.campos.puesto });
   await editar(page, "E", async (panel) => {
     await panel.getByLabel(puesto, { exact: true }).selectOption({ label: "Cuentas corrientes" });
   });

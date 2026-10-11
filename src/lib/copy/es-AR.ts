@@ -70,23 +70,6 @@ export type Copy = {
       B: string;
       C: string;
       D: string;
-      E: string;
-    };
-    camposLaborales: {
-      numero_legajo: string;
-      area: string;
-      puesto: string;
-      fecha_ingreso: string;
-      antiguedad: string;
-      estado_laboral: string;
-      sucursal: string;
-      tarea: string;
-      convenio: string;
-      categoria: string;
-    };
-    estadosLaborales: {
-      activo: string;
-      en_prueba: string;
     };
     estadosCiviles: {
       soltero: string;
@@ -162,6 +145,11 @@ export type Copy = {
         rechazado: string;
         faltante: string;
       };
+      // Admin-only types (Alta de AFIP): the owner only downloads them.
+      soloAdmin: {
+        aprobado: string;
+        faltante: string;
+      };
       requerido: string;
       opcional: string;
       archivoLabel: string;
@@ -184,6 +172,8 @@ export type Copy = {
         subirFallo: string;
         eliminarFallo: string;
         limpiezaFallo: string;
+        // An Admin-only type (Alta de AFIP) from Mi Legajo.
+        soloAdmin: string;
       };
     };
   };
@@ -202,14 +192,9 @@ export type Copy = {
     };
     busqueda: {
       label: string;
-      placeholder: string;
     };
     filtros: {
       label: string;
-      estadoLaboral: string;
-      area: string;
-      sucursal: string;
-      tarea: string;
       todos: string;
       todas: string;
       mostrarBajas: string;
@@ -218,15 +203,9 @@ export type Copy = {
     columnas: {
       empleado: string;
       cuil: string;
-      area: string;
-      puesto: string;
-      sucursal: string;
-      tarea: string;
-      estadoLaboral: string;
     };
     sinNombre: string;
     sinDato: string;
-    numeroLegajo: string;
     dadoDeBaja: string;
     detalle: {
       kicker: string;
@@ -238,16 +217,6 @@ export type Copy = {
       solicitudPendiente: string;
       revisarSolicitud: string;
       cargaFallo: string;
-    };
-    laborales: {
-      antiguedadNota: string;
-      // A required field's label.
-      obligatorio: string;
-      obligatoriosNota: string;
-      // A list item that is no longer offered, kept by a legajo.
-      inactivo: string;
-      // The Puesto dropdown before an Área is chosen.
-      elegirAreaPrimero: string;
     };
     documentos: {
       intro: string;
@@ -289,7 +258,6 @@ export type Copy = {
     errors: {
       solicitudPendiente: string;
       documentoPendiente: string;
-      numeroLegajoDuplicado: string;
       noEncontrado: string;
     };
   };
@@ -419,6 +387,7 @@ export type Copy = {
       dni_frente: string;
       dni_dorso: string;
       licencia_conducir: string;
+      alta_afip: string;
     };
     validation: {
       fileRequired: string;
@@ -788,23 +757,6 @@ export const copy = {
       B: "Domicilio y contacto",
       C: "Datos familiares",
       D: "Datos de emergencia",
-      E: "Datos laborales",
-    },
-    camposLaborales: {
-      numero_legajo: "Número de legajo",
-      area: "Área",
-      puesto: "Puesto",
-      fecha_ingreso: "Fecha de ingreso",
-      antiguedad: "Antigüedad",
-      estado_laboral: "Estado laboral",
-      sucursal: "Sucursal",
-      tarea: "Tarea",
-      convenio: "Convenio",
-      categoria: "Categoría",
-    },
-    estadosLaborales: {
-      activo: "Activo",
-      en_prueba: "En prueba",
     },
     estadosCiviles: {
       soltero: "Soltero",
@@ -881,6 +833,10 @@ export const copy = {
         rechazado: "Rechazado",
         faltante: "Sin cargar",
       },
+      soloAdmin: {
+        aprobado: "Cargado por Recursos Humanos",
+        faltante: "Lo carga Recursos Humanos",
+      },
       requerido: "Obligatorio",
       opcional: "Opcional",
       archivoLabel: "Archivo para {documento}",
@@ -904,6 +860,7 @@ export const copy = {
         eliminarFallo: "No pudimos eliminar el documento. Intentá de nuevo.",
         limpiezaFallo:
           "No pudimos completar la subida. Volvé a intentar en unos minutos y, si sigue pasando, avisá a Recursos Humanos.",
+        soloAdmin: "Este documento lo carga Recursos Humanos.",
       },
     },
   },
@@ -922,14 +879,9 @@ export const copy = {
     },
     busqueda: {
       label: "Buscar",
-      placeholder: "Nombre, DNI, CUIL o número de legajo",
     },
     filtros: {
       label: "Filtros",
-      estadoLaboral: "Estado laboral",
-      area: "Área",
-      sucursal: "Sucursal",
-      tarea: "Tarea",
       todos: "Todos",
       todas: "Todas",
       mostrarBajas: "Mostrar dados de baja",
@@ -938,15 +890,9 @@ export const copy = {
     columnas: {
       empleado: "Empleado",
       cuil: "CUIL",
-      area: "Área",
-      puesto: "Puesto",
-      sucursal: "Sucursal",
-      tarea: "Tarea",
-      estadoLaboral: "Estado laboral",
     },
     sinNombre: "Sin nombre cargado",
     sinDato: "—",
-    numeroLegajo: "Legajo {numero}",
     dadoDeBaja: "Dado de baja",
     detalle: {
       kicker: "Legajo",
@@ -959,13 +905,6 @@ export const copy = {
         "Este empleado tiene una solicitud de cambios pendiente. Sus datos personales, de contacto, familiares y de emergencia no se pueden editar hasta que se resuelva. Los datos laborales y los documentos se pueden editar igual.",
       revisarSolicitud: "Revisar solicitud",
       cargaFallo: "No pudimos cargar este legajo. Intentá de nuevo.",
-    },
-    laborales: {
-      antiguedadNota: "La antigüedad se calcula a partir de la fecha de ingreso.",
-      obligatorio: "{campo} *",
-      obligatoriosNota: "Los datos marcados con * son obligatorios.",
-      inactivo: "{nombre} (inactivo)",
-      elegirAreaPrimero: "Elegí primero un área",
     },
     documentos: {
       intro: "Subí archivos PDF, JPG o PNG de hasta 10 MB. Los documentos que subas quedan aprobados.",
@@ -1011,7 +950,6 @@ export const copy = {
         "Este empleado tiene una solicitud de cambios pendiente. Tiene que resolverse antes de editar estos datos.",
       documentoPendiente:
         "Este empleado tiene un documento de este tipo pendiente de aprobación. Tiene que resolverse antes de subir otro.",
-      numeroLegajoDuplicado: "Ese número de legajo ya está asignado a otro empleado.",
       noEncontrado: "No encontramos este legajo.",
     },
   },
@@ -1147,6 +1085,7 @@ export const copy = {
       dni_frente: "DNI (frente)",
       dni_dorso: "DNI (dorso)",
       licencia_conducir: "Licencia de conducir",
+      alta_afip: "Alta de AFIP",
     },
     validation: {
       fileRequired: "Elegí un archivo para subir.",

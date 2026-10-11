@@ -3,12 +3,12 @@ import { copy } from "@/lib/copy/es-AR";
 import { PARTIDOS } from "./options";
 import {
   datosFamiliaresSchema,
-  datosLaboralesSchema,
   domicilioContactoSchema,
   fieldErrors,
   isValidTelefono,
   legajoPersonalSchema,
 } from "./validation";
+import { datosLaboralesSchema } from "./laborales";
 
 const m = copy.legajo.validation;
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogoItem, CatalogoLista } from "@/lib/configuracion/listas";
 import { copy } from "@/lib/copy/es-AR";
+import { copyLaborales } from "@/lib/copy/laborales";
 import {
   formLaboralInicial,
   nombreItem,
@@ -98,7 +99,7 @@ describe("opcionesCampo", () => {
 });
 
 function formatInactivo(nombre: string) {
-  return copy.legajos.laborales.inactivo.replace("{nombre}", nombre);
+  return copyLaborales.form.inactivo.replace("{nombre}", nombre);
 }
 
 describe("validarDatosLaborales", () => {

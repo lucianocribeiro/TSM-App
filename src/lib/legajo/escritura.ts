@@ -6,6 +6,7 @@ import { CAMPO_HIJOS, type CampoSolicitudColumna } from "@/lib/aprobaciones/camp
 import { solicitudErrorMessage } from "@/lib/aprobaciones/solicitudes";
 import { listarItems } from "@/lib/configuracion/datos";
 import { copy } from "@/lib/copy/es-AR";
+import { copyLaborales } from "@/lib/copy/laborales";
 import type { Database } from "@/lib/supabase/database.types";
 import { camposDelGrupo, ESQUEMA_GRUPO, isGrupoEditable, type GrupoEditable } from "./grupos";
 import { fieldErrors } from "./validation";
@@ -119,7 +120,7 @@ export async function aplicarDatosLaborales(client: Client, profileId: string, v
     .select("legajo_id")
     .maybeSingle();
   if (error?.code === UNIQUE_VIOLATION) {
-    const mensaje = copy.legajos.errors.numeroLegajoDuplicado;
+    const mensaje = copyLaborales.errors.numeroLegajoDuplicado;
     return { ok: false, error: mensaje, fieldErrors: { numero_legajo: mensaje } };
   }
   if (error?.code === CHECK_VIOLATION && error.hint === ITEM_INACTIVO_HINT) {

@@ -9,7 +9,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { barrerHuerfanos, eliminarObjeto } from "./limpieza";
 import { buildDocumentoPath, parseDocumentoPath } from "./paths";
 import { MODOS_REEMPLAZO, type ModoReemplazo } from "./reemplazo";
-import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "./tipos";
+import { DOCUMENTO_TIPO_CODES, DOCUMENTOS_BUCKET, type DocumentoTipo } from "./tipos";
 import { validateDocumentoUpload } from "./validation";
 
 // The server side of a document upload, shared by /mi-legajo (own legajo)
@@ -30,7 +30,8 @@ import { validateDocumentoUpload } from "./validation";
 // objects older than UMBRAL_HUERFANO_MINUTOS (./limpieza.ts).
 //
 // Every function runs with the caller's own session client. The caller (a
-// Server Action) has already checked who may act on ownerId.
+// Server Action) has already checked who may act on ownerId, and says which
+// types it may write (tipos): Mi Legajo never writes the Admin-only ones.
 
 type Client = SupabaseClient<Database>;
 type DocumentoEstado = Database["public"]["Enums"]["documento_estado"];
@@ -52,6 +53,11 @@ const subidaInput = z.object({
   sizeBytes: z.number(),
 });
 
+// A type outside the caller's writable ones.
+function tipoNoPermitido(tipo: string, tipos: readonly DocumentoTipo[]): boolean {
+  return !(tipos as readonly string[]).includes(tipo);
+}
+
 // Step 1: a fresh path in the owner's folder. One pending document per type
 // at a time (mensajePendiente says so to the caller). The sweep of the
 // owner's folder runs first; its failure is noted and never blocks the upload.
@@ -59,13 +65,18 @@ export async function prepararRuta(
   client: Client,
   ownerId: string,
   input: unknown,
-  { origen, mensajePendiente = copy.aprobaciones.errors.documentoPendiente }: { origen: string; mensajePendiente?: string },
+  {
+    origen,
+    mensajePendiente = copy.aprobaciones.errors.documentoPendiente,
+    tipos = DOCUMENTO_TIPO_CODES,
+  }: { origen: string; mensajePendiente?: string; tipos?: readonly DocumentoTipo[] },
 ): Promise<ActionResult<{ path: string }>> {
   const parsed = subidaInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: errors.subirFallo };
 
   const valid = validateDocumentoUpload(parsed.data);
   if (!valid.ok) return valid;
+  if (tipoNoPermitido(valid.data.tipo, tipos)) return { ok: false, error: errors.soloAdmin };
 
   const pendientes = await client
     .from("legajo_documentos")
@@ -76,7 +87,7 @@ export async function prepararRuta(
   if (pendientes.error) return { ok: false, error: errors.subirFallo };
   if ((pendientes.count ?? 0) > 0) return { ok: false, error: mensajePendiente };
 
-  const barrido = await barrerHuerfanos(client, ownerId);
+  const barrido = await barrerHuerfanos(client, ownerId, { tipos });
   if (!barrido.ok) avisarFalloLimpieza(origen, "sweep");
 
   const path = buildDocumentoPath({
@@ -100,11 +111,13 @@ export type Registro = {
   // replaced (public.reemplazar_documento).
   esAdmin: boolean;
   origen: string;
+  // The types the caller may write (default: all).
+  tipos?: readonly DocumentoTipo[];
 };
 
 // Step 2: checks the stored object and records it.
 export async function registrarObjeto(
-  { client, ownerId, uploaderId, esAdmin, origen }: Registro,
+  { client, ownerId, uploaderId, esAdmin, origen, tipos = DOCUMENTO_TIPO_CODES }: Registro,
   input: unknown,
 ): Promise<ActionResult<{ estado: DocumentoEstado }>> {
   const parsed = z
@@ -116,6 +129,8 @@ export async function registrarObjeto(
   if (!ruta || ruta.profileId !== ownerId || ruta.tipo !== parsed.data.tipo) {
     return { ok: false, error: errors.subirFallo };
   }
+  // Refused before touching the object: the caller cannot write that folder.
+  if (tipoNoPermitido(ruta.tipo, tipos)) return { ok: false, error: errors.soloAdmin };
   const tipo: DocumentoTipo = ruta.tipo;
   const path = parsed.data.path;
   const bucket = client.storage.from(DOCUMENTOS_BUCKET);
@@ -237,10 +252,12 @@ export async function descartarObjeto(
   ownerId: string,
   input: unknown,
   origen: string,
+  tipos: readonly DocumentoTipo[] = DOCUMENTO_TIPO_CODES,
 ): Promise<ActionResult> {
   const parsed = z.object({ path: z.string() }).safeParse(input);
   const ruta = parsed.success ? parseDocumentoPath(parsed.data.path) : null;
   if (!parsed.success || !ruta || ruta.profileId !== ownerId) return { ok: false, error: errors.subirFallo };
+  if (tipoNoPermitido(ruta.tipo, tipos)) return { ok: false, error: errors.soloAdmin };
 
   const fila = await client
     .from("legajo_documentos")

@@ -8,6 +8,7 @@ import { Panel } from "@/components/ui/Panel";
 import { Select } from "@/components/ui/Select";
 import type { CatalogoItem } from "@/lib/configuracion/listas";
 import { copy } from "@/lib/copy/es-AR";
+import { copyLaborales } from "@/lib/copy/laborales";
 import { formatCopy } from "@/lib/copy/format";
 import {
   CAMPOS_LABORALES,
@@ -18,17 +19,17 @@ import {
   valoresLaborales,
   type ActualLaboral,
   type CampoLaboral,
+  type DatoLaboral,
   type FormLaboral,
 } from "@/lib/legajo/laborales";
 import { ESTADOS_LABORALES } from "@/lib/legajo/options";
-import type { DatoLaboral } from "@/lib/legajo/vista";
 import { actualizarDatosLaborales } from "../actions";
 
 const t = copy.miLegajo;
-const tl = copy.legajos.laborales;
+const tl = copyLaborales.form;
 
 // The label of each form field (the list fields by their list's name).
-const ETIQUETA: Record<CampoLaboral, keyof typeof t.camposLaborales> = {
+const ETIQUETA: Record<CampoLaboral, keyof typeof copyLaborales.campos> = {
   numero_legajo: "numero_legajo",
   area_id: "area",
   puesto_id: "puesto",
@@ -62,7 +63,7 @@ export function GrupoLaboralPanel({ profileId, laborales, inicial, actual, items
     <Panel aria-labelledby={titleId} data-testid="grupo-E">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id={titleId} className="text-[24px] font-normal leading-[1.1]">
-          {t.grupos.E}
+          {copyLaborales.grupo}
         </h2>
         {!editando ? (
           <Button variant="secondary" onClick={() => setEditando(true)} aria-describedby={titleId}>
@@ -85,7 +86,7 @@ export function GrupoLaboralPanel({ profileId, laborales, inicial, actual, items
           />
         ) : (
           <LabelValueGrid
-            items={laborales.map((dato) => ({ key: dato.key, label: t.camposLaborales[dato.key], value: dato.value }))}
+            items={laborales.map((dato) => ({ key: dato.key, label: copyLaborales.campos[dato.key], value: dato.value }))}
           />
         )}
       </div>
@@ -145,7 +146,7 @@ function LaboralForm({
       <p className="text-[12.5px] italic text-ink-soft">{tl.obligatoriosNota}</p>
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {CAMPOS_LABORALES.map((campo) => {
-          const etiqueta = t.camposLaborales[ETIQUETA[campo]];
+          const etiqueta = copyLaborales.campos[ETIQUETA[campo]];
           const common = {
             label: CAMPOS_OBLIGATORIOS.has(campo) ? formatCopy(tl.obligatorio, { campo: etiqueta }) : etiqueta,
             name: campo,
@@ -158,7 +159,7 @@ function LaboralForm({
                 key={campo}
                 {...common}
                 placeholder={t.elegir}
-                options={ESTADOS_LABORALES.map((estado) => ({ value: estado, label: t.estadosLaborales[estado] }))}
+                options={ESTADOS_LABORALES.map((estado) => ({ value: estado, label: copyLaborales.estados[estado] }))}
                 onChange={(event) => set(campo, event.target.value)}
               />
             );
@@ -182,7 +183,7 @@ function LaboralForm({
           return <Field key={campo} {...common} onChange={(event) => set(campo, event.target.value)} />;
         })}
       </div>
-      <p className="text-[12.5px] italic text-ink-soft">{copy.legajos.laborales.antiguedadNota}</p>
+      <p className="text-[12.5px] italic text-ink-soft">{tl.antiguedadNota}</p>
       {error ? (
         <p role="alert" className="text-[12.5px] italic text-accent-deep">
           {error}

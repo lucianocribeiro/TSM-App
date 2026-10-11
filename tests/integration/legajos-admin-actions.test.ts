@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
+import { copyLaborales } from "@/lib/copy/laborales";
 import { barrerHuerfanos } from "@/lib/documentos/limpieza";
 import { buildDocumentoPath } from "@/lib/documentos/paths";
 import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
@@ -190,7 +191,7 @@ describe("/legajos Server Actions (Admin)", () => {
       expect(await actions.actualizarDatosLaborales({ profileId: otro.id, valores: laborales(`D-${run}`) })).toEqual({ ok: true });
       expect(await actions.actualizarDatosLaborales({ profileId: empleado.id, valores: laborales(`D-${run}`) })).toMatchObject({
         ok: false,
-        fieldErrors: { numero_legajo: copy.legajos.errors.numeroLegajoDuplicado },
+        fieldErrors: { numero_legajo: copyLaborales.errors.numeroLegajoDuplicado },
       });
     });
 

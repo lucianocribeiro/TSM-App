@@ -10,9 +10,8 @@ import { copy } from "@/lib/copy/es-AR";
 import { historialDocumentos, reemplazantes } from "@/lib/documentos/historial";
 import { resumirDocumentos } from "@/lib/documentos/resumen";
 import { cargarLegajoAdmin } from "@/lib/legajo/admin-legajos";
-import { formLaboralInicial } from "@/lib/legajo/laborales";
+import { datosLaboralesVista, formLaboralInicial } from "@/lib/legajo/laborales";
 import { nombreCompleto } from "@/lib/cuentas/listado";
-import { datosLaboralesVista } from "@/lib/legajo/vista";
 import { LegajoAdminScreen } from "./LegajoAdminScreen";
 
 const t = copy.legajos;

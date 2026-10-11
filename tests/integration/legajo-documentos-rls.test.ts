@@ -29,7 +29,7 @@ const { createDocumentoSignedUrl, SIGNED_URL_TTL_SECONDS } = await import(
 const PERMISSION_DENIED = "42501";
 const UNIQUE_VIOLATION = "23505";
 const RLS_VIOLATION = /row-level security/i;
-const TIPOS: DocumentoTipo[] = ["dni_frente", "dni_dorso", "licencia_conducir"];
+const TIPOS: DocumentoTipo[] = ["dni_frente", "dni_dorso", "licencia_conducir", "alta_afip"];
 
 function fakePdf(label: string): Buffer {
   return Buffer.from(`%PDF-1.4\n% FAKE TEST FILE - ${label}\n%%EOF\n`);

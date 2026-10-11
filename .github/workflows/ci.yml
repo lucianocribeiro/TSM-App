@@ -58,6 +58,9 @@ jobs:
       - run: npm ci
       # No Supabase env is needed at build time.
       - run: npm run build
+      # AUDCR2-01: Mi Legajo's client chunks carry no group E strings.
+      - name: Check Mi Legajo client bundle
+        run: npm run check:bundle
 
   integration:
     runs-on: ubuntu-latest

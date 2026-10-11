@@ -71,10 +71,21 @@ describe("barrerHuerfanos", () => {
       `${UID}/dni_frente`,
       `${UID}/dni_dorso`,
       `${UID}/licencia_conducir`,
+      `${UID}/alta_afip`,
     ]);
     expect(fake.eq).toHaveBeenCalledWith("legajos.profile_id", UID);
     expect(fake.remove).toHaveBeenCalledTimes(1);
     expect(fake.remove).toHaveBeenCalledWith([`${UID}/dni_frente/viejo.pdf`]);
+  });
+
+  it("sweeps only the given type folders (an owner never sweeps alta_afip/)", async () => {
+    const fake = fakeClient({
+      folders: { [`${UID}/alta_afip`]: [{ name: "huerfano.pdf", id: "1", created_at: hace(60) }] },
+    });
+    const tipos = ["dni_frente", "dni_dorso", "licencia_conducir"] as const;
+    await expect(barrerHuerfanos(fake.client, UID, { now: NOW, tipos })).resolves.toEqual({ ok: true, eliminados: 0 });
+    expect(fake.list.mock.calls.map(([folder]) => folder)).toEqual(tipos.map((tipo) => `${UID}/${tipo}`));
+    expect(fake.remove).not.toHaveBeenCalled();
   });
 
   it("removes nothing when everything is fresh or registered", async () => {

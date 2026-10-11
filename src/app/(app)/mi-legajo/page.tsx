@@ -14,7 +14,8 @@ const t = copy.miLegajo;
 // session. There is no id in the URL: nobody can ask for another legajo here.
 // Groups A to D only: group E (datos laborales) is Admin only and lives in
 // its own table, which this page never reads (an Admin edits their own from
-// Legajos).
+// Legajos). Admin-only documents (Alta de AFIP) are download only here, for
+// every role.
 export default async function MiLegajoPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -40,7 +41,7 @@ export default async function MiLegajoPage() {
     <MiLegajoScreen
       actual={{ ...legajo, hijos: data.hijos }}
       solicitud={data.solicitud}
-      documentos={resumirDocumentos(data.documentos)}
+      documentos={resumirDocumentos(data.documentos, { propio: true })}
       esAdmin={user.role === "admin"}
       vacio={legajoVacio(legajo, data.hijos)}
     />

@@ -1,6 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.11 (draft) | Governed by: `docs/constitucion.md`
-Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation. v0.10 — Configuración (section 8, client change request CR-1): Admin-maintained lists (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) with add, rename, reorder, deactivate, reactivate and delete-if-never-used, a change history and initial values; Configuración in the menu. The legajo fields keep their current form until CR-2. v0.11 — Datos laborales from the Configuración lists (client change request CR-2): Área, Puesto (within the Área), Sucursal (was Sede), Tarea (replaces Modalidad), Convenio and Categoría (new) are list items; Bruto mensual and Modalidad are removed with their data; group E is Admin only, also in the database, and the Empleado no longer sees it (US-3, US-4, 5.5 to 5.7, section 8).
+Version: 0.12 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation. v0.10 — Configuración (section 8, client change request CR-1): Admin-maintained lists (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) with add, rename, reorder, deactivate, reactivate and delete-if-never-used, a change history and initial values; Configuración in the menu. The legajo fields keep their current form until CR-2. v0.11 — Datos laborales from the Configuración lists (client change request CR-2): Área, Puesto (within the Área), Sucursal (was Sede), Tarea (replaces Modalidad), Convenio and Categoría (new) are list items; Bruto mensual and Modalidad are removed with their data; group E is Admin only, also in the database, and the Empleado no longer sees it (US-3, US-4, 5.5 to 5.7, section 8). v0.12 — Alta de AFIP document (client change request CR-3): an optional document type that only an Admin uploads, replaces and deletes, approved at once and never in the approvals inbox or the bell; the employee sees and downloads their own current one, never its replaced history, and cannot upload, replace or delete it, also in the database (scope item 6, US-3, US-4, US-7, 5.6).
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -11,7 +11,7 @@ Deliver the Legajo module plus the auth, roles and data-isolation foundation tha
 3. Roles and profiles: one profile per auth user, role Empleado or Admin.
 4. User management: Admin creates employee accounts and assigns roles.
 5. Legajo: personal, contact, family, emergency and work data per employee (section 5), with role-based edit permissions.
-6. Legajo documents: upload, list and download from a private bucket. Types: DNI (frente y dorso), required; Licencia de conducir, optional.
+6. Legajo documents: upload, list and download from a private bucket. Types: DNI (frente y dorso), required; Licencia de conducir, optional; Alta de AFIP, optional, uploaded by an Admin only.
 7. App shell: login screen, layout, sidebar menu, TSM logo at the top of the sidebar, light and dark modes, TSM palette, centralized es-AR copy.
 8. Production deploy on Vercel with the real domain.
 9. E2E, role-boundary and RLS tests.
@@ -41,12 +41,13 @@ As an Empleado, I see my legajo and submit changes to my personal data (groups A
 - I do not see work data (group E, Datos laborales) at all, not even my own número de legajo, fecha de ingreso or antigüedad. This holds in the database: no table, view or function returns a group E value to an Empleado (Constitution §4).
 - Required fields and validation rules from section 5 are enforced.
 - I can view and download my own documents.
+- Alta de AFIP: only an Admin uploads, replaces or deletes it. I see and download my current one, but I have no control to upload, replace or delete it; while none is uploaded, the row says Recursos Humanos loads it. This holds in the database, not only in the page. An Admin's own Mi Legajo follows the same rule (they manage it from Legajos).
 
 ### US-4 Legajos (Admin)
 As Admin, I see the list of employees and open any legajo.
 - I can edit all legajo data (groups A to E); my changes apply directly, with no approval step. Group E is a form of dropdowns from Configuración (section 8): Área, Puesto (only the Puestos of the chosen Área; changing the Área clears the Puesto), Sucursal, Tarea, Convenio and Categoría offer the active items in Configuración order. A value the legajo already has that is inactive now stays selected, marked "(inactivo)", and is not offered to other legajos. Required fields are marked, and an incomplete save is refused with an error per field. My own group E is edited here too; Mi Legajo does not show it.
 - I review pending changes and document uploads from employees and approve or reject them (detail in US-7).
-- I can upload, replace, delete and download documents for any employee; files go to a private bucket.
+- I can upload, replace, delete and download documents for any employee; files go to a private bucket. This includes the Alta de AFIP (optional), which only an Admin manages, my own included.
 - Replacing a current document asks how: **Conservar historial** keeps the previous document as replaced, or **Reemplazar definitivamente** deletes it and its file for good, after an explicit confirmation. While the employee has a pending document of that type, I cannot upload or replace that type; it is decided in the approvals inbox first.
 - The legajo detail lists the replaced versions of each document type (when replaced, who replaced it) and lets me download them. Employees never see replaced documents.
 - While the employee has a pending change request, groups A to D and the children cannot be edited directly (group E and documents can); the notice links to the request in the inbox.
@@ -70,6 +71,7 @@ As Admin, I create an employee account and assign a role.
 
 ### US-7 Aprobación de cambios
 - An Empleado saving a change to groups A to D, or uploading a document, creates a pending item; the current value stays in place.
+- The Alta de AFIP never goes through approval: only an Admin uploads it, and Admin uploads are approved at once. It is never pending, so it never appears in the inbox or the bell; the database refuses a pending Alta de AFIP.
 - The Empleado sees their submitted value marked as pending, and the reason if it was rejected.
 - An Admin sees pending items with an in-app indicator, reviews the submitted value against the current one, and approves or rejects with a reason.
 - On approval the value (or document) becomes current; on rejection nothing changes.
@@ -180,7 +182,8 @@ Bruto mensual and Modalidad were removed in CR-2, with their data. Values stored
 |---|---|---|
 | A to D | Submits changes; they apply after Admin approval | Read and edit, applied directly |
 | E (laborales) | No access (does not see it) | Read and edit |
-| Documents | Uploads own; they apply after Admin approval; reads own | Uploads, replaces, deletes and reads for anyone |
+| Documents | Uploads own, except the Alta de AFIP; they apply after Admin approval; reads own (current ones only) | Uploads, replaces, deletes and reads for anyone |
+| Alta de AFIP | Reads and downloads own current one; no upload, replace or delete | Uploads, replaces, deletes and reads for anyone, approved at once |
 
 Validation (required fields, DNI digits only, Partido otro, children rule) is enforced on the server, not only in the form.
 

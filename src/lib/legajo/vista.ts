@@ -2,16 +2,13 @@ import { parseHijosValor, serializeValor, type HijoValor, type LegajoActual } fr
 import type { CampoSolicitud } from "@/lib/aprobaciones/campos";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
-import type { CatalogoItem } from "@/lib/configuracion/listas";
 import { formatearFecha } from "@/lib/format/fecha";
-import { calcularAntiguedad, type Antiguedad } from "./antiguedad";
-import { hoyEnArgentina } from "./fechas";
+import type { Antiguedad } from "./antiguedad";
 import type { GrupoEditable } from "./grupos";
-import { nombreItem, type ActualLaboral } from "./laborales";
 import { ESTADOS_CIVILES } from "./options";
 
-// Display and form helpers for /mi-legajo and /legajos. Pure (antigüedad is
-// as of today in Argentina).
+// Display and form helpers for /mi-legajo and /legajos. Pure. Nothing of
+// group E: its view lives in ./laborales.ts, Admin only (AUDCR2-01).
 
 const t = copy.miLegajo;
 const DATE_FIELDS = new Set<string>(["fecha_nacimiento"]);
@@ -47,38 +44,6 @@ export function textoAntiguedad(antiguedad: Antiguedad | null): string {
   if (anios > 0) partes.push(formatCopy(anios === 1 ? t.antiguedad.anio : t.antiguedad.anios, { n: String(anios) }));
   if (meses > 0) partes.push(formatCopy(meses === 1 ? t.antiguedad.mes : t.antiguedad.meses, { n: String(meses) }));
   return partes.join(t.antiguedad.separador);
-}
-
-export type DatoLaboral = { key: keyof typeof t.camposLaborales; value: string };
-
-// Group E for display (Admin only), in page order, with antigüedad
-// calculated and list items by name (an inactive one marked).
-export function datosLaboralesVista(laboral: ActualLaboral | null, items: readonly CatalogoItem[]): DatoLaboral[] {
-  const sinDato = (value: string | null | undefined) => value || t.sinDato;
-  const item = (id: string | null | undefined) => {
-    const encontrado = id ? items.find((candidato) => candidato.id === id) : undefined;
-    return encontrado ? nombreItem(encontrado) : t.sinDato;
-  };
-  const fechaIngreso = laboral?.fecha_ingreso ?? null;
-  const estado = laboral?.estado_laboral;
-  return [
-    { key: "numero_legajo", value: sinDato(laboral?.numero_legajo) },
-    { key: "area", value: item(laboral?.area_id) },
-    { key: "puesto", value: item(laboral?.puesto_id) },
-    { key: "fecha_ingreso", value: sinDato(formatearFecha(fechaIngreso)) },
-    {
-      key: "antiguedad",
-      value: fechaIngreso ? textoAntiguedad(calcularAntiguedad(fechaIngreso, hoyEnArgentina())) : t.sinDato,
-    },
-    {
-      key: "estado_laboral",
-      value: estado === "activo" || estado === "en_prueba" ? t.estadosLaborales[estado] : t.sinDato,
-    },
-    { key: "sucursal", value: item(laboral?.sucursal_id) },
-    { key: "tarea", value: item(laboral?.tarea_id) },
-    { key: "convenio", value: item(laboral?.convenio_id) },
-    { key: "categoria", value: item(laboral?.categoria_id) },
-  ];
 }
 
 // The value of a field in its stored text form.

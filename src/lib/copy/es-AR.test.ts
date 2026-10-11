@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copy } from "./es-AR";
+import { copyLaborales } from "./laborales";
 
 function collectStrings(value: unknown, path = "copy"): Array<[string, string]> {
   if (typeof value === "string") return [[path, value]];
@@ -153,7 +154,29 @@ describe("es-AR copy", () => {
     expect(copy.miLegajo.documentos.motivoRechazo).toContain("{motivo}");
     expect(copy.miLegajo.documentos.archivoLabel).toContain("{documento}");
     expect(copy.miLegajo.hijos.hijoN).toContain("{n}");
-    expect(Object.keys(copy.miLegajo.grupos)).toEqual(["A", "B", "C", "D", "E"]);
+    // Group E is Admin only: its title lives in ./laborales.ts (AUDCR2-01).
+    expect(Object.keys(copy.miLegajo.grupos)).toEqual(["A", "B", "C", "D"]);
+  });
+
+  it("keeps group E labels out of the shared copy, in the Admin-only module", () => {
+    const compartido = collectStrings(copy).map(([, text]) => text);
+    for (const etiqueta of [copyLaborales.grupo, copyLaborales.campos.numero_legajo, copyLaborales.campos.fecha_ingreso]) {
+      expect(compartido, etiqueta).not.toContain(etiqueta);
+    }
+    for (const [path, text] of collectStrings(copyLaborales, "copyLaborales")) {
+      expect(text.trim(), path).not.toBe("");
+    }
+    expect(copyLaborales.grupo).toBe("Datos laborales");
+    expect(copyLaborales.form.obligatorio).toContain("{campo}");
+    expect(copyLaborales.form.inactivo).toContain("{nombre}");
+    expect(copyLaborales.listado.numeroLegajo).toContain("{numero}");
+  });
+
+  it("defines the Alta de AFIP texts: its type label and the owner's download-only states", () => {
+    expect(copy.documentos.tipos.alta_afip).toBe("Alta de AFIP");
+    expect(copy.miLegajo.documentos.soloAdmin.faltante).toBe("Lo carga Recursos Humanos");
+    expect(copy.miLegajo.documentos.soloAdmin.aprobado.trim()).not.toBe("");
+    expect(copy.miLegajo.documentos.errors.soloAdmin.trim()).not.toBe("");
   });
 
   it("uses the generic login error from the PRD", () => {

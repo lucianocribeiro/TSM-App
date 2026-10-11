@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
 import { THEME_COOKIE, type Theme } from "../src/lib/theme/theme";
-import { adminNuevo, empleadoCompleto, registro, solicitudPendiente } from "./datos";
+import { adminNuevo, altaAfipCargada, empleadoCompleto, registro, solicitudPendiente } from "./datos";
 import { fillLogin, loginAs } from "./helpers";
 import { assertNoSecretOnPage } from "./secrets";
 import { createE2EUser, localServiceClient } from "./service";
@@ -149,6 +149,29 @@ const PANTALLAS: Pantalla[] = [
       await page.getByTestId("grupo-E").getByRole("button", { name: copy.miLegajo.editar }).click();
     },
     lista: (page) => page.getByTestId("grupo-E").getByRole("combobox", { name: /Puesto/ }),
+  },
+  // CR-3: the documents with an Alta de AFIP, download only for the
+  // employee, and among the Admin's documents in the legajo.
+  {
+    nombre: "mi-legajo-documentos",
+    abrir: async (page) => {
+      const emp = await empleadoCompleto("visual-documentos", cuentas.add);
+      const admin = await adminNuevo("visual-documentos-admin", cuentas.add);
+      await altaAfipCargada(emp, admin.id, "visual-alta-afip");
+      await loginAs(page, emp);
+    },
+    lista: (page) => page.getByTestId("documento-alta_afip").getByRole("button", { name: copy.miLegajo.documentos.descargar }),
+  },
+  {
+    nombre: "legajo-detalle-documentos",
+    abrir: async (page) => {
+      const emp = await empleadoCompleto("visual-detalle-documentos", cuentas.add);
+      const admin = await adminNuevo("visual-detalle-documentos-admin", cuentas.add);
+      await altaAfipCargada(emp, admin.id, "visual-alta-afip-admin");
+      await loginAs(page, admin);
+      await page.goto(`/legajos/${emp.id}`);
+    },
+    lista: (page) => page.getByTestId("documento-alta_afip").getByRole("button", { name: copy.legajos.documentos.reemplazar }),
   },
   {
     nombre: "aprobaciones",
