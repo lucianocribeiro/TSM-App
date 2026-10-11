@@ -212,13 +212,15 @@ async function filas<T>(consulta: PromiseLike<{ data: T[] | null; error: { messa
 export async function instantanea(service: TypedClient, ids: string[]) {
   const legajos = await filas(service.from("legajos").select("*").in("profile_id", ids).order("id"));
   const legajoIds = legajos.map((legajo) => legajo.id);
-  const [profiles, laborales, hijos, documentos, solicitudes, eventos] = await Promise.all([
+  const [profiles, laborales, hijos, documentos, solicitudes, eventos, exportaciones] = await Promise.all([
     filas(service.from("profiles").select("*").in("id", ids).order("id")),
     filas(service.from("legajos_laborales").select("*").in("legajo_id", legajoIds).order("legajo_id")),
     filas(service.from("legajo_hijos").select("*").in("legajo_id", legajoIds).order("id")),
     filas(service.from("legajo_documentos").select("*").in("legajo_id", legajoIds).order("id")),
     filas(service.from("solicitudes_cambio").select("*").in("legajo_id", legajoIds).order("id")),
     filas(service.from("cuenta_eventos").select("*").in("profile_id", ids).order("id")),
+    // CR-4: exports they made (a refused export logs nothing).
+    filas(service.from("exportaciones").select("*").in("actor_id", ids).order("id")),
   ]);
   const items = await filas(
     service
@@ -247,5 +249,5 @@ export async function instantanea(service: TypedClient, ids: string[]) {
       return { id, existe: Boolean(data.user), email: data.user?.email ?? null, banned_until: data.user?.banned_until ?? null };
     }),
   );
-  return { profiles, legajos, laborales, hijos, documentos, solicitudes, items, eventos, objetos, usuarios };
+  return { profiles, legajos, laborales, hijos, documentos, solicitudes, items, eventos, exportaciones, objetos, usuarios };
 }

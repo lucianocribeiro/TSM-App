@@ -278,6 +278,18 @@ describe("account state at the database (GAP-01)", () => {
         esperado: "42501",
         llamar: (c, x) => c.rpc("registrar_creacion_cuenta", { p_profile_id: x.victima.id }),
       },
+      // CR-4: an inactive Admin cannot log (so cannot complete) an export.
+      registrar_exportacion: {
+        esperado: "42501",
+        llamar: (c) =>
+          c.rpc("registrar_exportacion", {
+            p_campos: ["nombres"],
+            p_incluye_hijos: false,
+            p_cantidad: 1,
+            p_filtros: {},
+            p_resultado: "ok",
+          }),
+      },
     };
 
     const llamantes = [

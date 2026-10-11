@@ -151,6 +151,50 @@ export type Database = {
           },
         ]
       }
+      exportaciones: {
+        Row: {
+          actor_id: string
+          campos: string[]
+          cantidad: number
+          created_at: string
+          filtros: Json
+          id: string
+          incluye_hijos: boolean
+          resultado: string
+          secuencia: number
+        }
+        Insert: {
+          actor_id: string
+          campos: string[]
+          cantidad: number
+          created_at?: string
+          filtros: Json
+          id?: string
+          incluye_hijos: boolean
+          resultado: string
+          secuencia?: never
+        }
+        Update: {
+          actor_id?: string
+          campos?: string[]
+          cantidad?: number
+          created_at?: string
+          filtros?: Json
+          id?: string
+          incluye_hijos?: boolean
+          resultado?: string
+          secuencia?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exportaciones_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       legajo_documentos: {
         Row: {
           created_at: string
@@ -717,6 +761,16 @@ export type Database = {
       registrar_creacion_cuenta: {
         Args: { p_profile_id: string }
         Returns: undefined
+      }
+      registrar_exportacion: {
+        Args: {
+          p_campos: string[]
+          p_cantidad: number
+          p_filtros: Json
+          p_incluye_hijos: boolean
+          p_resultado: string
+        }
+        Returns: string
       }
     }
     Enums: {
