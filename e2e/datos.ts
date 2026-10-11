@@ -152,6 +152,29 @@ export async function documentoPendiente(empleado: { id: string; legajoId: strin
   return { ...data!, path };
 }
 
+// The employee's current Alta de AFIP (CR-3), as an Admin's upload leaves it:
+// object and approved row, reviewed by that Admin.
+export async function altaAfipCargada(empleado: { id: string; legajoId: string }, adminId: string, label: string) {
+  const service = localServiceClient();
+  const path = `${empleado.id}/alta_afip/${randomUUID()}.pdf`;
+  const file = pdf(label);
+  expect((await service.storage.from(BUCKET).upload(path, file.buffer, { contentType: "application/pdf" })).error).toBeNull();
+  const { error } = await service.from("legajo_documentos").insert({
+    legajo_id: empleado.legajoId,
+    tipo: "alta_afip",
+    storage_path: path,
+    file_name: file.name,
+    mime_type: "application/pdf",
+    size_bytes: file.buffer.length,
+    uploaded_by: adminId,
+    estado: "aprobado",
+    revisado_por: adminId,
+    revisado_en: new Date().toISOString(),
+  });
+  expect(error).toBeNull();
+  return { path, fileName: file.name };
+}
+
 // An ISO timestamp some hours before now.
 export function haceHoras(horas: number): string {
   return new Date(Date.now() - horas * 3_600_000).toISOString();

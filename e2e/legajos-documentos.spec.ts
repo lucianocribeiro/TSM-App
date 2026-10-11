@@ -13,7 +13,7 @@ import { localServiceClient } from "./service";
 // are checked after every step. Each test creates its own accounts.
 
 type DocumentoTipo = Database["public"]["Enums"]["documento_tipo"];
-const TIPOS: DocumentoTipo[] = ["dni_frente", "dni_dorso", "licencia_conducir"];
+const TIPOS: DocumentoTipo[] = ["dni_frente", "dni_dorso", "licencia_conducir", "alta_afip"];
 const ml = copy.miLegajo;
 const r = copy.legajos.documentos;
 const cuentas = registro();
