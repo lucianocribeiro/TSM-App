@@ -276,10 +276,7 @@ export type Database = {
         Row: {
           alergias: string | null
           apellido: string | null
-          area: string | null
-          bruto_mensual: number | null
           calle_altura: string | null
-          convenio: string | null
           created_at: string
           cuil: string | null
           dni: string | null
@@ -289,26 +286,20 @@ export type Database = {
           emergencia_parentesco: string | null
           emergencia_telefono: string | null
           estado_civil: Database["public"]["Enums"]["estado_civil"] | null
-          estado_laboral: Database["public"]["Enums"]["estado_laboral"] | null
-          fecha_ingreso: string | null
           fecha_nacimiento: string | null
           grupo_sanguineo: string | null
           id: string
           localidad: string | null
           medicacion_habitual: string | null
-          modalidad: string | null
           nacionalidad: string | null
           nombre_conyuge: string | null
           nombres: string | null
           numero_afiliado: string | null
-          numero_legajo: string | null
           obra_social: string | null
           partido: string | null
           partido_otro: string | null
           piso_depto: string | null
           profile_id: string
-          puesto: string | null
-          sede: string | null
           telefono_celular: string | null
           tiene_hijos: boolean | null
           updated_at: string
@@ -316,10 +307,7 @@ export type Database = {
         Insert: {
           alergias?: string | null
           apellido?: string | null
-          area?: string | null
-          bruto_mensual?: number | null
           calle_altura?: string | null
-          convenio?: string | null
           created_at?: string
           cuil?: string | null
           dni?: string | null
@@ -329,26 +317,20 @@ export type Database = {
           emergencia_parentesco?: string | null
           emergencia_telefono?: string | null
           estado_civil?: Database["public"]["Enums"]["estado_civil"] | null
-          estado_laboral?: Database["public"]["Enums"]["estado_laboral"] | null
-          fecha_ingreso?: string | null
           fecha_nacimiento?: string | null
           grupo_sanguineo?: string | null
           id?: string
           localidad?: string | null
           medicacion_habitual?: string | null
-          modalidad?: string | null
           nacionalidad?: string | null
           nombre_conyuge?: string | null
           nombres?: string | null
           numero_afiliado?: string | null
-          numero_legajo?: string | null
           obra_social?: string | null
           partido?: string | null
           partido_otro?: string | null
           piso_depto?: string | null
           profile_id: string
-          puesto?: string | null
-          sede?: string | null
           telefono_celular?: string | null
           tiene_hijos?: boolean | null
           updated_at?: string
@@ -356,10 +338,7 @@ export type Database = {
         Update: {
           alergias?: string | null
           apellido?: string | null
-          area?: string | null
-          bruto_mensual?: number | null
           calle_altura?: string | null
-          convenio?: string | null
           created_at?: string
           cuil?: string | null
           dni?: string | null
@@ -369,26 +348,20 @@ export type Database = {
           emergencia_parentesco?: string | null
           emergencia_telefono?: string | null
           estado_civil?: Database["public"]["Enums"]["estado_civil"] | null
-          estado_laboral?: Database["public"]["Enums"]["estado_laboral"] | null
-          fecha_ingreso?: string | null
           fecha_nacimiento?: string | null
           grupo_sanguineo?: string | null
           id?: string
           localidad?: string | null
           medicacion_habitual?: string | null
-          modalidad?: string | null
           nacionalidad?: string | null
           nombre_conyuge?: string | null
           nombres?: string | null
           numero_afiliado?: string | null
-          numero_legajo?: string | null
           obra_social?: string | null
           partido?: string | null
           partido_otro?: string | null
           piso_depto?: string | null
           profile_id?: string
-          puesto?: string | null
-          sede?: string | null
           telefono_celular?: string | null
           tiene_hijos?: boolean | null
           updated_at?: string
@@ -400,6 +373,126 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      legajos_laborales: {
+        Row: {
+          area_id: string | null
+          area_lista: Database["public"]["Enums"]["catalogo_lista"] | null
+          categoria_id: string | null
+          categoria_lista: Database["public"]["Enums"]["catalogo_lista"] | null
+          convenio_id: string | null
+          convenio_lista: Database["public"]["Enums"]["catalogo_lista"] | null
+          created_at: string
+          estado_laboral: Database["public"]["Enums"]["estado_laboral"] | null
+          fecha_ingreso: string | null
+          legajo_id: string
+          numero_legajo: string | null
+          puesto_id: string | null
+          puesto_lista: Database["public"]["Enums"]["catalogo_lista"] | null
+          sucursal_id: string | null
+          sucursal_lista: Database["public"]["Enums"]["catalogo_lista"] | null
+          tarea_id: string | null
+          tarea_lista: Database["public"]["Enums"]["catalogo_lista"] | null
+          updated_at: string
+        }
+        Insert: {
+          area_id?: string | null
+          area_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          categoria_id?: string | null
+          categoria_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          convenio_id?: string | null
+          convenio_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          created_at?: string
+          estado_laboral?: Database["public"]["Enums"]["estado_laboral"] | null
+          fecha_ingreso?: string | null
+          legajo_id: string
+          numero_legajo?: string | null
+          puesto_id?: string | null
+          puesto_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          sucursal_id?: string | null
+          sucursal_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          tarea_id?: string | null
+          tarea_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          updated_at?: string
+        }
+        Update: {
+          area_id?: string | null
+          area_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          categoria_id?: string | null
+          categoria_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          convenio_id?: string | null
+          convenio_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          created_at?: string
+          estado_laboral?: Database["public"]["Enums"]["estado_laboral"] | null
+          fecha_ingreso?: string | null
+          legajo_id?: string
+          numero_legajo?: string | null
+          puesto_id?: string | null
+          puesto_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          sucursal_id?: string | null
+          sucursal_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          tarea_id?: string | null
+          tarea_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legajos_laborales_area_fkey"
+            columns: ["area_id", "area_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
+          },
+          {
+            foreignKeyName: "legajos_laborales_categoria_fkey"
+            columns: ["categoria_id", "categoria_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
+          },
+          {
+            foreignKeyName: "legajos_laborales_convenio_fkey"
+            columns: ["convenio_id", "convenio_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
+          },
+          {
+            foreignKeyName: "legajos_laborales_legajo_id_fkey"
+            columns: ["legajo_id"]
+            isOneToOne: true
+            referencedRelation: "legajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legajos_laborales_puesto_area_fkey"
+            columns: ["puesto_id", "area_id"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "area_id"]
+          },
+          {
+            foreignKeyName: "legajos_laborales_puesto_fkey"
+            columns: ["puesto_id", "puesto_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
+          },
+          {
+            foreignKeyName: "legajos_laborales_sucursal_fkey"
+            columns: ["sucursal_id", "sucursal_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
+          },
+          {
+            foreignKeyName: "legajos_laborales_tarea_fkey"
+            columns: ["tarea_id", "tarea_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
           },
         ]
       }
@@ -537,6 +630,14 @@ export type Database = {
         Returns: undefined
       }
       campos_solicitud_permitidos: { Args: never; Returns: string[] }
+      catalogo_item_por_texto: {
+        Args: {
+          p_area_id: string
+          p_lista: Database["public"]["Enums"]["catalogo_lista"]
+          p_texto: string
+        }
+        Returns: string
+      }
       cerrar_sesiones_cuenta: {
         Args: { p_profile_id: string }
         Returns: undefined
