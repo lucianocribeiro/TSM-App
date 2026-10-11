@@ -92,6 +92,39 @@ const inactivo = (fila: Record<Op, Resultado>) => ({
 
 type Tabla = keyof Database["public"]["Tables"];
 export const BUCKET_DOCUMENTOS = `storage.objects (${DOCUMENTOS_BUCKET})`;
+// CR-3: the Admin-only type, row and object, on top of the generic entries.
+export const DOCUMENTOS_ALTA_AFIP = "legajo_documentos (alta_afip)";
+export const BUCKET_ALTA_AFIP = `storage.objects (${DOCUMENTOS_BUCKET}, alta_afip)`;
+
+// The titular's current Alta de AFIP, as an Admin leaves it (approved at
+// once): object and row. The service role keeps the values it writes.
+async function altaAfipVigente(service: TypedClient, titular: Titular, conObjeto: boolean) {
+  const path = rutaDocumento(titular.id, "alta_afip");
+  if (conObjeto) {
+    const subida = await service.storage.from(DOCUMENTOS_BUCKET).upload(path, fakePdf("matriz alta afip"), {
+      contentType: "application/pdf",
+    });
+    if (subida.error) throw new Error(`service upload failed: ${subida.error.message}`);
+  }
+  const documento = await primera(
+    service
+      .from("legajo_documentos")
+      .insert({
+        legajo_id: titular.legajoId,
+        tipo: "alta_afip",
+        storage_path: path,
+        file_name: "alta.pdf",
+        mime_type: "application/pdf",
+        size_bytes: 10,
+        uploaded_by: titular.id,
+        estado: "aprobado",
+        revisado_por: titular.id,
+        revisado_en: new Date().toISOString(),
+      })
+      .select("id"),
+  );
+  return { path, documento: documento.id };
+}
 
 // A pending change request with one item, for solicitudes_cambio and its items.
 async function solicitudPendiente(service: TypedClient, titular: Titular): Promise<Objetivo> {
@@ -126,7 +159,10 @@ async function borrarSolicitudes(service: TypedClient, titular: Titular) {
   await service.from("solicitudes_cambio").delete().eq("legajo_id", titular.legajoId);
 }
 
-export const TABLAS: Record<Tabla | typeof BUCKET_DOCUMENTOS, EspecTabla> = {
+export const TABLAS: Record<
+  Tabla | typeof BUCKET_DOCUMENTOS | typeof DOCUMENTOS_ALTA_AFIP | typeof BUCKET_ALTA_AFIP,
+  EspecTabla
+> = {
   // No INSERT or DELETE for any API role; UPDATE (role) is Admin only.
   // An inactive user keeps SELECT of their own row, and only that.
   profiles: {
@@ -298,6 +334,52 @@ export const TABLAS: Record<Tabla | typeof BUCKET_DOCUMENTOS, EspecTabla> = {
       admin: e(P, P, P, P),
       ...inactivo(e(V, N, V, V)),
       "cambio-forzado-propio": e(P, P, V, P),
+    },
+  },
+
+  // CR-3. The target is the titular's current Alta de AFIP. The owner reads
+  // it and nothing else: INSERT of the type is refused by the policy for a
+  // non-admin; UPDATE is Admin only; the owner's DELETE needs a pending
+  // document, which an Alta de AFIP never is. The Admin's INSERT passes the
+  // policy and meets the one-current-per-type index (the target is current).
+  [DOCUMENTOS_ALTA_AFIP]: {
+    preparar: async (service, titular) => {
+      const { documento } = await altaAfipVigente(service, titular, false);
+      return { id: documento };
+    },
+    estado: (service, titular) =>
+      filas(service.from("legajo_documentos").select("*").eq("legajo_id", titular.legajoId).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("legajo_documentos").select("id").eq("id", o.id)),
+      insert: (c, l, t) =>
+        r(
+          c
+            .from("legajo_documentos")
+            .insert({
+              legajo_id: t.legajoId,
+              tipo: "alta_afip",
+              storage_path: rutaDocumento(t.id, "alta_afip"),
+              file_name: "intento.pdf",
+              mime_type: "application/pdf",
+              size_bytes: 10,
+              uploaded_by: l.id ?? t.id,
+            })
+            .select("id"),
+        ),
+      update: (c, l, t, o) =>
+        r(c.from("legajo_documentos").update({ file_name: "cambiado.pdf", uploaded_by: l.id ?? t.id }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("legajo_documentos").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async (service, titular) => {
+      await service.from("legajo_documentos").delete().eq("legajo_id", titular.legajoId);
+    },
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(P, N, V, V),
+      "empleado-ajeno": e(V, N, V, V),
+      admin: e(P, "error:23505", P, P),
+      ...inactivo(e(V, N, V, V)),
+      "cambio-forzado-propio": e(P, N, V, V),
     },
   },
 
@@ -511,6 +593,57 @@ export const TABLAS: Record<Tabla | typeof BUCKET_DOCUMENTOS, EspecTabla> = {
       admin: e(P, P, P, P),
       ...inactivo(e(V, N, N, V)),
       "cambio-forzado-propio": e(P, P, P, P),
+    },
+  },
+
+  // CR-3. The target is the object of the titular's current Alta de AFIP.
+  // The owner downloads it and writes nothing under alta_afip/: no upload
+  // (INSERT, to a new path there), no overwrite, no removal (the storage API
+  // answers a refused removal with no objects). The Admin does everything.
+  [BUCKET_ALTA_AFIP]: {
+    preparar: async (service, titular) => {
+      const { path, documento } = await altaAfipVigente(service, titular, true);
+      return { path, nuevo: rutaDocumento(titular.id, "alta_afip"), documento };
+    },
+    estado: async (service, _titular, o) => {
+      const bucket = service.storage.from(DOCUMENTOS_BUCKET);
+      const [actual, nuevo] = await Promise.all([bucket.download(o.path), bucket.download(o.nuevo)]);
+      return {
+        actual: actual.data ? await actual.data.text() : null,
+        nuevo: nuevo.data ? await nuevo.data.text() : null,
+      };
+    },
+    ops: {
+      select: async (c, _l, _t, o) => ((await c.storage.from(DOCUMENTOS_BUCKET).download(o.path)).data ? P : V),
+      insert: async (c, _l, _t, o) => {
+        const { error } = await c.storage
+          .from(DOCUMENTOS_BUCKET)
+          .upload(o.nuevo, fakePdf("matriz intento"), { contentType: "application/pdf" });
+        return error ? N : P;
+      },
+      update: async (c, _l, _t, o) => {
+        const { error } = await c.storage
+          .from(DOCUMENTOS_BUCKET)
+          .update(o.path, fakePdf("matriz cambiado"), { contentType: "application/pdf" });
+        return error ? N : P;
+      },
+      delete: async (c, _l, _t, o) => {
+        const { data, error } = await c.storage.from(DOCUMENTOS_BUCKET).remove([o.path]);
+        if (error) return N;
+        return (data?.length ?? 0) > 0 ? P : V;
+      },
+    },
+    limpiar: async (service, _titular, o) => {
+      await service.storage.from(DOCUMENTOS_BUCKET).remove([o.path, o.nuevo]);
+      await service.from("legajo_documentos").delete().eq("id", o.documento);
+    },
+    esperado: {
+      anon: e(V, N, N, V),
+      "empleado-propio": e(P, N, N, V),
+      "empleado-ajeno": e(V, N, N, V),
+      admin: e(P, P, P, P),
+      ...inactivo(e(V, N, N, V)),
+      "cambio-forzado-propio": e(P, N, N, V),
     },
   },
 };
