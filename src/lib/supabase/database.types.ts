@@ -743,7 +743,11 @@ export type Database = {
         | "password_temporal"
         | "password_cambiada"
       documento_estado: "pendiente" | "aprobado" | "rechazado" | "reemplazado"
-      documento_tipo: "dni_frente" | "dni_dorso" | "licencia_conducir"
+      documento_tipo:
+        | "dni_frente"
+        | "dni_dorso"
+        | "licencia_conducir"
+        | "alta_afip"
       estado_civil:
         | "soltero"
         | "casado"
@@ -905,7 +909,12 @@ export const Constants = {
         "password_cambiada",
       ],
       documento_estado: ["pendiente", "aprobado", "rechazado", "reemplazado"],
-      documento_tipo: ["dni_frente", "dni_dorso", "licencia_conducir"],
+      documento_tipo: [
+        "dni_frente",
+        "dni_dorso",
+        "licencia_conducir",
+        "alta_afip",
+      ],
       estado_civil: [
         "soltero",
         "casado",
