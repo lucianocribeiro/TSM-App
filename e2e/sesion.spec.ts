@@ -21,7 +21,7 @@ async function usuario(label: string, rol: "empleado" | "admin" = "empleado") {
 
 const PUBLICA = "/login";
 const AUTENTICADAS = ["/mi-legajo", "/cambiar-password"];
-const ADMIN = ["/legajos", "/usuarios", "/aprobaciones", "/configuracion", "/configuracion/historial"];
+const ADMIN = ["/legajos", "/legajos/exportaciones", "/usuarios", "/aprobaciones", "/configuracion", "/configuracion/historial"];
 const SIN_MAPA = "/no-existe";
 
 // Where each path ends up for a user: path -> expected URL (path + query).
@@ -39,6 +39,7 @@ test.describe("access matrix", () => {
       "/mi-legajo": "/login?volver=%2Fmi-legajo",
       "/cambiar-password": "/login?volver=%2Fcambiar-password",
       "/legajos": "/login?volver=%2Flegajos",
+      "/legajos/exportaciones": "/login?volver=%2Flegajos%2Fexportaciones",
       "/usuarios": "/login?volver=%2Fusuarios",
       "/aprobaciones": "/login?volver=%2Faprobaciones",
       "/configuracion": "/login?volver=%2Fconfiguracion",

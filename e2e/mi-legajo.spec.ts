@@ -105,6 +105,10 @@ test("an Empleado sees their own data, and no datos laborales at all; nobody els
     const cuerpo = await respuesta.text();
     expect(cuerpo, JSON.stringify(headers)).toContain(user.apellido);
     expect(cuerpo, JSON.stringify(headers)).not.toContain(user.numeroLegajo);
+    // CR-4: the Admin's read-only group E is rendered for an Admin only.
+    for (const marca of [copyLaborales.grupo, copyLaborales.campos.numero_legajo, copyLaborales.propio.editar, "grupo-E-propio"]) {
+      expect(cuerpo, `${JSON.stringify(headers)} ${marca}`).not.toContain(marca);
+    }
   }
 
   // Another employee's data never appears.
