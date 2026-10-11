@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
+import { copyLaborales } from "../src/lib/copy/laborales";
 import { formatCopy } from "../src/lib/copy/format";
 import { cuilDigitoVerificador } from "../src/lib/legajo/cuil";
 import { loginAs, mainNav } from "./helpers";
@@ -42,7 +43,7 @@ async function nuevaArea(): Promise<string> {
 }
 
 // A required field's label in the group E form.
-const obligatorio = (campo: keyof typeof ml.camposLaborales) => formatCopy(t.laborales.obligatorio, { campo: ml.camposLaborales[campo] });
+const obligatorio = (campo: keyof typeof copyLaborales.campos) => formatCopy(copyLaborales.form.obligatorio, { campo: copyLaborales.campos[campo] });
 
 // A valid CUIL for a DNI (prefix 20, or 23 when 20 has no check digit).
 function cuilPara(dni: string): string {
@@ -136,29 +137,29 @@ test("the Admin filters, searches and shows deactivated employees in the list", 
 
   // Área filter (options from Configuración): only this test's employees;
   // the deactivated one hidden.
-  await page.getByLabel(t.filtros.area, { exact: true }).selectOption({ label: area });
+  await page.getByLabel(copyLaborales.listado.filtros.area, { exact: true }).selectOption({ label: area });
   await expect(filas(page)).toHaveCount(2);
   await expect(filas(page).nth(0)).toContainText("Ana Aguirre");
   await expect(filas(page).nth(1)).toContainText("Beto Benítez");
-  await expect(filas(page).nth(0)).toContainText(formatCopy(t.numeroLegajo, { numero: ana.numeroLegajo }));
+  await expect(filas(page).nth(0)).toContainText(formatCopy(copyLaborales.listado.numeroLegajo, { numero: ana.numeroLegajo }));
   await screenshotBoth(page, "legajos-lista");
 
   // The Sucursal and Tarea columns and filters; no bruto anywhere.
-  await expect(page.getByRole("columnheader", { name: t.columnas.sucursal })).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: t.columnas.tarea })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: copyLaborales.listado.columnas.sucursal })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: copyLaborales.listado.columnas.tarea })).toBeVisible();
   await expect(filas(page).nth(1)).toContainText("Pacheco");
   await expect(filas(page).nth(1)).toContainText("Cajero");
-  await page.getByLabel(t.filtros.sucursal, { exact: true }).selectOption({ label: "Pacheco" });
+  await page.getByLabel(copyLaborales.listado.filtros.sucursal, { exact: true }).selectOption({ label: "Pacheco" });
   await expect(filas(page)).toHaveCount(1);
   await expect(filas(page)).toContainText("Beto Benítez");
-  await page.getByLabel(t.filtros.sucursal, { exact: true }).selectOption("");
-  await page.getByLabel(t.filtros.tarea, { exact: true }).selectOption({ label: "Cajero" });
+  await page.getByLabel(copyLaborales.listado.filtros.sucursal, { exact: true }).selectOption("");
+  await page.getByLabel(copyLaborales.listado.filtros.tarea, { exact: true }).selectOption({ label: "Cajero" });
   await expect(filas(page)).toHaveCount(1);
   await expect(filas(page)).toContainText("Beto Benítez");
-  await page.getByLabel(t.filtros.tarea, { exact: true }).selectOption("");
-  await page.getByLabel(t.filtros.estadoLaboral, { exact: true }).selectOption("en_prueba");
+  await page.getByLabel(copyLaborales.listado.filtros.tarea, { exact: true }).selectOption("");
+  await page.getByLabel(copyLaborales.listado.filtros.estadoLaboral, { exact: true }).selectOption("en_prueba");
   await expect(page.getByText(t.sinResultados)).toBeVisible();
-  await page.getByLabel(t.filtros.estadoLaboral, { exact: true }).selectOption("");
+  await page.getByLabel(copyLaborales.listado.filtros.estadoLaboral, { exact: true }).selectOption("");
 
   // Search: CUIL without hyphens, CUIL with hyphens, DNI, name, número de legajo.
   const buscar = page.getByLabel(t.busqueda.label, { exact: true });
@@ -180,7 +181,7 @@ test("the Admin filters, searches and shows deactivated employees in the list", 
   await screenshotBoth(page, "legajos-lista-bajas");
 
   await page.getByRole("button", { name: t.filtros.limpiar }).click();
-  await expect(page.getByLabel(t.filtros.area, { exact: true })).toHaveValue("");
+  await expect(page.getByLabel(copyLaborales.listado.filtros.area, { exact: true })).toHaveValue("");
   await expect(page.getByLabel(t.filtros.mostrarBajas, { exact: true })).not.toBeChecked();
 });
 
@@ -213,7 +214,7 @@ test("the KPI cards show Activos and Ingresos del mes for the whole workforce, a
 
   // Filters, search and the deactivated toggle leave the cards as they are.
   const antes = { activos: await kpi(page, "activos").textContent(), ingresos: await kpi(page, "ingresos-del-mes").textContent() };
-  await page.getByLabel(t.filtros.area, { exact: true }).selectOption({ label: area });
+  await page.getByLabel(copyLaborales.listado.filtros.area, { exact: true }).selectOption({ label: area });
   await page.getByLabel(t.busqueda.label, { exact: true }).fill("gomez");
   await page.getByLabel(t.filtros.mostrarBajas, { exact: true }).check();
   await expect(filas(page)).toHaveCount(1);
@@ -231,7 +232,7 @@ test("the Admin opens a legajo, edits groups E and A directly, and uploads and d
   const adminUser = await admin();
   await loginAs(page, adminUser);
   await page.goto("/legajos");
-  await page.getByLabel(t.filtros.area, { exact: true }).selectOption({ label: area });
+  await page.getByLabel(copyLaborales.listado.filtros.area, { exact: true }).selectOption({ label: area });
   await filas(page).first().click();
   await expect(page).toHaveURL(new RegExp(`/legajos/${emp.id}$`));
   await expect(page.getByRole("heading", { level: 1, name: "Diego Duarte" })).toBeVisible();
@@ -239,7 +240,7 @@ test("the Admin opens a legajo, edits groups E and A directly, and uploads and d
 
   // Group E (CR-2): dropdowns of Configuración, the inactive Sucursal kept
   // and marked, no bruto mensual or modalidad.
-  const inactiva = formatCopy(t.laborales.inactivo, { nombre: vieja });
+  const inactiva = formatCopy(copyLaborales.form.inactivo, { nombre: vieja });
   const e = grupo(page, "E");
   await expect(dato(page, "E", "sucursal")).toContainText(inactiva);
   await expect(dato(page, "E", "area")).toContainText(area);

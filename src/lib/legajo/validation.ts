@@ -4,14 +4,15 @@ import { validarCuil } from "./cuil";
 import { esFechaFutura } from "./fechas";
 import {
   ESTADOS_CIVILES,
-  ESTADOS_LABORALES,
   PARTIDO_OTRO,
   PARTIDOS,
 } from "./options";
 
 // Shared server validation for the legajo (PRD section 5).
-// Groups A to D are editable by Empleado (own legajo) and Admin; group E by
-// Admin only. Server Actions must validate with these schemas before writing.
+// Groups A to D are editable by Empleado (own legajo) and Admin. Group E is
+// Admin only and its schema lives in ./laborales.ts, out of the bundle of
+// Mi Legajo (AUDCR2-01); it builds on the field rules exported here.
+// Server Actions must validate with these schemas before writing.
 
 const messages = copy.legajo.validation;
 
@@ -29,7 +30,7 @@ function isValidIsoDate(value: string): boolean {
 }
 
 // Required text: trimmed, non-empty.
-const requiredText = () =>
+export const requiredText = () =>
   z.string({ error: messages.required }).trim().min(1, { error: messages.required });
 
 // Optional text: trimmed; empty becomes null.
@@ -45,7 +46,7 @@ const requiredDate = () =>
   requiredText().refine(isValidIsoDate, { error: messages.dateInvalid });
 
 // Required ISO date that is not after today in Argentina (PRD 5.7).
-const requiredPastDate = () =>
+export const requiredPastDate = () =>
   requiredDate().refine((value) => !esFechaFutura(value), { error: messages.fechaFutura });
 
 // CUIL (PRD 5.7): XX-XXXXXXXX-X or 11 digits, prefix 20, 23, 24 or 27, and a
@@ -74,7 +75,7 @@ export function isValidTelefono(value: string): boolean {
 }
 const telefono = () => requiredText().refine(isValidTelefono, { error: messages.telefonoInvalid });
 
-const option = <const T extends readonly [string, ...string[]]>(values: T) =>
+export const option = <const T extends readonly [string, ...string[]]>(values: T) =>
   z.enum(values, {
     error: (issue) =>
       issue.input === undefined || issue.input === null || issue.input === ""
@@ -180,36 +181,8 @@ export const legajoPersonalSchema = z
     checkHijos(value, ctx);
   });
 
-// ---------------------------------------------------------------------------
-// Group E: Datos laborales (Admin only)
-// ---------------------------------------------------------------------------
-// Área, Puesto, Sucursal, Tarea, Convenio and Categoría are list item ids;
-// that each one is an item of its list (and the Puesto of the Área) is
-// checked against the lists by validarDatosLaborales (./laborales.ts).
-const requiredId = () => requiredText().pipe(z.uuid({ error: messages.optionInvalid }));
-const optionalId = () =>
-  z
-    .string({ error: messages.optionInvalid })
-    .nullish()
-    .transform((value) => value || null)
-    .pipe(z.uuid({ error: messages.optionInvalid }).nullable());
-
-export const datosLaboralesSchema = z.object({
-  numero_legajo: requiredText(),
-  area_id: requiredId(),
-  puesto_id: requiredId(),
-  fecha_ingreso: requiredPastDate(),
-  estado_laboral: option(ESTADOS_LABORALES),
-  sucursal_id: requiredId(),
-  tarea_id: optionalId(),
-  convenio_id: optionalId(),
-  categoria_id: optionalId(),
-});
-
 export type LegajoPersonalInput = z.input<typeof legajoPersonalSchema>;
 export type LegajoPersonal = z.output<typeof legajoPersonalSchema>;
-export type DatosLaboralesInput = z.input<typeof datosLaboralesSchema>;
-export type DatosLaborales = z.output<typeof datosLaboralesSchema>;
 
 // Field errors for a form: the first message per field path, keyed as
 // "campo" or, inside the children list, "hijos.0.nombre_completo".

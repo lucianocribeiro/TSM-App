@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/Select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { rowClassName, Table, Td, Th } from "@/components/ui/Table";
 import { copy } from "@/lib/copy/es-AR";
+import { copyLaborales } from "@/lib/copy/laborales";
 import { formatCopy } from "@/lib/copy/format";
 import type { CatalogoItem } from "@/lib/configuracion/listas";
 import type { Opcion } from "@/lib/legajo/laborales";
@@ -27,6 +28,7 @@ import type { KpisLegajos } from "@/lib/legajo/kpis";
 import { ESTADOS_LABORALES } from "@/lib/legajo/options";
 
 const t = copy.legajos;
+const tl = copyLaborales.listado;
 
 type LegajosScreenProps = {
   legajos: LegajoListItem[];
@@ -77,29 +79,29 @@ export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScree
               <Field
                 label={t.busqueda.label}
                 type="search"
-                placeholder={t.busqueda.placeholder}
+                placeholder={tl.busquedaPlaceholder}
                 value={filtros.busqueda}
                 onChange={(event) => set("busqueda", event.target.value)}
               />
             </div>
             <Select
-              label={t.filtros.estadoLaboral}
+              label={tl.filtros.estadoLaboral}
               placeholder={t.filtros.todos}
               value={filtros.estadoLaboral}
               onChange={(event) => {
                 const value = ESTADOS_LABORALES.find((estado) => estado === event.target.value);
                 set("estadoLaboral", value ?? "");
               }}
-              options={ESTADOS_LABORALES.map((estado) => ({ value: estado, label: copy.miLegajo.estadosLaborales[estado] }))}
+              options={ESTADOS_LABORALES.map((estado) => ({ value: estado, label: copyLaborales.estados[estado] }))}
             />
-            <FiltroLista label={t.filtros.area} opciones={opciones.area} value={filtros.areaId} onChange={(v) => set("areaId", v)} />
+            <FiltroLista label={tl.filtros.area} opciones={opciones.area} value={filtros.areaId} onChange={(v) => set("areaId", v)} />
             <FiltroLista
-              label={t.filtros.sucursal}
+              label={tl.filtros.sucursal}
               opciones={opciones.sucursal}
               value={filtros.sucursalId}
               onChange={(v) => set("sucursalId", v)}
             />
-            <FiltroLista label={t.filtros.tarea} opciones={opciones.tarea} value={filtros.tareaId} onChange={(v) => set("tareaId", v)} />
+            <FiltroLista label={tl.filtros.tarea} opciones={opciones.tarea} value={filtros.tareaId} onChange={(v) => set("tareaId", v)} />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Checkbox
@@ -138,11 +140,11 @@ export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScree
               <tr>
                 <Th>{t.columnas.empleado}</Th>
                 <Th>{t.columnas.cuil}</Th>
-                <Th>{t.columnas.area}</Th>
-                <Th>{t.columnas.puesto}</Th>
-                <Th>{t.columnas.sucursal}</Th>
-                <Th>{t.columnas.tarea}</Th>
-                <Th>{t.columnas.estadoLaboral}</Th>
+                <Th>{tl.columnas.area}</Th>
+                <Th>{tl.columnas.puesto}</Th>
+                <Th>{tl.columnas.sucursal}</Th>
+                <Th>{tl.columnas.tarea}</Th>
+                <Th>{tl.columnas.estadoLaboral}</Th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +207,7 @@ function LegajoRow({ item, onOpen }: { item: LegajoListItem; onOpen: (href: stri
           </Link>
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-soft tabular-nums">
-          {item.numeroLegajo ? <span>{formatCopy(t.numeroLegajo, { numero: item.numeroLegajo })}</span> : null}
+          {item.numeroLegajo ? <span>{formatCopy(tl.numeroLegajo, { numero: item.numeroLegajo })}</span> : null}
           {baja ? <StatusBadge label={t.dadoDeBaja} tone="secondary" /> : null}
         </div>
       </Td>
@@ -217,7 +219,7 @@ function LegajoRow({ item, onOpen }: { item: LegajoListItem; onOpen: (href: stri
       <Td>
         {item.estadoLaboral ? (
           <StatusBadge
-            label={copy.miLegajo.estadosLaborales[item.estadoLaboral]}
+            label={copyLaborales.estados[item.estadoLaboral]}
             tone={item.estadoLaboral === "activo" ? "active" : "secondary"}
           />
         ) : (

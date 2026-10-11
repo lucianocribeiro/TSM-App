@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
+import { copyLaborales } from "@/lib/copy/laborales";
 
 // The /legajos actions with Storage and the database replaced by a fake
 // session client: the Admin role check, the pending-request lock, and the
@@ -229,8 +230,8 @@ describe("pending change request lock", () => {
     const result = await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES });
     expect(result).toEqual({
       ok: false,
-      error: copy.legajos.errors.numeroLegajoDuplicado,
-      fieldErrors: { numero_legajo: copy.legajos.errors.numeroLegajoDuplicado },
+      error: copyLaborales.errors.numeroLegajoDuplicado,
+      fieldErrors: { numero_legajo: copyLaborales.errors.numeroLegajoDuplicado },
     });
   });
 });

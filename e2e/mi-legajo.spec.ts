@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
+import { copyLaborales } from "../src/lib/copy/laborales";
 import { formatCopy } from "../src/lib/copy/format";
 import { loginAs } from "./helpers";
 import { screenshotBoth } from "./screens";
@@ -84,7 +85,7 @@ test.afterAll(async () => {
 });
 
 // The group E values fillLaboral stores, as a page would show them.
-const VALORES_E = ["Mostrador (SM)", "Casa Central", "15/01/2020", t.grupos.E, t.camposLaborales.antiguedad, t.camposLaborales.numero_legajo];
+const VALORES_E = ["Mostrador (SM)", "Casa Central", "15/01/2020", copyLaborales.grupo, copyLaborales.campos.antiguedad, copyLaborales.campos.numero_legajo];
 
 test("an Empleado sees their own data, and no datos laborales at all; nobody else's", async ({ page }) => {
   const user = await usuario("ver");

@@ -3,11 +3,11 @@ import { copy } from "@/lib/copy/es-AR";
 import {
   datosEmergenciaShape,
   datosFamiliaresShape,
-  datosLaboralesSchema,
   datosPersonalesShape,
   domicilioContactoShape,
   legajoPersonalSchema,
 } from "@/lib/legajo/validation";
+import { datosLaboralesSchema } from "@/lib/legajo/laborales";
 import { CAMPO_SOLICITUD_CODES, CAMPOS_SOLICITUD, isCampoSolicitud } from "./campos";
 
 // Drift guard: the approvable fields are exactly the group A to D fields of
