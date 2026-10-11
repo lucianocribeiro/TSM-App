@@ -88,22 +88,23 @@ const VALORES_E = ["Mostrador (SM)", "Casa Central", "15/01/2020", t.grupos.E, t
 
 test("an Empleado sees their own data, and no datos laborales at all; nobody else's", async ({ page }) => {
   const user = await usuario("ver");
-  const respuestas: string[] = [];
-  page.on("response", async (response) => {
-    if (response.url().includes("/mi-legajo")) respuestas.push(await response.text().catch(() => ""));
-  });
   await loginAs(page, user);
   await expect(page.getByRole("heading", { level: 1, name: t.title })).toBeVisible();
   await expect(dato(page, "A", "apellido")).toContainText(user.apellido);
   await expect(dato(page, "A", "fecha_nacimiento")).toContainText("01/01/1990");
 
   // Group E (CR-2): no section, no field, no value, also not in the page
-  // payload (the HTML and the RSC data it carries).
+  // payload: the HTML and the RSC data, fetched with the same session.
   await expect(grupo(page, "E")).toHaveCount(0);
   const texto = await page.locator("main").innerText();
   for (const valor of [...VALORES_E, user.numeroLegajo]) expect(texto, valor).not.toContain(valor);
-  expect(respuestas.length).toBeGreaterThan(0);
-  for (const cuerpo of respuestas) expect(cuerpo).not.toContain(user.numeroLegajo);
+  for (const headers of [{}, { RSC: "1" }] as Record<string, string>[]) {
+    const respuesta = await page.request.get("/mi-legajo", { headers });
+    expect(respuesta.ok()).toBe(true);
+    const cuerpo = await respuesta.text();
+    expect(cuerpo, JSON.stringify(headers)).toContain(user.apellido);
+    expect(cuerpo, JSON.stringify(headers)).not.toContain(user.numeroLegajo);
+  }
 
   // Another employee's data never appears.
   await expect(page.getByText("Prueba Empleado A")).toHaveCount(0);

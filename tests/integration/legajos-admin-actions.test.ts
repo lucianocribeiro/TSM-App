@@ -200,7 +200,8 @@ describe("/legajos Server Actions (Admin)", () => {
       expect(await actions.actualizarGrupoLegajo({ profileId: admin.id, grupo: "B", valores: { ...GRUPO_B, localidad: "Propia" } })).toEqual({
         ok: true,
       });
-      expect(await legajoOf(admin.id)).toMatchObject({ numero_legajo: `A-${run}`, localidad: "Propia" });
+      expect(await legajoOf(admin.id)).toMatchObject({ localidad: "Propia" });
+      expect((await laboralOf(admin.id)).numero_legajo).toBe(`A-${run}`);
     });
 
     it("the pending-request lock: A to D refused while a request is pending, group E still saved", async () => {
