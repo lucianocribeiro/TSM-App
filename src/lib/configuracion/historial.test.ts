@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
-import { filaHistorial, type EventoCatalogo } from "./historial";
+import { filaHistorial, nombresDeActores, type EventoCatalogo } from "./historial";
 
 const t = copy.configuracion.historial;
 const ACTOR = "11111111-1111-4111-8111-111111111111";
@@ -64,7 +64,56 @@ describe("filaHistorial", () => {
     ]);
   });
 
-  it("shows the id of an actor it cannot name", () => {
-    expect(filaHistorial(evento({}), new Map()).usuario).toBe(ACTOR);
+});
+
+// AUDCR1-01: an actor who cannot be named is never shown by id.
+describe("an actor who cannot be resolved", () => {
+  const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  // Everything the view renders (id is only the React key, never rendered).
+  const visible = (fila: ReturnType<typeof filaHistorial>) =>
+    Object.entries(fila)
+      .filter(([campo]) => campo !== "id")
+      .map(([, valor]) => valor)
+      .join(" | ");
+
+  it("shows the fallback copy, not the id", () => {
+    const fila = filaHistorial(evento({}), new Map());
+    expect(fila.usuario).toBe(t.usuarioNoDisponible);
+    expect(t.usuarioNoDisponible).toBe("Usuario no disponible");
+    expect(visible(fila)).not.toMatch(UUID);
+  });
+
+  it("an account with neither name nor email, or a missing one, is not named", () => {
+    const nombres = nombresDeActores([
+      { id: ACTOR, nombre: "  ", email: "" },
+      { id: "22222222-2222-4222-8222-222222222222", nombre: null, email: null },
+    ]);
+    expect(nombres.size).toBe(0);
+    expect(filaHistorial(evento({}), nombres).usuario).toBe(t.usuarioNoDisponible);
+    expect(filaHistorial(evento({ actorId: "33333333-3333-4333-8333-333333333333" }), nombres).usuario).toBe(t.usuarioNoDisponible);
+  });
+
+  it("if the account lookup fails, every row shows the fallback and no id", () => {
+    const sinCuentas = nombresDeActores([]);
+    const filas = (["alta", "renombre", "reorden", "desactivacion", "reactivacion", "baja"] as const).map((accion, i) =>
+      filaHistorial(evento({ id: `e${i}`, accion, actorId: `${i}1111111-1111-4111-8111-111111111111` }), sinCuentas),
+    );
+    for (const fila of filas) {
+      expect(fila.usuario).toBe(t.usuarioNoDisponible);
+      expect(visible(fila)).not.toMatch(UUID);
+    }
+  });
+});
+
+describe("nombresDeActores", () => {
+  it("names an account by its name, else its email, as Usuarios does", () => {
+    const nombres = nombresDeActores([
+      { id: "a", nombre: "Ana Pérez", email: "ana@mitsm.test" },
+      { id: "b", nombre: null, email: "beto@mitsm.test" },
+    ]);
+    expect([...nombres]).toEqual([
+      ["a", "Ana Pérez"],
+      ["b", "beto@mitsm.test"],
+    ]);
   });
 });

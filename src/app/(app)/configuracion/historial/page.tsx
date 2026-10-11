@@ -6,7 +6,7 @@ import { rowClassName, Table, Td, Th } from "@/components/ui/Table";
 import { listarCuentas } from "@/lib/admin/cuentas";
 import { requireRole } from "@/lib/auth/require-role";
 import { HISTORIAL_LIMITE, listarEventos } from "@/lib/configuracion/datos";
-import { filaHistorial } from "@/lib/configuracion/historial";
+import { filaHistorial, nombresDeActores } from "@/lib/configuracion/historial";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
 
@@ -17,8 +17,10 @@ const t = copy.configuracion.historial;
 export default async function ConfiguracionHistorialPage() {
   await requireRole("admin");
   const [eventos, cuentas] = await Promise.all([listarEventos(), listarCuentas()]);
-  // Who did it: the name from their legajo, else their email.
-  const nombres = new Map((cuentas.ok ? (cuentas.data ?? []) : []).map((cuenta) => [cuenta.id, cuenta.nombre ?? cuenta.email]));
+  // Who did it. If the accounts cannot be read, every row shows the fallback
+  // copy; the failure is logged once, without ids.
+  if (!cuentas.ok) console.error("[configuracion/historial] account lookup failed; actors shown as unavailable");
+  const nombres = nombresDeActores(cuentas.ok ? (cuentas.data ?? []) : []);
   const filas = (eventos ?? []).map((evento) => filaHistorial(evento, nombres));
 
   return (

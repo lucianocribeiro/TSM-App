@@ -44,13 +44,25 @@ function valor(accion: CatalogoAccion, crudo: string | null): string {
   return crudo;
 }
 
-// nombres: who acted, by profile id (name or email); an unknown id is shown as is.
+// Who acted, by profile id: the name from their legajo, else their email, as
+// in Usuarios. Accounts with neither are left out.
+export function nombresDeActores(cuentas: readonly { id: string; nombre: string | null; email: string | null }[]): Map<string, string> {
+  const nombres = new Map<string, string>();
+  for (const cuenta of cuentas) {
+    const nombre = cuenta.nombre?.trim() || cuenta.email?.trim();
+    if (nombre) nombres.set(cuenta.id, nombre);
+  }
+  return nombres;
+}
+
+// nombres: from nombresDeActores. An actor it cannot name is shown with the
+// fallback copy, never with their id.
 export function filaHistorial(evento: EventoCatalogo, nombres: ReadonlyMap<string, string>): FilaHistorial {
   const lista = copy.configuracion.listas[evento.lista];
   return {
     id: evento.id,
     fecha: formatearFechaHora(evento.fecha),
-    usuario: nombres.get(evento.actorId) ?? evento.actorId,
+    usuario: nombres.get(evento.actorId) ?? t.usuarioNoDisponible,
     lista: evento.areaNombre ? formatCopy(t.listaConArea, { lista, area: evento.areaNombre }) : lista,
     item: evento.itemNombre,
     accion: t.acciones[evento.accion],

@@ -704,6 +704,8 @@ export type Copy = {
       listaConArea: string;
       posicion: string;
       sinValor: string;
+      // An actor who cannot be named (never an internal id).
+      usuarioNoDisponible: string;
     };
   };
 };
@@ -1457,6 +1459,7 @@ export const copy = {
       listaConArea: "{lista} ({area})",
       posicion: "Posición {n}",
       sinValor: "—",
+      usuarioNoDisponible: "Usuario no disponible",
     },
   },
 } as const satisfies Copy;

@@ -130,6 +130,10 @@ test("an Admin adds, renames, reorders, deactivates, reactivates and deletes an 
   for (const texto of [admin.email, t.listas.sucursal, dos, tres]) {
     await expect(renombre.getByText(texto, { exact: true }).first()).toBeVisible();
   }
+  // No internal id reaches the page (AUDCR1-01). Test accounts' emails carry
+  // a random UUID, so the emails are taken out first.
+  const texto = (await page.locator("main").innerText()).replace(/\S+@mitsm\.test/g, "");
+  expect(texto).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   await screenshotBoth(page, "configuracion-historial");
 });
 
