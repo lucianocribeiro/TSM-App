@@ -3,7 +3,7 @@ import { expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { cuilDigitoVerificador } from "../src/lib/legajo/cuil";
 import type { Database } from "../src/lib/supabase/database.types";
-import { createE2EUser, deleteE2EUser, fillLegajo, localServiceClient } from "./service";
+import { createE2EUser, deleteE2EUser, fillLaboral, fillLegajo, localServiceClient } from "./service";
 
 // Shared data setup for the F1-11B specs (local stack, service role). Every
 // test creates its own accounts and data; nothing depends on other tests.
@@ -36,7 +36,8 @@ export function dniAleatorio(): string {
   return String(90_000_000 + Math.floor(Math.random() * 9_000_000));
 }
 
-// An Empleado with every group A to E filled with valid data. The apellido is
+// An Empleado with every group A to E filled with valid data (group E from
+// the seeded Configuración lists). The apellido is
 // unique, to find this employee's rows among other tests' data.
 export async function empleadoCompleto(label: string, alta: (id: string) => void, extra: { tieneHijos?: boolean } = {}) {
   const suffix = randomUUID().slice(0, 8);
@@ -70,16 +71,8 @@ export async function empleadoCompleto(label: string, alta: (id: string) => void
     emergencia_parentesco: "Madre",
     emergencia_domicilio: "Calle 2",
     emergencia_telefono: "11 5555-6666",
-    numero_legajo: `F-${suffix}`,
-    area: "Área de Prueba",
-    puesto: "Técnico",
-    fecha_ingreso: "2020-01-15",
-    estado_laboral: "activo",
-    sede: "Sede Norte",
-    modalidad: "Presencial",
-    convenio: "Convenio de Prueba",
-    bruto_mensual: 850000,
   });
+  await fillLaboral(user.id, { numero_legajo: `F-${suffix}` });
   const legajoId = await legajoIdDe(user.id);
   return { ...user, apellido, nombre: `Ana ${apellido}`, legajoId, dni };
 }
