@@ -50,7 +50,14 @@ const eslintConfig = defineConfig([
       "src/lib/documentos/**/*.{ts,tsx}",
       "src/lib/legajo/{antiguedad,cuil,fechas,grupos,mi-legajo,options,validation,vista}.ts",
     ],
-    ignores: ["**/*.test.{ts,tsx}"],
+    ignores: [
+      "**/*.test.{ts,tsx}",
+      // CR-4, the one exception: the Admin's own group E, read only, in Mi
+      // Legajo. A "server-only" server component rendered only for an Admin,
+      // so nothing of it reaches the route's client chunks (the bundle check
+      // still runs). The general rule above still applies to it.
+      "src/app/(app)/mi-legajo/DatosLaboralesPropios.tsx",
+    ],
     rules: {
       "no-restricted-imports": ["error", { ...serviceRole, patterns: [...serviceRole.patterns, ...grupoE] }],
     },

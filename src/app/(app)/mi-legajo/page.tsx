@@ -6,6 +6,7 @@ import { copy } from "@/lib/copy/es-AR";
 import { resumirDocumentos } from "@/lib/documentos/resumen";
 import { cargarMiLegajo } from "@/lib/legajo/mi-legajo";
 import { legajoVacio } from "@/lib/legajo/vista";
+import { DatosLaboralesPropios } from "./DatosLaboralesPropios";
 import { MiLegajoScreen } from "./MiLegajoScreen";
 
 const t = copy.miLegajo;
@@ -14,8 +15,9 @@ const t = copy.miLegajo;
 // session. There is no id in the URL: nobody can ask for another legajo here.
 // Groups A to D only: group E (datos laborales) is Admin only and lives in
 // its own table, which this page never reads (an Admin edits their own from
-// Legajos). Admin-only documents (Alta de AFIP) are download only here, for
-// every role.
+// Legajos). An Admin sees their own group E read only (CR-4), rendered on
+// the server for that Admin only; an Empleado's response carries none of it.
+// Admin-only documents (Alta de AFIP) are download only here, for every role.
 export default async function MiLegajoPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -43,6 +45,7 @@ export default async function MiLegajoPage() {
       solicitud={data.solicitud}
       documentos={resumirDocumentos(data.documentos, { propio: true })}
       esAdmin={user.role === "admin"}
+      laborales={user.role === "admin" ? <DatosLaboralesPropios profileId={user.id} /> : null}
       vacio={legajoVacio(legajo, data.hijos)}
     />
   );

@@ -53,6 +53,12 @@ export type CopyLaborales = {
   errors: {
     numeroLegajoDuplicado: string;
   };
+  // An Admin's own group E in Mi Legajo, read only (CR-4).
+  propio: {
+    nota: string;
+    editar: string;
+    fallo: string;
+  };
 };
 
 export const copyLaborales = {
@@ -99,5 +105,10 @@ export const copyLaborales = {
   },
   errors: {
     numeroLegajoDuplicado: "Ese número de legajo ya está asignado a otro empleado.",
+  },
+  propio: {
+    nota: "Solo lectura. Tus datos laborales se editan desde tu legajo en Legajos.",
+    editar: "Editar en Legajos",
+    fallo: "No pudimos cargar tus datos laborales. Intentá de nuevo.",
   },
 } as const satisfies CopyLaborales;

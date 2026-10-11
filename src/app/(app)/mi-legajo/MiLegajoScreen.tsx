@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -40,9 +40,12 @@ type MiLegajoScreenProps = {
   documentos: ResumenDocumento[];
   esAdmin: boolean;
   vacio: boolean;
+  // An Admin's own group E, read only, rendered on the server (null for an
+  // Empleado).
+  laborales: ReactNode;
 };
 
-export function MiLegajoScreen({ actual, solicitud, documentos, esAdmin, vacio }: MiLegajoScreenProps) {
+export function MiLegajoScreen({ actual, solicitud, documentos, esAdmin, vacio, laborales }: MiLegajoScreenProps) {
   const [aviso, setAviso] = useState<string | null>(null);
   const [confirmarCancelacion, setConfirmarCancelacion] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -116,6 +119,8 @@ export function MiLegajoScreen({ actual, solicitud, documentos, esAdmin, vacio }
             onGuardado={setAviso}
           />
         ))}
+
+        {laborales}
 
         <DocumentosSection
           documentos={documentos}
