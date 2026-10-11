@@ -32,12 +32,20 @@ export type ResumenDocumento = {
   pendiente: DocumentoFila | null;
   // The rejected upload, when it is the latest one: its reason is shown.
   rechazado: DocumentoFila | null;
-  // A new upload is possible unless one is already pending.
+  // A new upload is possible unless one is already pending, or the type is
+  // read-only here.
   puedeSubir: boolean;
+  // An Admin-only type seen by its owner (Mi Legajo): download only.
+  soloLectura: boolean;
 };
 
-export function resumirDocumentos(filas: readonly DocumentoFila[]): ResumenDocumento[] {
-  return DOCUMENTO_TIPOS.map(({ tipo, required }) => {
+// propio: the owner's own view (Mi Legajo), where Admin-only types are
+// read-only for every role.
+export function resumirDocumentos(
+  filas: readonly DocumentoFila[],
+  { propio = false }: { propio?: boolean } = {},
+): ResumenDocumento[] {
+  return DOCUMENTO_TIPOS.map(({ tipo, required, soloAdmin }) => {
     const delTipo = filas
       .filter((fila) => fila.tipo === tipo && fila.estado !== "reemplazado")
       .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
@@ -54,6 +62,7 @@ export function resumirDocumentos(filas: readonly DocumentoFila[]): ResumenDocum
           ? "aprobado"
           : "faltante";
 
-    return { tipo, requerido: required, estado, vigente, pendiente, rechazado, puedeSubir: !pendiente };
+    const soloLectura = propio && soloAdmin;
+    return { tipo, requerido: required, estado, vigente, pendiente, rechazado, puedeSubir: !pendiente && !soloLectura, soloLectura };
   });
 }

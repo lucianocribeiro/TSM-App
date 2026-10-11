@@ -123,7 +123,12 @@ function DocumentoRow({
   const mostrado = resumen.pendiente ?? resumen.rechazado ?? resumen.vigente;
   // An Admin replaces a current document through the mode dialog (F1-09B);
   // nobody uploads over a pending one.
-  const reemplazable = esAdmin && resumen.vigente !== null && resumen.pendiente === null;
+  const reemplazable = esAdmin && !resumen.soloLectura && resumen.vigente !== null && resumen.pendiente === null;
+  // Admin-only types in the owner's own view: download only (CR-3).
+  const estadoLabel =
+    resumen.soloLectura && (resumen.estado === "aprobado" || resumen.estado === "faltante")
+      ? t.soloAdmin[resumen.estado]
+      : t.estados[resumen.estado];
 
   function descargar(documento: DocumentoFila) {
     setError(null);
@@ -178,7 +183,7 @@ function DocumentoRow({
       </Td>
       <Td>
         <div className="flex flex-col items-start gap-1.5">
-          <StatusBadge label={t.estados[resumen.estado]} tone={resumen.estado === "aprobado" ? "active" : "secondary"} />
+          <StatusBadge label={estadoLabel} tone={resumen.estado === "aprobado" ? "active" : "secondary"} />
           {resumen.rechazado?.motivoRechazo ? (
             <span className="text-[12.5px] italic text-accent-deep">
               {formatCopy(t.motivoRechazo, { motivo: resumen.rechazado.motivoRechazo })}
@@ -199,7 +204,7 @@ function DocumentoRow({
               <Button variant="secondary" onClick={() => descargar(resumen.vigente!)} disabled={descargando}>
                 {t.descargar}
               </Button>
-              {eliminable === "vigente" ? (
+              {eliminable === "vigente" && !resumen.soloLectura ? (
                 <Button variant="secondary" onClick={() => onEliminar(resumen.vigente!)}>
                   {t.eliminar}
                 </Button>
@@ -211,7 +216,7 @@ function DocumentoRow({
               <Button variant="secondary" onClick={() => descargar(resumen.pendiente!)} disabled={descargando}>
                 {t.descargarPendiente}
               </Button>
-              {eliminable === "pendiente" ? (
+              {eliminable === "pendiente" && !resumen.soloLectura ? (
                 <Button variant="secondary" onClick={() => onEliminar(resumen.pendiente!)}>
                   {t.eliminar}
                 </Button>

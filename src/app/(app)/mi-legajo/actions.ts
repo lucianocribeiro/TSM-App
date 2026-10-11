@@ -8,7 +8,7 @@ import { sessionWithRole, usuarioActivo } from "@/lib/auth/require-role";
 import { copy } from "@/lib/copy/es-AR";
 import { descartarObjeto, prepararRuta, registrarObjeto } from "@/lib/documentos/registro";
 import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
-import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
+import { DOCUMENTO_TIPOS_PROPIOS, DOCUMENTOS_BUCKET, esTipoSoloAdmin } from "@/lib/documentos/tipos";
 import { camposDelGrupo } from "@/lib/legajo/grupos";
 import { aplicarGrupo, dbErrorMessage, validarGrupo } from "@/lib/legajo/escritura";
 import type { Database } from "@/lib/supabase/database.types";
@@ -98,13 +98,15 @@ export async function actualizarLegajoPropio(input: unknown): Promise<ActionResu
 // Documents
 // ---------------------------------------------------------------------------
 // Three steps around a browser-direct upload to the caller's own folder, with
-// cleanup on every failure (src/lib/documentos/registro.ts).
+// cleanup on every failure (src/lib/documentos/registro.ts). Admin-only types
+// (Alta de AFIP) are refused here for every role, an Admin included: they are
+// managed from Legajos (CR-3).
 const ORIGEN = "mi-legajo";
 
 export async function prepararSubidaDocumento(input: unknown): Promise<ActionResult<{ path: string }>> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  return prepararRuta(await createClient(), user.id, input, { origen: ORIGEN });
+  return prepararRuta(await createClient(), user.id, input, { origen: ORIGEN, tipos: DOCUMENTO_TIPOS_PROPIOS });
 }
 
 export async function registrarDocumento(
@@ -113,7 +115,14 @@ export async function registrarDocumento(
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
   const result = await registrarObjeto(
-    { client: await createClient(), ownerId: user.id, uploaderId: user.id, esAdmin: user.role === "admin", origen: ORIGEN },
+    {
+      client: await createClient(),
+      ownerId: user.id,
+      uploaderId: user.id,
+      esAdmin: user.role === "admin",
+      origen: ORIGEN,
+      tipos: DOCUMENTO_TIPOS_PROPIOS,
+    },
     input,
   );
   if (result.ok) revalidatePath(MI_LEGAJO_PATH);
@@ -124,7 +133,7 @@ export async function registrarDocumento(
 export async function descartarSubida(input: unknown): Promise<ActionResult> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  return descartarObjeto(await createClient(), user.id, input, ORIGEN);
+  return descartarObjeto(await createClient(), user.id, input, ORIGEN, DOCUMENTO_TIPOS_PROPIOS);
 }
 
 // A document of the caller's own legajo, found by id. An Admin's RLS reaches
@@ -135,7 +144,7 @@ async function documentoPropio(documentoId: unknown, userId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("legajo_documentos")
-    .select("id, estado, storage_path, file_name, legajos!inner(profile_id)")
+    .select("id, tipo, estado, storage_path, file_name, legajos!inner(profile_id)")
     .eq("id", parsed.data)
     .eq("legajos.profile_id", userId)
     .maybeSingle();
@@ -146,6 +155,7 @@ export async function eliminarDocumentoPendiente(input: unknown): Promise<Action
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
   const found = await documentoPropio((input as { documentoId?: unknown } | null)?.documentoId, user.id);
+  if (found && esTipoSoloAdmin(found.documento.tipo)) return { ok: false, error: t.documentos.errors.soloAdmin };
   if (!found || found.documento.estado !== "pendiente") return { ok: false, error: t.documentos.errors.eliminarFallo };
 
   const { supabase, documento } = found;

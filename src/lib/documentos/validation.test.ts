@@ -4,6 +4,8 @@ import { copy } from "@/lib/copy/es-AR";
 import {
   DOCUMENTO_MIME_LIST,
   DOCUMENTO_TIPOS,
+  DOCUMENTO_TIPOS_PROPIOS,
+  esTipoSoloAdmin,
   isDocumentoTipo,
   MAX_DOCUMENTO_BYTES,
 } from "./tipos";
@@ -22,12 +24,22 @@ function input(overrides: Partial<Parameters<typeof validateDocumentoUpload>[0]>
 }
 
 describe("document types", () => {
-  it("defines DNI frente and dorso as required and licencia as optional", () => {
+  it("defines DNI frente and dorso as required, licencia and Alta de AFIP as optional", () => {
     expect(DOCUMENTO_TIPOS.map(({ tipo, required }) => [tipo, required])).toEqual([
       ["dni_frente", true],
       ["dni_dorso", true],
       ["licencia_conducir", false],
+      ["alta_afip", false],
     ]);
+  });
+
+  it("makes Alta de AFIP Admin only: never one of the owner's own upload types", () => {
+    expect(DOCUMENTO_TIPOS.filter((config) => config.soloAdmin).map((config) => config.tipo)).toEqual(["alta_afip"]);
+    expect(DOCUMENTO_TIPOS_PROPIOS).toEqual(["dni_frente", "dni_dorso", "licencia_conducir"]);
+    expect(esTipoSoloAdmin("alta_afip")).toBe(true);
+    expect(esTipoSoloAdmin("dni_frente")).toBe(false);
+    expect(isDocumentoTipo("alta_afip")).toBe(true);
+    expect(copy.documentos.tipos.alta_afip).toBe("Alta de AFIP");
   });
 
   it("has a copy label for every type", () => {

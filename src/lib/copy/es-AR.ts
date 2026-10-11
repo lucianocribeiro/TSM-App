@@ -162,6 +162,11 @@ export type Copy = {
         rechazado: string;
         faltante: string;
       };
+      // Admin-only types (Alta de AFIP): the owner only downloads them.
+      soloAdmin: {
+        aprobado: string;
+        faltante: string;
+      };
       requerido: string;
       opcional: string;
       archivoLabel: string;
@@ -184,6 +189,8 @@ export type Copy = {
         subirFallo: string;
         eliminarFallo: string;
         limpiezaFallo: string;
+        // An Admin-only type (Alta de AFIP) from Mi Legajo.
+        soloAdmin: string;
       };
     };
   };
@@ -419,6 +426,7 @@ export type Copy = {
       dni_frente: string;
       dni_dorso: string;
       licencia_conducir: string;
+      alta_afip: string;
     };
     validation: {
       fileRequired: string;
@@ -881,6 +889,10 @@ export const copy = {
         rechazado: "Rechazado",
         faltante: "Sin cargar",
       },
+      soloAdmin: {
+        aprobado: "Cargado por Recursos Humanos",
+        faltante: "Lo carga Recursos Humanos",
+      },
       requerido: "Obligatorio",
       opcional: "Opcional",
       archivoLabel: "Archivo para {documento}",
@@ -904,6 +916,7 @@ export const copy = {
         eliminarFallo: "No pudimos eliminar el documento. Intentá de nuevo.",
         limpiezaFallo:
           "No pudimos completar la subida. Volvé a intentar en unos minutos y, si sigue pasando, avisá a Recursos Humanos.",
+        soloAdmin: "Este documento lo carga Recursos Humanos.",
       },
     },
   },
@@ -1147,6 +1160,7 @@ export const copy = {
       dni_frente: "DNI (frente)",
       dni_dorso: "DNI (dorso)",
       licencia_conducir: "Licencia de conducir",
+      alta_afip: "Alta de AFIP",
     },
     validation: {
       fileRequired: "Elegí un archivo para subir.",

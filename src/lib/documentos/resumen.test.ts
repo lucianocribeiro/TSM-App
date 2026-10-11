@@ -24,7 +24,23 @@ describe("resumirDocumentos", () => {
       ["dni_frente", "faltante", true, true],
       ["dni_dorso", "faltante", true, true],
       ["licencia_conducir", "faltante", false, true],
+      ["alta_afip", "faltante", false, true],
     ]);
+    // In Legajos (Admin) nothing is read-only.
+    expect(resumen.some((r) => r.soloLectura)).toBe(false);
+  });
+
+  it("makes Alta de AFIP download only in the owner's own view, present or missing", () => {
+    const faltante = Object.fromEntries(resumirDocumentos([], { propio: true }).map((r) => [r.tipo, r]));
+    expect(faltante.alta_afip).toMatchObject({ estado: "faltante", soloLectura: true, puedeSubir: false, vigente: null });
+    // The other types keep their upload.
+    expect(faltante.dni_frente).toMatchObject({ soloLectura: false, puedeSubir: true });
+
+    const cargada = resumirDocumentos([fila({ id: "afip", tipo: "alta_afip" })], { propio: true }).find(
+      (r) => r.tipo === "alta_afip",
+    );
+    expect(cargada).toMatchObject({ estado: "aprobado", soloLectura: true, puedeSubir: false });
+    expect(cargada?.vigente?.id).toBe("afip");
   });
 
   it("shows the approved file", () => {

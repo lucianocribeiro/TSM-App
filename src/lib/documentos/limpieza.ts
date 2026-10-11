@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
-import { DOCUMENTO_TIPO_CODES, DOCUMENTOS_BUCKET } from "./tipos";
+import { DOCUMENTO_TIPO_CODES, DOCUMENTOS_BUCKET, type DocumentoTipo } from "./tipos";
 
 // Objects in legajo-docs without a legajo_documentos row (an upload whose
 // registration failed or was abandoned) must not stay beyond a short window.
@@ -47,16 +47,22 @@ export type BarridoResultado = { ok: true; eliminados: number } | { ok: false };
 
 // The lazy sweep of the caller's own folder: lists <profileId>/<tipo>/ for
 // each type, keeps what has a document row (read under RLS), and removes the
-// rest once older than the threshold. Never looks at another folder.
+// rest once older than the threshold. Never looks at another folder. tipos:
+// the type folders the caller may write to (an owner never sweeps the
+// Admin-only ones, which the storage policies keep from them).
 export async function barrerHuerfanos(
   client: Client,
   profileId: string,
-  { now = new Date(), umbralMs = UMBRAL_HUERFANO_MS }: { now?: Date; umbralMs?: number } = {},
+  {
+    now = new Date(),
+    umbralMs = UMBRAL_HUERFANO_MS,
+    tipos = DOCUMENTO_TIPO_CODES,
+  }: { now?: Date; umbralMs?: number; tipos?: readonly DocumentoTipo[] } = {},
 ): Promise<BarridoResultado> {
   try {
     const bucket = client.storage.from(DOCUMENTOS_BUCKET);
     const objetos: ObjetoGuardado[] = [];
-    for (const tipo of DOCUMENTO_TIPO_CODES) {
+    for (const tipo of tipos) {
       const folder = `${profileId}/${tipo}`;
       const { data, error } = await bucket.list(folder, { limit: 1000 });
       if (error) return { ok: false };

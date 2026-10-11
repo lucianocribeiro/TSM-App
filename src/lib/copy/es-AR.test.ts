@@ -156,6 +156,13 @@ describe("es-AR copy", () => {
     expect(Object.keys(copy.miLegajo.grupos)).toEqual(["A", "B", "C", "D", "E"]);
   });
 
+  it("defines the Alta de AFIP texts: its type label and the owner's download-only states", () => {
+    expect(copy.documentos.tipos.alta_afip).toBe("Alta de AFIP");
+    expect(copy.miLegajo.documentos.soloAdmin.faltante).toBe("Lo carga Recursos Humanos");
+    expect(copy.miLegajo.documentos.soloAdmin.aprobado.trim()).not.toBe("");
+    expect(copy.miLegajo.documentos.errors.soloAdmin.trim()).not.toBe("");
+  });
+
   it("uses the generic login error from the PRD", () => {
     expect(copy.auth.errors.invalidCredentials).toBe(
       "Email o contraseña incorrectos.",
