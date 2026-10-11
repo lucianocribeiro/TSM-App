@@ -683,6 +683,63 @@ export type Copy = {
       usuarioNoDisponible: string;
     };
   };
+  exportacion: {
+    boton: string;
+    historialLink: string;
+    dialogo: {
+      title: string;
+      intro: string;
+      cantidad: string;
+      cantidadUno: string;
+      seleccionarTodos: string;
+      grupoTodo: string;
+      grupoNinguno: string;
+      hijos: string;
+      hijosNota: string;
+      requerido: string;
+      exportar: string;
+      exportando: string;
+      cancelar: string;
+    };
+    hojas: {
+      legajos: string;
+      hijos: string;
+    };
+    exito: string;
+    errors: {
+      fallo: string;
+      seleccion: string;
+      sinEmpleados: string;
+    };
+    historial: {
+      kicker: string;
+      title: string;
+      intro: string;
+      volver: string;
+      vacio: string;
+      fallo: string;
+      limite: string;
+      columnas: {
+        fecha: string;
+        usuario: string;
+        cantidad: string;
+        campos: string;
+        hijos: string;
+        filtros: string;
+      };
+      grupoCompleto: string;
+      separador: string;
+      si: string;
+      no: string;
+      sinFiltros: string;
+      filtro: string;
+      busqueda: string;
+      conBajas: string;
+      itemNoDisponible: string;
+      noCompletada: string;
+      usuarioNoDisponible: string;
+    };
+  };
 };
 
 export const copy = {
@@ -1407,6 +1464,63 @@ export const copy = {
       listaConArea: "{lista} ({area})",
       posicion: "Posición {n}",
       sinValor: "—",
+      usuarioNoDisponible: "Usuario no disponible",
+    },
+  },
+  exportacion: {
+    boton: "Exportar a Excel",
+    historialLink: "Historial de exportaciones",
+    dialogo: {
+      title: "Exportar a Excel",
+      intro: "Elegí qué datos incluir. Se exportan los empleados que muestra la lista con los filtros y la búsqueda actuales.",
+      cantidad: "Se van a exportar {n} empleados.",
+      cantidadUno: "Se va a exportar 1 empleado.",
+      seleccionarTodos: "Seleccionar todos",
+      grupoTodo: "Todo",
+      grupoNinguno: "Ninguno",
+      hijos: "Hijos",
+      hijosNota: "En una hoja aparte, una fila por hijo.",
+      requerido: "Elegí al menos un dato.",
+      exportar: "Exportar",
+      exportando: "Exportando…",
+      cancelar: "Cancelar",
+    },
+    hojas: {
+      legajos: "Legajos",
+      hijos: "Hijos",
+    },
+    exito: "Descargamos el archivo.",
+    errors: {
+      fallo: "No pudimos generar el archivo. Intentá de nuevo.",
+      seleccion: "Revisá los datos elegidos e intentá de nuevo.",
+      sinEmpleados: "No hay empleados para exportar con estos filtros.",
+    },
+    historial: {
+      kicker: "Legajos",
+      title: "Historial de exportaciones",
+      intro: "Cada exportación a Excel queda registrada: quién la hizo, cuándo, qué datos incluyó, cuántos empleados y con qué filtros.",
+      volver: "Volver a Legajos",
+      vacio: "Todavía no hay exportaciones.",
+      fallo: "No pudimos cargar el historial. Intentá de nuevo.",
+      limite: "Se muestran las últimas {n} exportaciones.",
+      columnas: {
+        fecha: "Fecha y hora",
+        usuario: "Usuario",
+        cantidad: "Empleados",
+        campos: "Datos",
+        hijos: "Hijos",
+        filtros: "Filtros",
+      },
+      grupoCompleto: "{grupo} (todos)",
+      separador: " · ",
+      si: "Sí",
+      no: "No",
+      sinFiltros: "Sin filtros",
+      filtro: "{filtro}: {valor}",
+      busqueda: "Búsqueda: «{texto}»",
+      conBajas: "Con dados de baja",
+      itemNoDisponible: "Ítem no disponible",
+      noCompletada: "No se completó",
       usuarioNoDisponible: "Usuario no disponible",
     },
   },

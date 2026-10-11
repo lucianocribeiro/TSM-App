@@ -60,6 +60,7 @@ describe("route map", () => {
       "/configuracion",
       "/configuracion/historial",
       "/configuracion/otra",
+      "/legajos/exportaciones",
     ]) {
       expect(clasificarRuta(path), path).toBe("admin");
     }

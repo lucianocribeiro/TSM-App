@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buscarProhibidos, IDS_PROHIBIDOS, TEXTOS_PROHIBIDOS } from "../../../scripts/bundle-mi-legajo.mjs";
+import { buscarProhibidos, IDS_PROHIBIDOS, MARCA_XLSX, TEXTOS_PROHIBIDOS } from "../../../scripts/bundle-mi-legajo.mjs";
 import { copyLaborales } from "@/lib/copy/laborales";
 import { CAMPOS_LABORALES } from "./laborales";
 
@@ -19,6 +19,11 @@ describe("Mi Legajo bundle check", () => {
       ]),
     );
     expect(IDS_PROHIBIDOS).toEqual(expect.arrayContaining([...CAMPOS_LABORALES, "legajos_laborales"]));
+  });
+
+  it("looks for the .xlsx writer by a path only a workbook writer carries (CR-4)", () => {
+    expect(buscarProhibidos([["cliente.js", 'f("xl/worksheets/sheet1.xml")']], [MARCA_XLSX])).toEqual([{ chunk: "cliente.js", texto: MARCA_XLSX }]);
+    expect(buscarProhibidos([["cliente.js", "const a=1;"]], [MARCA_XLSX])).toEqual([]);
   });
 
   it("finds a forbidden string raw or \\u-escaped, and nothing in a clean chunk", () => {

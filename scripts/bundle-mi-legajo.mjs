@@ -9,8 +9,12 @@
 // them contains a forbidden string, raw or \u-escaped. As a control, the same
 // scan must find group E in the Legajo detail route, so a scan that reads the
 // wrong files (or nothing) cannot pass. Prints chunk names and strings only.
+//
+// CR-4 adds a second check: the .xlsx writer (write-excel-file) is server
+// only. No client chunk of any route may contain its workbook paths, and,
+// as a control, a server chunk must.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -32,6 +36,9 @@ export const IDS_PROHIBIDOS = [
   "legajos_laborales",
 ];
 export const PROHIBIDOS = [...TEXTOS_PROHIBIDOS, ...IDS_PROHIBIDOS];
+
+// A string only the .xlsx writer carries: the worksheet part's path.
+export const MARCA_XLSX = "xl/worksheets/";
 
 const RUTA = "/(app)/mi-legajo/page";
 const CONTROL = "/(app)/legajos/[id]/page";
@@ -75,6 +82,15 @@ export function chunksDeRuta(nextDir, ruta) {
   return chunks.map((nombre) => [nombre, readFileSync(path.join(nextDir, nombre), "utf8")]);
 }
 
+// Every .js file under a directory, as [name, content].
+function archivosJs(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { recursive: true })
+    .map(String)
+    .filter((nombre) => nombre.endsWith(".js"))
+    .map((nombre) => [nombre, readFileSync(path.join(dir, nombre), "utf8")]);
+}
+
 function main() {
   const nextDir = path.join(process.cwd(), ".next");
   const miLegajo = chunksDeRuta(nextDir, RUTA);
@@ -86,11 +102,19 @@ function main() {
   console.log(`Mi Legajo client chunks scanned: ${miLegajo.length}; forbidden strings checked: ${PROHIBIDOS.length}.`);
   for (const { chunk, texto } of hallazgos) console.log(`  found "${texto}" in ${chunk}`);
   if (!controlOk) console.log("  control failed: group E not found in the Legajo detail chunks; the scan is not reading the bundle.");
-  if (hallazgos.length > 0 || !controlOk) {
+  const clientes = archivosJs(path.join(nextDir, "static", "chunks"));
+  const xlsxCliente = buscarProhibidos(clientes, [MARCA_XLSX]);
+  const xlsxServidor = buscarProhibidos(archivosJs(path.join(nextDir, "server")), [MARCA_XLSX]).length > 0;
+  console.log(`Client chunks scanned for the .xlsx writer: ${clientes.length}.`);
+  for (const { chunk } of xlsxCliente) console.log(`  .xlsx writer found in client chunk ${chunk}`);
+  if (!xlsxServidor) console.log("  control failed: the .xlsx writer was not found in any server chunk.");
+
+  if (hallazgos.length > 0 || !controlOk || clientes.length === 0 || xlsxCliente.length > 0 || !xlsxServidor) {
     console.log("Bundle check failed.");
     process.exit(1);
   }
   console.log("Bundle check passed: no group E strings in Mi Legajo's client chunks (control found them in Legajo detail).");
+  console.log("Bundle check passed: the .xlsx writer is in no client chunk (control found it server side).");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

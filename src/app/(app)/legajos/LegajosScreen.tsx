@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClassName } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Field } from "@/components/ui/Field";
 import { KpiStrip } from "@/components/ui/KpiStrip";
@@ -26,6 +26,7 @@ import {
 } from "@/lib/legajo/listado";
 import type { KpisLegajos } from "@/lib/legajo/kpis";
 import { ESTADOS_LABORALES } from "@/lib/legajo/options";
+import { ExportarDialog } from "./ExportarDialog";
 
 const t = copy.legajos;
 const tl = copyLaborales.listado;
@@ -42,6 +43,8 @@ type LegajosScreenProps = {
 export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScreenProps) {
   const router = useRouter();
   const [filtros, setFiltros] = useState<FiltrosLegajos>(FILTROS_INICIALES);
+  const [exportando, setExportando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const visibles = useMemo(() => filtrarLegajos(legajos, filtros), [legajos, filtros]);
   // Options from Configuración (plus inactive items still in use).
@@ -61,7 +64,20 @@ export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScree
 
   return (
     <>
-      <PageHeader kicker={t.kicker} title={t.title} />
+      <PageHeader
+        kicker={t.kicker}
+        title={t.title}
+        actions={
+          <>
+            <Link href="/legajos/exportaciones" className={buttonClassName("secondary")}>
+              {copy.exportacion.historialLink}
+            </Link>
+            <Button onClick={() => setExportando(true)} disabled={listaFallo}>
+              {copy.exportacion.boton}
+            </Button>
+          </>
+        }
+      />
       <div className="flex flex-col gap-4 px-[34px] pb-10 pt-[26px]">
         {kpis ? (
           <KpiStrip
@@ -124,6 +140,12 @@ export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScree
           </div>
         </div>
 
+        {aviso ? (
+          <p role="status" className="text-[12.5px] italic text-ink-soft">
+            {aviso}
+          </p>
+        ) : null}
+
         {listaFallo ? (
           <Panel>
             <p role="alert" className="text-accent-deep">
@@ -155,6 +177,13 @@ export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScree
           </Table>
         )}
       </div>
+      <ExportarDialog
+        open={exportando}
+        onClose={() => setExportando(false)}
+        filtros={filtros}
+        cantidad={visibles.length}
+        onAviso={setAviso}
+      />
     </>
   );
 }

@@ -8,6 +8,7 @@ import { copy } from "@/lib/copy/es-AR";
 import { eliminarObjeto } from "@/lib/documentos/limpieza";
 import { avisarFalloLimpieza, descartarObjeto, prepararRuta, registrarObjeto } from "@/lib/documentos/registro";
 import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
+import { exportarLegajos as exportar, type ArchivoExportado } from "@/lib/exportacion/exportar";
 import type { Database } from "@/lib/supabase/database.types";
 import { aplicarDatosLaborales, aplicarGrupo, tieneSolicitudPendiente, validarGrupo } from "@/lib/legajo/escritura";
 import { createClient } from "@/lib/supabase/server";
@@ -160,4 +161,16 @@ export async function obtenerUrlDocumentoAdmin(input: unknown): Promise<ActionRe
   if (!found) return noAutorizado;
   if (found === "invalido") return { ok: false, error: copy.documentos.errors.downloadFailed };
   return createDocumentoSignedUrl(found.documento.storage_path, { download: found.documento.file_name });
+}
+
+// ---------------------------------------------------------------------------
+// Excel export (CR-4)
+// ---------------------------------------------------------------------------
+// Input: the list state ({ filtros }) and the chosen fields ({ seleccion:
+// { campos, hijos } }), never rows. The file comes back base64-encoded for
+// the browser to save; it is logged before it is returned, and never stored.
+export async function exportarLegajos(input: unknown): Promise<ActionResult<ArchivoExportado>> {
+  const admin = await sessionWithRole("admin");
+  if (!admin) return noAutorizado;
+  return exportar(input);
 }
