@@ -8,6 +8,7 @@ import { screenshotBoth } from "./screens";
 import {
   createE2EUser,
   deleteE2EUser,
+  fillLaboral,
   fillLegajo,
   localServiceClient,
   seedAdminClient,
@@ -45,15 +46,6 @@ function base(suffix: string) {
     emergencia_parentesco: "Madre",
     emergencia_domicilio: "Calle Falsa 456",
     emergencia_telefono: "11 5555-6666",
-    numero_legajo: `E2E-${suffix}`,
-    area: "Operaciones",
-    puesto: "Técnico",
-    fecha_ingreso: "2020-01-15",
-    estado_laboral: "activo" as const,
-    sede: "Sede de Prueba",
-    modalidad: "Presencial",
-    convenio: "Convenio de Prueba",
-    bruto_mensual: 850000,
   };
 }
 
@@ -61,8 +53,12 @@ async function usuario(label: string, { rol = "empleado", lleno = true }: { rol?
   const suffix = randomUUID().slice(0, 8);
   const user = await createE2EUser(`${label}-${suffix}`, rol);
   created.push(user.id);
-  if (lleno) await fillLegajo(user.id, base(suffix));
-  return { ...user, apellido: `MiLegajo${suffix}` };
+  if (lleno) {
+    await fillLegajo(user.id, base(suffix));
+    // Group E is filled too (Admin only): the page must not show it.
+    await fillLaboral(user.id, { numero_legajo: `E2E-${suffix}` });
+  }
+  return { ...user, apellido: `MiLegajo${suffix}`, numeroLegajo: `E2E-${suffix}` };
 }
 
 const grupo = (page: Page, id: string) => page.getByTestId(`grupo-${id}`);
@@ -87,19 +83,28 @@ test.afterAll(async () => {
   for (const id of created) await deleteE2EUser(id);
 });
 
-test("an Empleado sees their own data, with group E read only; nobody else's", async ({ page }) => {
+// The group E values fillLaboral stores, as a page would show them.
+const VALORES_E = ["Mostrador (SM)", "Casa Central", "15/01/2020", t.grupos.E, t.camposLaborales.antiguedad, t.camposLaborales.numero_legajo];
+
+test("an Empleado sees their own data, and no datos laborales at all; nobody else's", async ({ page }) => {
   const user = await usuario("ver");
   await loginAs(page, user);
   await expect(page.getByRole("heading", { level: 1, name: t.title })).toBeVisible();
   await expect(dato(page, "A", "apellido")).toContainText(user.apellido);
   await expect(dato(page, "A", "fecha_nacimiento")).toContainText("01/01/1990");
 
-  const laborales = grupo(page, "E");
-  await expect(laborales.getByText(t.laboralesNota)).toBeVisible();
-  await expect(laborales.locator('[data-campo="bruto_mensual"]')).toContainText(/850\.000,00/);
-  await expect(laborales.locator('[data-campo="antiguedad"]')).toContainText(/años/);
-  await expect(laborales.getByRole("button")).toHaveCount(0);
-  await expect(laborales.getByRole("textbox")).toHaveCount(0);
+  // Group E (CR-2): no section, no field, no value, also not in the page
+  // payload: the HTML and the RSC data, fetched with the same session.
+  await expect(grupo(page, "E")).toHaveCount(0);
+  const texto = await page.locator("main").innerText();
+  for (const valor of [...VALORES_E, user.numeroLegajo]) expect(texto, valor).not.toContain(valor);
+  for (const headers of [{}, { RSC: "1" }] as Record<string, string>[]) {
+    const respuesta = await page.request.get("/mi-legajo", { headers });
+    expect(respuesta.ok()).toBe(true);
+    const cuerpo = await respuesta.text();
+    expect(cuerpo, JSON.stringify(headers)).toContain(user.apellido);
+    expect(cuerpo, JSON.stringify(headers)).not.toContain(user.numeroLegajo);
+  }
 
   // Another employee's data never appears.
   await expect(page.getByText("Prueba Empleado A")).toHaveCount(0);
@@ -233,6 +238,9 @@ test("an Admin editing their own legajo saves directly, with no request", async 
   await expect(page.getByRole("status").filter({ hasText: t.exito.guardado })).toBeVisible();
   await expect(dato(page, "D", "alergias")).toContainText("Polen (directo)");
   await expect(page.getByTestId("banner-pendiente")).toHaveCount(0);
+  // Their own group E is edited from Legajos, not here.
+  await expect(grupo(page, "E")).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText(user.numeroLegajo);
 
   const service = localServiceClient();
   const { data: legajo } = await service.from("legajos").select("id, alergias").eq("profile_id", user.id).single();
@@ -276,7 +284,7 @@ test("an empty legajo renders cleanly and invites the user to complete it", asyn
   await loginAs(page, user);
   await expect(page.getByRole("heading", { name: t.vacio.title })).toBeVisible();
   await expect(dato(page, "A", "nombres")).toContainText(t.sinDato);
-  await expect(grupo(page, "E").locator('[data-campo="antiguedad"]')).toContainText(t.sinDato);
+  await expect(grupo(page, "E")).toHaveCount(0);
   for (const tipo of ["dni_frente", "dni_dorso", "licencia_conducir"]) {
     await expect(page.getByTestId(`documento-${tipo}`)).toContainText(t.documentos.estados.faltante);
   }

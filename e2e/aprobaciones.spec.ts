@@ -5,7 +5,7 @@ import { formatCopy } from "../src/lib/copy/format";
 import { cuilDigitoVerificador } from "../src/lib/legajo/cuil";
 import { loginAs } from "./helpers";
 import { screenshotBoth } from "./screens";
-import { createE2EUser, deleteE2EUser, fillLegajo, localServiceClient, ultimaSolicitud } from "./service";
+import { createE2EUser, deleteE2EUser, fillLaboral, fillLegajo, localServiceClient, ultimaSolicitud } from "./service";
 
 // F1-09B: the approvals inbox, the Admin's bell and the Admin's replacement
 // modes (PRD US-4, US-7). Each test uses its own throwaway accounts, told
@@ -58,8 +58,8 @@ async function empleado(label: string, dni: string) {
     emergencia_parentesco: "Madre",
     emergencia_domicilio: "Calle 2",
     emergencia_telefono: "11 5555-6666",
-    numero_legajo: `B-${suffix}`,
   });
+  await fillLaboral(user.id, { numero_legajo: `B-${suffix}` });
   return { ...user, apellido, nombre: `Prueba ${apellido}` };
 }
 

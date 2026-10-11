@@ -5,7 +5,7 @@ import type { LegajoListItem } from "@/lib/legajo/listado";
 // and hands them to the screen once: filters, search and the deactivated
 // toggle live in the screen and never reach them.
 
-const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, area: null, puesto: null, sede: null, modalidad: null, estadoLaboral: "activo" as const };
+const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, areaId: null, area: null, puesto: null, sucursalId: null, sucursal: null, tareaId: null, tarea: null, estadoLaboral: "activo" as const };
 const hoy = new Date();
 const mesActual = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit" }).format(hoy);
 const LISTA: LegajoListItem[] = [
@@ -16,7 +16,7 @@ const LISTA: LegajoListItem[] = [
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: async () => ({ id: "admin" }) }));
-vi.mock("@/lib/legajo/admin-legajos", () => ({ cargarListadoLegajos: async () => LISTA }));
+vi.mock("@/lib/legajo/admin-legajos", () => ({ cargarListadoLegajos: async () => ({ legajos: LISTA, items: [] }) }));
 vi.mock("./LegajosScreen", () => ({ LegajosScreen: () => null }));
 
 const { default: LegajosPage } = await import("./page");
@@ -24,6 +24,6 @@ const { default: LegajosPage } = await import("./page");
 describe("LegajosPage", () => {
   it("passes KPI cards computed from the whole list, deactivated accounts excluded", async () => {
     const element = await LegajosPage();
-    expect(element.props).toMatchObject({ legajos: LISTA, listaFallo: false, kpis: { activos: 2, ingresosDelMes: 1 } });
+    expect(element.props).toMatchObject({ legajos: LISTA, items: [], listaFallo: false, kpis: { activos: 2, ingresosDelMes: 1 } });
   });
 });

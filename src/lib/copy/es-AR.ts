@@ -72,7 +72,6 @@ export type Copy = {
       D: string;
       E: string;
     };
-    laboralesNota: string;
     camposLaborales: {
       numero_legajo: string;
       area: string;
@@ -80,10 +79,10 @@ export type Copy = {
       fecha_ingreso: string;
       antiguedad: string;
       estado_laboral: string;
-      sede: string;
-      modalidad: string;
+      sucursal: string;
+      tarea: string;
       convenio: string;
-      bruto_mensual: string;
+      categoria: string;
     };
     estadosLaborales: {
       activo: string;
@@ -209,8 +208,8 @@ export type Copy = {
       label: string;
       estadoLaboral: string;
       area: string;
-      sede: string;
-      modalidad: string;
+      sucursal: string;
+      tarea: string;
       todos: string;
       todas: string;
       mostrarBajas: string;
@@ -221,8 +220,8 @@ export type Copy = {
       cuil: string;
       area: string;
       puesto: string;
-      sede: string;
-      modalidad: string;
+      sucursal: string;
+      tarea: string;
       estadoLaboral: string;
     };
     sinNombre: string;
@@ -242,6 +241,13 @@ export type Copy = {
     };
     laborales: {
       antiguedadNota: string;
+      // A required field's label.
+      obligatorio: string;
+      obligatoriosNota: string;
+      // A list item that is no longer offered, kept by a legajo.
+      inactivo: string;
+      // The Puesto dropdown before an Área is chosen.
+      elegirAreaPrimero: string;
     };
     documentos: {
       intro: string;
@@ -399,8 +405,8 @@ export type Copy = {
       partidoOtroNotAllowed: string;
       hijosRequired: string;
       hijosNotAllowed: string;
-      numberInvalid: string;
-      brutoMensualNegative: string;
+      puestoFueraDeArea: string;
+      itemInactivo: string;
       cuilInvalid: string;
       cuilPrefijo: string;
       cuilDigito: string;
@@ -784,7 +790,6 @@ export const copy = {
       D: "Datos de emergencia",
       E: "Datos laborales",
     },
-    laboralesNota: "Estos datos los administra Recursos Humanos.",
     camposLaborales: {
       numero_legajo: "Número de legajo",
       area: "Área",
@@ -792,10 +797,10 @@ export const copy = {
       fecha_ingreso: "Fecha de ingreso",
       antiguedad: "Antigüedad",
       estado_laboral: "Estado laboral",
-      sede: "Sede",
-      modalidad: "Modalidad",
+      sucursal: "Sucursal",
+      tarea: "Tarea",
       convenio: "Convenio",
-      bruto_mensual: "Bruto mensual",
+      categoria: "Categoría",
     },
     estadosLaborales: {
       activo: "Activo",
@@ -849,7 +854,7 @@ export const copy = {
       banner: "Tu última solicitud fue rechazada. Motivo: «{motivo}». Podés corregir los datos y enviarlos de nuevo.",
     },
     admin: {
-      nota: "Como administrador, tus cambios se guardan directamente, sin pasar por aprobación.",
+      nota: "Como administrador, tus cambios se guardan directamente, sin pasar por aprobación. Tus datos laborales se editan desde Legajos.",
     },
     exito: {
       enviada: "Enviamos tus cambios. Quedan pendientes hasta que Recursos Humanos los revise.",
@@ -923,8 +928,8 @@ export const copy = {
       label: "Filtros",
       estadoLaboral: "Estado laboral",
       area: "Área",
-      sede: "Sede",
-      modalidad: "Modalidad",
+      sucursal: "Sucursal",
+      tarea: "Tarea",
       todos: "Todos",
       todas: "Todas",
       mostrarBajas: "Mostrar dados de baja",
@@ -935,8 +940,8 @@ export const copy = {
       cuil: "CUIL",
       area: "Área",
       puesto: "Puesto",
-      sede: "Sede",
-      modalidad: "Modalidad",
+      sucursal: "Sucursal",
+      tarea: "Tarea",
       estadoLaboral: "Estado laboral",
     },
     sinNombre: "Sin nombre cargado",
@@ -957,6 +962,10 @@ export const copy = {
     },
     laborales: {
       antiguedadNota: "La antigüedad se calcula a partir de la fecha de ingreso.",
+      obligatorio: "{campo} *",
+      obligatoriosNota: "Los datos marcados con * son obligatorios.",
+      inactivo: "{nombre} (inactivo)",
+      elegirAreaPrimero: "Elegí primero un área",
     },
     documentos: {
       intro: "Subí archivos PDF, JPG o PNG de hasta 10 MB. Los documentos que subas quedan aprobados.",
@@ -1123,8 +1132,8 @@ export const copy = {
       partidoOtroNotAllowed: "Completá este dato solo si elegiste «Otro».",
       hijosRequired: "Agregá al menos un hijo o elegí «No».",
       hijosNotAllowed: "Si elegiste «No», no agregues hijos.",
-      numberInvalid: "Ingresá un número válido.",
-      brutoMensualNegative: "El bruto mensual no puede ser negativo.",
+      puestoFueraDeArea: "Elegí un puesto del área seleccionada.",
+      itemInactivo: "Esa opción está inactiva. Elegí otra.",
       cuilInvalid: "Ingresá un CUIL válido, con el formato XX-XXXXXXXX-X.",
       cuilPrefijo: "El CUIL tiene que empezar con 20, 23, 24 o 27.",
       cuilDigito: "El dígito verificador del CUIL no es correcto. Revisalo y volvé a intentar.",

@@ -5,13 +5,16 @@ import { getSessionUser } from "@/lib/auth/session";
 import { copy } from "@/lib/copy/es-AR";
 import { resumirDocumentos } from "@/lib/documentos/resumen";
 import { cargarMiLegajo } from "@/lib/legajo/mi-legajo";
-import { datosLaboralesVista, legajoVacio } from "@/lib/legajo/vista";
+import { legajoVacio } from "@/lib/legajo/vista";
 import { MiLegajoScreen } from "./MiLegajoScreen";
 
 const t = copy.miLegajo;
 
 // Mi Legajo (PRD US-3, US-7): the signed-in user's own legajo, read with their
 // session. There is no id in the URL: nobody can ask for another legajo here.
+// Groups A to D only: group E (datos laborales) is Admin only and lives in
+// its own table, which this page never reads (an Admin edits their own from
+// Legajos).
 export default async function MiLegajoPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -37,7 +40,6 @@ export default async function MiLegajoPage() {
     <MiLegajoScreen
       actual={{ ...legajo, hijos: data.hijos }}
       solicitud={data.solicitud}
-      laborales={datosLaboralesVista(legajo)}
       documentos={resumirDocumentos(data.documentos)}
       esAdmin={user.role === "admin"}
       vacio={legajoVacio(legajo, data.hijos)}

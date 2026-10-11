@@ -131,16 +131,7 @@ set
   emergencia_nombre = 'Contacto Ficticio Uno',
   emergencia_parentesco = 'Cónyuge',
   emergencia_domicilio = 'Calle Falsa 123, Villa Ficticia',
-  emergencia_telefono = '1100000101',
-  numero_legajo = 'TEST-001',
-  area = 'Administración',
-  puesto = 'Responsable de RR. HH. (prueba)',
-  fecha_ingreso = '2015-02-01',
-  estado_laboral = 'activo',
-  sede = 'Sede de Prueba',
-  modalidad = 'Presencial',
-  convenio = 'Convenio de Prueba',
-  bruto_mensual = 1500000.00
+  emergencia_telefono = '1100000101'
 where profile_id = '00000000-0000-4000-a000-000000000001';
 
 update public.legajos
@@ -169,16 +160,7 @@ set
   emergencia_nombre = 'Contacto Ficticio Dos',
   emergencia_parentesco = 'Hermana',
   emergencia_domicilio = 'Avenida Inventada 789, Barrio de Prueba',
-  emergencia_telefono = '1100000102',
-  numero_legajo = 'TEST-002',
-  area = 'Operaciones',
-  puesto = 'Técnico (prueba)',
-  fecha_ingreso = '2021-09-15',
-  estado_laboral = 'activo',
-  sede = 'Sede de Prueba',
-  modalidad = 'Híbrida',
-  convenio = 'Convenio de Prueba',
-  bruto_mensual = 950000.00
+  emergencia_telefono = '1100000102'
 where profile_id = '00000000-0000-4000-a000-000000000002';
 
 update public.legajos
@@ -207,17 +189,35 @@ set
   emergencia_nombre = 'Contacto Ficticio Tres',
   emergencia_parentesco = 'Padre',
   emergencia_domicilio = 'Pasaje Imaginario 12, Localidad de Prueba',
-  emergencia_telefono = '1100000103',
-  numero_legajo = 'TEST-003',
-  area = 'Logística',
-  puesto = 'Operario (prueba)',
-  fecha_ingreso = '2025-06-02',
-  estado_laboral = 'en_prueba',
-  sede = 'Sede de Prueba',
-  modalidad = 'Presencial',
-  convenio = 'Convenio de Prueba',
-  bruto_mensual = 720000.00
+  emergencia_telefono = '1100000103'
 where profile_id = '00000000-0000-4000-a000-000000000003';
+
+-- Group E (Admin only, CR-2): list items of Configuración, by name.
+update public.legajos_laborales as ll
+set
+  numero_legajo = v.numero_legajo,
+  area_id = (select i.id from public.catalogo_items as i where i.lista = 'area' and i.nombre = v.area),
+  puesto_id = (
+    select p.id from public.catalogo_items as p
+    join public.catalogo_items as a on a.id = p.area_id
+    where p.lista = 'puesto' and a.nombre = v.area and p.nombre = v.puesto
+  ),
+  fecha_ingreso = v.fecha_ingreso,
+  estado_laboral = v.estado_laboral,
+  sucursal_id = (select i.id from public.catalogo_items as i where i.lista = 'sucursal' and i.nombre = v.sucursal),
+  tarea_id = (select i.id from public.catalogo_items as i where i.lista = 'tarea' and i.nombre = v.tarea),
+  convenio_id = (select i.id from public.catalogo_items as i where i.lista = 'convenio' and i.nombre = v.convenio),
+  categoria_id = (select i.id from public.catalogo_items as i where i.lista = 'categoria' and i.nombre = v.categoria)
+from public.legajos as l,
+  (values
+    ('00000000-0000-4000-a000-000000000001'::uuid, 'TEST-001', 'Administración', 'Otros', '2015-02-01'::date,
+      'activo'::public.estado_laboral, 'Casa Central', 'Administrativo', 'Comercio', 'A'),
+    ('00000000-0000-4000-a000-000000000002'::uuid, 'TEST-002', 'Ventas', 'Mostrador (SM)', '2021-09-15'::date,
+      'activo'::public.estado_laboral, 'San Martín', 'Ventas', 'Comercio', 'B'),
+    ('00000000-0000-4000-a000-000000000003'::uuid, 'TEST-003', 'Logística', 'Depósito', '2025-06-02'::date,
+      'en_prueba'::public.estado_laboral, 'Pacheco', 'Maestranza y Servicios', null, 'C')
+  ) as v (profile_id, numero_legajo, area, puesto, fecha_ingreso, estado_laboral, sucursal, tarea, convenio, categoria)
+where l.profile_id = v.profile_id and ll.legajo_id = l.id;
 
 update public.legajos
 set

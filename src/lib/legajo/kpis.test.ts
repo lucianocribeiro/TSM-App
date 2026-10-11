@@ -49,16 +49,16 @@ describe("calcularKpis", () => {
   });
 
   it("is computed over the whole list, whatever the filters show", () => {
-    const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, puesto: null, sede: null, modalidad: null, estadoLaboral: "activo" as const };
+    const base = { nombres: null, apellido: null, dni: null, cuil: null, numeroLegajo: null, puesto: null, sucursalId: null, sucursal: null, tareaId: null, tarea: null, estadoLaboral: "activo" as const };
     const items: LegajoListItem[] = [
-      { ...base, profileId: "a", nombre: "Ana", area: "Ventas", fechaIngreso: "2026-09-02", estadoCuenta: "activa" },
-      { ...base, profileId: "b", nombre: "Beto", area: "Taller", fechaIngreso: "2026-01-02", estadoCuenta: "activa" },
-      { ...base, profileId: "c", nombre: "Carla", area: "Ventas", fechaIngreso: "2026-09-03", estadoCuenta: "inactiva" },
+      { ...base, profileId: "a", nombre: "Ana", areaId: "ventas", area: "Ventas", fechaIngreso: "2026-09-02", estadoCuenta: "activa" },
+      { ...base, profileId: "b", nombre: "Beto", areaId: "taller", area: "Taller", fechaIngreso: "2026-01-02", estadoCuenta: "activa" },
+      { ...base, profileId: "c", nombre: "Carla", areaId: "ventas", area: "Ventas", fechaIngreso: "2026-09-03", estadoCuenta: "inactiva" },
     ];
     const todas = calcularKpis(items, SEPTIEMBRE);
     expect(todas).toEqual({ activos: 2, ingresosDelMes: 1 });
     // What a filtered view would show is a different set; the cards do not use it.
-    expect(filtrarLegajos(items, { ...FILTROS_INICIALES, area: "Taller" })).toHaveLength(1);
+    expect(filtrarLegajos(items, { ...FILTROS_INICIALES, areaId: "taller" })).toHaveLength(1);
     expect(filtrarLegajos(items, { ...FILTROS_INICIALES, busqueda: "carla", mostrarBajas: true })).toHaveLength(1);
   });
 });

@@ -55,6 +55,54 @@ export async function fillLegajo(profileId: string, values: Database["public"]["
   if (error) throw new Error(`legajo setup failed: ${error.message}`);
 }
 
+// The id of a seeded Configuración item (a Puesto within its Área).
+export async function itemIdE2E(lista: Database["public"]["Enums"]["catalogo_lista"], nombre: string, area?: string): Promise<string> {
+  let consulta = localServiceClient().from("catalogo_items").select("id").eq("lista", lista).eq("nombre", nombre);
+  if (area) consulta = consulta.eq("area_id", await itemIdE2E("area", area));
+  const { data, error } = await consulta.single();
+  if (error || !data) throw new Error(`catalog item not found: ${lista} ${nombre}`);
+  return data.id;
+}
+
+// Group E (CR-2: legajos_laborales, list items by name). A write that sets
+// any value must complete the six required fields; this fills every field.
+export async function fillLaboral(
+  profileId: string,
+  valores: {
+    numero_legajo: string;
+    area?: string;
+    puesto?: string;
+    fecha_ingreso?: string;
+    estado_laboral?: Database["public"]["Enums"]["estado_laboral"];
+    sucursal?: string;
+    tarea?: string | null;
+    convenio?: string | null;
+    categoria?: string | null;
+  },
+) {
+  const area = valores.area ?? "Ventas";
+  const opcional = async (lista: "tarea" | "convenio" | "categoria", nombre: string | null | undefined, porDefecto: string) =>
+    nombre === null ? null : itemIdE2E(lista, nombre ?? porDefecto);
+  const service = localServiceClient();
+  const { data: legajo, error: legajoError } = await service.from("legajos").select("id").eq("profile_id", profileId).single();
+  if (legajoError || !legajo) throw new Error(`legajo lookup failed: ${legajoError?.message}`);
+  const { error } = await service
+    .from("legajos_laborales")
+    .update({
+      numero_legajo: valores.numero_legajo,
+      area_id: await itemIdE2E("area", area),
+      puesto_id: await itemIdE2E("puesto", valores.puesto ?? "Mostrador (SM)", area),
+      fecha_ingreso: valores.fecha_ingreso ?? "2020-01-15",
+      estado_laboral: valores.estado_laboral ?? "activo",
+      sucursal_id: await itemIdE2E("sucursal", valores.sucursal ?? "Casa Central"),
+      tarea_id: await opcional("tarea", valores.tarea, "Ventas"),
+      convenio_id: await opcional("convenio", valores.convenio, "Comercio"),
+      categoria_id: await opcional("categoria", valores.categoria, "A"),
+    })
+    .eq("legajo_id", legajo.id);
+  if (error) throw new Error(`group E setup failed: ${error.message}`);
+}
+
 // The seed Admin's session (local stack only), to decide requests the way an
 // Admin does: the decision functions check auth.uid(), not the service role.
 export async function seedAdminClient() {

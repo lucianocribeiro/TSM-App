@@ -1,6 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.10 (draft) | Governed by: `docs/constitucion.md`
-Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation. v0.10 — Configuración (section 8, client change request CR-1): Admin-maintained lists (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) with add, rename, reorder, deactivate, reactivate and delete-if-never-used, a change history and initial values; Configuración in the menu. The legajo fields keep their current form until CR-2.
+Version: 0.11 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation. v0.10 — Configuración (section 8, client change request CR-1): Admin-maintained lists (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) with add, rename, reorder, deactivate, reactivate and delete-if-never-used, a change history and initial values; Configuración in the menu. The legajo fields keep their current form until CR-2. v0.11 — Datos laborales from the Configuración lists (client change request CR-2): Área, Puesto (within the Área), Sucursal (was Sede), Tarea (replaces Modalidad), Convenio and Categoría (new) are list items; Bruto mensual and Modalidad are removed with their data; group E is Admin only, also in the database, and the Empleado no longer sees it (US-3, US-4, 5.5 to 5.7, section 8).
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -38,18 +38,19 @@ As the system, I restrict every view and every row by role.
 As an Empleado, I see my legajo and submit changes to my personal data (groups A to D in section 5).
 - My changes to groups A to D and the documents I upload stay pending until an Admin approves them (detail in US-7).
 - While a change is pending, I see the current value plus my submitted value marked as pending; if it is rejected, I see the reason.
-- Work data (group E) is read-only for Empleado, enforced in RLS and in the Server Action.
+- I do not see work data (group E, Datos laborales) at all, not even my own número de legajo, fecha de ingreso or antigüedad. This holds in the database: no table, view or function returns a group E value to an Empleado (Constitution §4).
 - Required fields and validation rules from section 5 are enforced.
 - I can view and download my own documents.
 
 ### US-4 Legajos (Admin)
 As Admin, I see the list of employees and open any legajo.
-- I can edit all legajo data (groups A to E); my changes apply directly, with no approval step.
+- I can edit all legajo data (groups A to E); my changes apply directly, with no approval step. Group E is a form of dropdowns from Configuración (section 8): Área, Puesto (only the Puestos of the chosen Área; changing the Área clears the Puesto), Sucursal, Tarea, Convenio and Categoría offer the active items in Configuración order. A value the legajo already has that is inactive now stays selected, marked "(inactivo)", and is not offered to other legajos. Required fields are marked, and an incomplete save is refused with an error per field. My own group E is edited here too; Mi Legajo does not show it.
 - I review pending changes and document uploads from employees and approve or reject them (detail in US-7).
 - I can upload, replace, delete and download documents for any employee; files go to a private bucket.
 - Replacing a current document asks how: **Conservar historial** keeps the previous document as replaced, or **Reemplazar definitivamente** deletes it and its file for good, after an explicit confirmation. While the employee has a pending document of that type, I cannot upload or replace that type; it is decided in the approvals inbox first.
 - The legajo detail lists the replaced versions of each document type (when replaced, who replaced it) and lets me download them. Employees never see replaced documents.
 - While the employee has a pending change request, groups A to D and the children cannot be edited directly (group E and documents can); the notice links to the request in the inbox.
+- The Legajos list shows Empleado, CUIL, Área, Puesto, Sucursal, Tarea and Estado laboral (never any amount). It filters by estado laboral, Área, Sucursal and Tarea; the options are the active items of Configuración, plus any inactive item a legajo still has, marked "(inactivo)".
 - The Legajos list shows two KPI cards, over the whole workforce (not affected by the list's filters, search or the deactivated toggle):
   - Activos: employees whose account is not deactivated and whose estado laboral is Activo or En prueba. Legajos without estado laboral are excluded.
   - Ingresos del mes: of those active employees, the ones whose Fecha de ingreso falls in the current calendar month in Argentina (America/Argentina/Buenos_Aires).
@@ -159,37 +160,42 @@ Source: TSM validated employee update form ("Formulario de actualización - Tecn
 - Teléfono de contacto de emergencia*
 
 ### 5.5 Datos laborales (group E)
-- Número de legajo*
-- Área*
-- Puesto*
+Admin only (5.6). The list fields take an item of the Configuración list of the same name (section 8).
+- Número de legajo* — unique
+- Área* — list Área
+- Puesto* — list Puesto, of the selected Área
 - Fecha de ingreso*
 - Antigüedad — calculated from Fecha de ingreso, not stored
 - Estado laboral* — options: Activo, En prueba ("En licencia" is added with the Licencias module in Fase 3)
   Estado laboral describes the employment situation and is independent of Estado de la cuenta (US-8), which controls access to the portal.
-- Sede*
-- Modalidad*
-- Convenio*
-- Bruto mensual*
+- Sucursal* — list Sucursal (was "Sede")
+- Tarea — list Tarea (replaces "Modalidad")
+- Convenio — list Convenio
+- Categoría — list Categoría
+
+Bruto mensual and Modalidad were removed in CR-2, with their data. Values stored as free text before CR-2 were matched to the list items by name (ignoring case, accents and spaces; a Puesto within its matched Área); values without a match were left empty, to be completed the next time the Admin saves group E.
 
 ### 5.6 Edit permissions
 | Group | Empleado (own legajo only) | Admin (any legajo) |
 |---|---|---|
 | A to D | Submits changes; they apply after Admin approval | Read and edit, applied directly |
-| E (laborales, including Bruto mensual) | Read only | Read and edit |
+| E (laborales) | No access (does not see it) | Read and edit |
 | Documents | Uploads own; they apply after Admin approval; reads own | Uploads, replaces, deletes and reads for anyone |
 
 Validation (required fields, DNI digits only, Partido otro, children rule) is enforced on the server, not only in the form.
 
-While a legajo has a pending change request, the database refuses direct changes to groups A to D and to the children, for every API user including Admin; group E stays editable. Approving or rejecting the request (or the employee cancelling it) releases the lock.
+While a legajo has a pending change request, the database refuses direct changes to groups A to D and to the children, for every API user including Admin; group E stays editable.
+
+Group E is stored apart from groups A to D and only an active Admin reads or writes it, in the database. Any write that sets or changes group E must leave its required fields (5.5) filled, and may only newly choose an active item (for a Puesto, also of an active Área); the database refuses it otherwise. A new account starts with an empty group E, and an employee's approved change to groups A to D never depends on group E. Approving or rejecting the request (or the employee cancelling it) releases the lock.
 
 ### 5.7 Field validations
 - CUIL: 11 digits in `XX-XXXXXXXX-X` format, prefix 20, 23, 24 or 27, with the check digit validated (modulo 11; a DNI whose check digit would be 10 takes prefix 23).
 - DNI: digits only.
 - Email personal: valid email format.
 - Teléfonos (celular and emergency): 8 to 20 characters, digits plus optional spaces, hyphens, parentheses and a leading `+`. No country-specific format enforced.
-- Grupo sanguíneo, Sede, Área, Puesto, Convenio: free text for now. The Configuración lists (section 8) exist; the legajo fields move to them in CR-2.
+- Grupo sanguíneo: free text.
+- Área, Puesto, Sucursal, Tarea, Convenio, Categoría: dropdowns of Configuración (section 8). The value must be an item of that list (a Puesto of the selected Área); a newly chosen item must be active (a Puesto, of an active Área); the item a legajo already has stays valid if it was deactivated since. Checked by the server with the same rules as the form, and by the database.
 - Fecha de nacimiento and Fecha de ingreso: valid dates, not in the future.
-- Bruto mensual: non-negative number.
 
 ## 6. Open decisions
 | # | Decision | Needed before |
@@ -208,7 +214,7 @@ While a legajo has a pending change request, the database refuses direct changes
 - Repo state checked before merge.
 
 ## 8. Configuración
-Client change request CR-1. A menu section for Admin only, numbered like the other entries, to maintain the lists the legajo uses. This section defines the lists and their rules; which legajo fields use them, and how, is CR-2.
+Client change request CR-1. A menu section for Admin only, numbered like the other entries, to maintain the lists the legajo uses. This section defines the lists and their rules; the legajo fields that use them are in 5.5 (CR-2).
 
 ### 8.1 Lists
 Área, Puesto, Sucursal, Convenio, Tarea and Categoría. Each Puesto belongs to one Área. Only an active Admin can read or change the lists (database and server guards); an Empleado never reaches them.
@@ -220,7 +226,7 @@ Client change request CR-1. A menu section for Admin only, numbered like the oth
 - Rename: records reference the item, not its text, so the new name shows everywhere the item is used.
 - Order: the Admin moves an item one place up or down (keyboard accessible); the order is the one dropdowns use.
 - Deactivate: the item no longer appears for new selections; records that already have it keep it. Deactivating an Área hides its Puestos from new selections too, without changing their own state; reactivating the Área shows them again. Deactivation asks for confirmation.
-- Delete: only for an item never used, and it asks for confirmation. An item in use (today, an Área with Puestos; from CR-2, any item a legajo references) is refused by the database with a message suggesting deactivation, and the screen does not offer it.
+- Delete: only for an item not in use, and it asks for confirmation. An item in use (an Área with Puestos, or any item a legajo references) is refused by the database with a message suggesting deactivation, and the screen does not offer it. Once no legajo uses it any more, it can be deleted.
 - A change made from a stale screen (another Admin changed the item in between) is refused with a message, and the list reloads.
 
 ### 8.3 History

@@ -6,25 +6,55 @@ import { Field } from "@/components/ui/Field";
 import { LabelValueGrid } from "@/components/ui/LabelValueGrid";
 import { Panel } from "@/components/ui/Panel";
 import { Select } from "@/components/ui/Select";
+import type { CatalogoItem } from "@/lib/configuracion/listas";
 import { copy } from "@/lib/copy/es-AR";
-import { CAMPOS_LABORALES, valoresLaborales, type CampoLaboral, type FormLaboral } from "@/lib/legajo/laborales";
+import { formatCopy } from "@/lib/copy/format";
+import {
+  CAMPOS_LABORALES,
+  CAMPOS_OBLIGATORIOS,
+  esCampoLista,
+  opcionesCampo,
+  validarDatosLaborales,
+  valoresLaborales,
+  type ActualLaboral,
+  type CampoLaboral,
+  type FormLaboral,
+} from "@/lib/legajo/laborales";
 import { ESTADOS_LABORALES } from "@/lib/legajo/options";
-import { datosLaboralesSchema, fieldErrors } from "@/lib/legajo/validation";
 import type { DatoLaboral } from "@/lib/legajo/vista";
 import { actualizarDatosLaborales } from "../actions";
 
 const t = copy.miLegajo;
+const tl = copy.legajos.laborales;
+
+// The label of each form field (the list fields by their list's name).
+const ETIQUETA: Record<CampoLaboral, keyof typeof t.camposLaborales> = {
+  numero_legajo: "numero_legajo",
+  area_id: "area",
+  puesto_id: "puesto",
+  fecha_ingreso: "fecha_ingreso",
+  estado_laboral: "estado_laboral",
+  sucursal_id: "sucursal",
+  tarea_id: "tarea",
+  convenio_id: "convenio",
+  categoria_id: "categoria",
+};
 
 type GrupoLaboralPanelProps = {
   profileId: string;
   laborales: DatoLaboral[];
   inicial: FormLaboral;
+  // The stored values, which stay valid even if their item is inactive now.
+  actual: ActualLaboral | null;
+  // The Configuración lists.
+  items: CatalogoItem[];
   onGuardado: (mensaje: string) => void;
 };
 
-// Group E (PRD 5.5), edited by the Admin directly. Antigüedad is shown,
-// calculated from the fecha de ingreso, and never edited.
-export function GrupoLaboralPanel({ profileId, laborales, inicial, onGuardado }: GrupoLaboralPanelProps) {
+// Group E (PRD 5.5), Admin only, edited directly. The list fields are
+// dropdowns of Configuración; antigüedad is shown, calculated from the fecha
+// de ingreso, and never edited.
+export function GrupoLaboralPanel({ profileId, laborales, inicial, actual, items, onGuardado }: GrupoLaboralPanelProps) {
   const [editando, setEditando] = useState(false);
   const titleId = "grupo-E-title";
 
@@ -45,6 +75,8 @@ export function GrupoLaboralPanel({ profileId, laborales, inicial, onGuardado }:
           <LaboralForm
             profileId={profileId}
             inicial={inicial}
+            actual={actual}
+            items={items}
             onCancel={() => setEditando(false)}
             onSaved={() => {
               setEditando(false);
@@ -64,11 +96,15 @@ export function GrupoLaboralPanel({ profileId, laborales, inicial, onGuardado }:
 function LaboralForm({
   profileId,
   inicial,
+  actual,
+  items,
   onCancel,
   onSaved,
 }: {
   profileId: string;
   inicial: FormLaboral;
+  actual: ActualLaboral | null;
+  items: CatalogoItem[];
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -77,15 +113,17 @@ function LaboralForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const set = (campo: CampoLaboral, value: string) => setForm((prev) => ({ ...prev, [campo]: value }));
+  // A new Área clears the Puesto: Puestos belong to one Área.
+  const set = (campo: CampoLaboral, value: string) =>
+    setForm((prev) => (campo === "area_id" && value !== prev.area_id ? { ...prev, area_id: value, puesto_id: "" } : { ...prev, [campo]: value }));
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const valores = valoresLaborales(form);
-    // Immediate feedback with the same schema the server applies.
-    const local = datosLaboralesSchema.safeParse(valores);
-    if (!local.success) {
-      setErrores(fieldErrors(local.error));
+    // Immediate feedback with the same validator the server applies.
+    const local = validarDatosLaborales(valores, items, actual);
+    if (!local.ok) {
+      setErrores(local.fieldErrors);
       setError(t.errors.revisarCampos);
       return;
     }
@@ -104,10 +142,12 @@ function LaboralForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <p className="text-[12.5px] italic text-ink-soft">{tl.obligatoriosNota}</p>
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {CAMPOS_LABORALES.map((campo) => {
+          const etiqueta = t.camposLaborales[ETIQUETA[campo]];
           const common = {
-            label: t.camposLaborales[campo],
+            label: CAMPOS_OBLIGATORIOS.has(campo) ? formatCopy(tl.obligatorio, { campo: etiqueta }) : etiqueta,
             name: campo,
             value: form[campo],
             error: errores[campo],
@@ -123,11 +163,21 @@ function LaboralForm({
               />
             );
           }
+          if (esCampoLista(campo)) {
+            const sinArea = campo === "puesto_id" && !form.area_id;
+            return (
+              <Select
+                key={campo}
+                {...common}
+                placeholder={sinArea ? tl.elegirAreaPrimero : t.elegir}
+                disabled={sinArea}
+                options={opcionesCampo(items, campo, { actual: actual?.[campo], areaId: form.area_id || null })}
+                onChange={(event) => set(campo, event.target.value)}
+              />
+            );
+          }
           if (campo === "fecha_ingreso") {
             return <Field key={campo} {...common} type="date" onChange={(event) => set(campo, event.target.value)} />;
-          }
-          if (campo === "bruto_mensual") {
-            return <Field key={campo} {...common} inputMode="decimal" onChange={(event) => set(campo, event.target.value)} />;
           }
           return <Field key={campo} {...common} onChange={(event) => set(campo, event.target.value)} />;
         })}

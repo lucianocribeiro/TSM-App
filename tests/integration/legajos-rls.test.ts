@@ -8,6 +8,7 @@ import {
   type TestUser,
   type TypedClient,
 } from "./helpers";
+import { laboralCompleto, laboralDe } from "./laborales";
 
 // RLS, grants, triggers and constraints for public.legajos and public.legajo_hijos.
 // Assertions run through user sessions; the service-role client is used for
@@ -24,6 +25,10 @@ const DATA_COLUMNS = [
   "estado_civil", "nombre_conyuge", "tiene_hijos",
   "grupo_sanguineo", "alergias", "medicacion_habitual", "obra_social", "numero_afiliado",
   "emergencia_nombre", "emergencia_parentesco", "emergencia_domicilio", "emergencia_telefono",
+] as const;
+
+// Group E's former columns (CR-2: now in legajos_laborales, or dropped).
+const COLUMNAS_E_ANTERIORES = [
   "numero_legajo", "area", "puesto", "fecha_ingreso", "estado_laboral", "sede", "modalidad", "convenio", "bruto_mensual",
 ] as const;
 
@@ -55,19 +60,6 @@ const PERSONAL_UPDATE: LegajoUpdate = {
   emergencia_parentesco: "Madre",
   emergencia_domicilio: "Calle de Prueba 2",
   emergencia_telefono: "1100008888",
-};
-
-// One value per group E column, different from the empty legajo (all null).
-const LABORAL_VALUES: LegajoUpdate = {
-  numero_legajo: "RLS-E-001",
-  area: "Área de Prueba",
-  puesto: "Puesto de Prueba",
-  fecha_ingreso: "2020-01-02",
-  estado_laboral: "activo",
-  sede: "Sede de Prueba",
-  modalidad: "Presencial",
-  convenio: "Convenio de Prueba",
-  bruto_mensual: 123456.78,
 };
 
 describe("legajos and legajo_hijos RLS", () => {
@@ -174,6 +166,15 @@ describe("legajos and legajo_hijos RLS", () => {
         .select("id", { count: "exact", head: true })
         .eq("profile_id", user.id);
       expect(count).toBe(1);
+
+      // And its empty group E row (CR-2), which the user cannot read.
+      expect(await laboralDe(service, legajo!.id)).toMatchObject({
+        numero_legajo: null, area_id: null, puesto_id: null, fecha_ingreso: null, estado_laboral: null,
+        sucursal_id: null, tarea_id: null, convenio_id: null, categoria_id: null,
+      });
+      const propio = await user.client.from("legajos_laborales").select("*");
+      expect(propio.error).toBeNull();
+      expect(propio.data).toEqual([]);
     });
   });
 
@@ -218,17 +219,16 @@ describe("legajos and legajo_hijos RLS", () => {
       },
     );
 
-    it.each(Object.entries(LABORAL_VALUES))("cannot change group E column %s on own legajo", async (column, value) => {
-      const before = await storedLegajo(legajoA);
-      const { data, error } = await empleadoA.client
-        .from("legajos")
-        .update({ [column]: value } as LegajoUpdate)
-        .eq("id", legajoA)
-        .select();
+    // CR-2: group E left this table; its own (legajos_laborales) is Admin
+    // only (datos-laborales.test.ts).
+    it("the own legajo row carries no group E column", async () => {
+      const { data, error } = await empleadoA.client.from("legajos").select("*").eq("id", legajoA).single();
       expect(error).toBeNull();
-      expect(data).toEqual([]);
-      const after = await storedLegajo(legajoA);
-      expect(after?.[column as keyof typeof after]).toEqual(before?.[column as keyof typeof before]);
+      for (const column of COLUMNAS_E_ANTERIORES) expect(Object.keys(data ?? {}), column).not.toContain(column);
+      for (const column of COLUMNAS_E_ANTERIORES) {
+        const nombrada = await empleadoA.client.from("legajos").select(column).eq("id", legajoA);
+        expect(nombrada.error?.code, column).toBe("42703");
+      }
     });
 
     it("cannot update another empleado's legajo", async () => {
@@ -362,12 +362,18 @@ describe("legajos and legajo_hijos RLS", () => {
       expect(children.data).toEqual([{ id: hijoB }]);
     });
 
-    it("updates groups A to E on any legajo", async () => {
-      const update = { ...PERSONAL_UPDATE, dni: "92000002", tiene_hijos: false, ...LABORAL_VALUES, numero_legajo: "RLS-E-ADMIN" };
+    it("updates groups A to D, and group E in its own table, on any legajo", async () => {
+      const update = { ...PERSONAL_UPDATE, dni: "92000002", tiene_hijos: false };
       const { data, error } = await admin.client.from("legajos").update(update).eq("id", legajoB).select();
       expect(error).toBeNull();
       expect(data).toHaveLength(1);
       expect(await storedLegajo(legajoB)).toMatchObject(update);
+
+      const laboral = await laboralCompleto(service, "RLS-E-ADMIN");
+      const e = await admin.client.from("legajos_laborales").update(laboral).eq("legajo_id", legajoB).select();
+      expect(e.error).toBeNull();
+      expect(e.data).toHaveLength(1);
+      expect(await laboralDe(service, legajoB)).toMatchObject(laboral);
     });
 
     it("manages any employee's children", async () => {
@@ -420,42 +426,6 @@ describe("legajos and legajo_hijos RLS", () => {
 
     it("rejects a partido outside the PRD list", async () => {
       await expectCheckViolation({ partido: "Rosario", partido_otro: null });
-    });
-
-    it("rejects a negative bruto_mensual", async () => {
-      const { data, error } = await admin.client
-        .from("legajos")
-        .update({ bruto_mensual: -1 })
-        .eq("id", legajoB)
-        .select();
-      expect(data).toBeNull();
-      expect(error?.code).toBe(CHECK_VIOLATION);
-    });
-
-    it("rejects NaN in bruto_mensual on update and on insert", async () => {
-      // PostgREST casts the string "NaN" to numeric NaN.
-      const update = await admin.client
-        .from("legajos")
-        .update({ bruto_mensual: "NaN" as unknown as number })
-        .eq("id", legajoB)
-        .select();
-      expect(update.data).toBeNull();
-      expect(update.error?.code).toBe(CHECK_VIOLATION);
-
-      // Insert path: remove the trigger-created legajo first, so the only
-      // reason this insert can fail is the constraint.
-      const user = await createTestUser(service, "legajo-nan");
-      createdIds.push(user.id);
-      const removed = await service.from("legajos").delete().eq("profile_id", user.id).select();
-      expect(removed.error).toBeNull();
-      expect(removed.data).toHaveLength(1);
-
-      const insert = await admin.client
-        .from("legajos")
-        .insert({ profile_id: user.id, bruto_mensual: "NaN" as unknown as number })
-        .select();
-      expect(insert.data).toBeNull();
-      expect(insert.error?.code).toBe(CHECK_VIOLATION);
     });
   });
 });

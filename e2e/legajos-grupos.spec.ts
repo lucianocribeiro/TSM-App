@@ -3,7 +3,7 @@ import { copy } from "../src/lib/copy/es-AR";
 import { formatCopy } from "../src/lib/copy/format";
 import { adminNuevo, empleadoCompleto, hijosDe, legajoDe, registro, solicitudPendiente } from "./datos";
 import { loginAs } from "./helpers";
-import { localServiceClient } from "./service";
+import { itemIdE2E, localServiceClient } from "./service";
 
 // F1-11B, GAP-05 (groups): the Admin edits every group of an employee's
 // legajo in /legajos/[id] and each change is checked in the database; with a
@@ -158,14 +158,17 @@ test("with a pending request, groups A to D and the children are read-only, grou
   await expect(grupo(page, "C").locator('[data-campo="hijos"]')).toContainText("Hijo Bloqueado");
   await expect(grupo(page, "C").getByRole("button", { name: ml.hijos.agregar })).toHaveCount(0);
 
+  // Group E (its own table since CR-2): a required field, so its label is marked.
+  const puesto = formatCopy(copy.legajos.laborales.obligatorio, { campo: ml.camposLaborales.puesto });
   await editar(page, "E", async (panel) => {
-    await panel.getByLabel(ml.camposLaborales.puesto, { exact: true }).fill("Supervisora");
+    await panel.getByLabel(puesto, { exact: true }).selectOption({ label: "Cuentas corrientes" });
   });
-  await expect.poll(async () => (await legajoDe(emp.id)).puesto).toBe("Supervisora");
+  const cuentasCorrientes = await itemIdE2E("puesto", "Cuentas corrientes", "Ventas");
+  await expect
+    .poll(async () => (await service.from("legajos_laborales").select("puesto_id").eq("legajo_id", emp.legajoId).single()).data?.puesto_id)
+    .toBe(cuentasCorrientes);
 
-  const despues = await legajoDe(emp.id);
-  // Everything but the group E field just saved and the update time.
-  const aD = (legajo: typeof despues) => ({ ...legajo, puesto: null, updated_at: null });
-  expect(aD(despues)).toEqual(aD(antes.legajo));
+  // Groups A to D and the children exactly as they were.
+  expect(await legajoDe(emp.id)).toEqual(antes.legajo);
   expect(await hijosDe(emp.legajoId)).toEqual(antes.hijos);
 });

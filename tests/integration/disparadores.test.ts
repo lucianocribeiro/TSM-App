@@ -3,6 +3,7 @@ import { DOCUMENTOS_BUCKET } from "@/lib/documentos/tipos";
 import type { Database } from "@/lib/supabase/database.types";
 import { legajoIdDe, rutaDocumento } from "./actores";
 import { anonClient, createTestUser, deleteTestUsers, serviceClient, TEST_PASSWORD, uniqueEmail, type TestUser, type TypedClient } from "./helpers";
+import { laboralCompleto, laboralDe } from "./laborales";
 
 // F1-11A, GAP-03: triggers and internal SECURITY DEFINER functions, through
 // their public boundary (PostgREST and RPC as the signed-in users). Each
@@ -73,21 +74,6 @@ const OTROS_A_D: Required<Pick<LegajoUpdate, keyof typeof GRUPOS_A_D>> = {
   emergencia_parentesco: "Padre",
   emergencia_domicilio: "Calle 3",
   emergencia_telefono: "11 7777-8888",
-};
-
-// A different value for every group E column.
-const OTROS_E: Required<
-  Pick<LegajoUpdate, "numero_legajo" | "area" | "puesto" | "fecha_ingreso" | "estado_laboral" | "sede" | "modalidad" | "convenio" | "bruto_mensual">
-> = {
-  numero_legajo: `E-${Date.now()}`,
-  area: "Intrusa",
-  puesto: "Intruso",
-  fecha_ingreso: "2001-01-01",
-  estado_laboral: "en_prueba",
-  sede: "Otra sede",
-  modalidad: "Remota",
-  convenio: "Otro",
-  bruto_mensual: 1,
 };
 
 describe("triggers and internal functions (GAP-03)", () => {
@@ -172,21 +158,12 @@ describe("triggers and internal functions (GAP-03)", () => {
       expect(await hijosDe(legajoOtro)).toHaveLength(1);
     });
 
-    it("still allows every group E field, and a write that changes no group A to D value", async () => {
-      const deAdmin = {
-        numero_legajo: `A-${Date.now()}`,
-        area: "Administración",
-        puesto: "Analista",
-        fecha_ingreso: "2002-02-02",
-        estado_laboral: "activo" as const,
-        sede: "Central",
-        modalidad: "Híbrida",
-        convenio: "Comercio",
-        bruto_mensual: 2,
-      } satisfies Record<keyof typeof OTROS_E, unknown>;
-      const cambio = await admin.client.from("legajos").update(deAdmin).eq("id", legajo).select("area");
+    it("still allows group E (its own table, CR-2), and a write that changes no group A to D value", async () => {
+      const deAdmin = await laboralCompleto(service, "A");
+      const cambio = await admin.client.from("legajos_laborales").update(deAdmin).eq("legajo_id", legajo).select("numero_legajo");
       expect(cambio.error).toBeNull();
-      expect(cambio.data).toEqual([{ area: "Administración" }]);
+      expect(cambio.data).toEqual([{ numero_legajo: deAdmin.numero_legajo }]);
+      expect(await laboralDe(service, legajo)).toMatchObject(deAdmin);
       const mismo = await admin.client.from("legajos").update({ nombres: GRUPOS_A_D.nombres }).eq("id", legajo).select("id");
       expect(mismo.error).toBeNull();
       expect(mismo.data).toHaveLength(1);
@@ -271,37 +248,42 @@ describe("triggers and internal functions (GAP-03)", () => {
   });
 
   // -------------------------------------------------------------------------
-  // The trigger is defence in depth: no API path lets a non-Admin update a
-  // legajo row at all (legajos_update_admin), so RLS stops every attempt
-  // before the trigger would.
-  describe("protect_legajo_laboral", () => {
-    it.each(Object.keys(OTROS_E) as (keyof typeof OTROS_E)[])(
-      "an Empleado cannot change %s by update, upsert or change request",
-      async (campo) => {
-        const antes = await legajoDe(legajo);
-        const valor = { [campo]: OTROS_E[campo] } as LegajoUpdate;
+  // CR-2: group E is in legajos_laborales, Admin only (protect_legajo_laboral
+  // is gone with the columns it guarded). No API path lets an Empleado
+  // change it: RLS hides the row, refuses an insert or upsert, and a change
+  // request never takes a group E field.
+  describe("group E (legajos_laborales)", () => {
+    const CAMPOS_E = ["numero_legajo", "area_id", "puesto_id", "fecha_ingreso", "estado_laboral", "sucursal_id", "tarea_id", "convenio_id", "categoria_id"] as const;
 
-        const update = await empleado.client.from("legajos").update(valor).eq("id", legajo).select("id");
-        expect(update.error).toBeNull();
-        expect(update.data).toEqual([]);
+    it("an Empleado cannot change their group E by update, insert, upsert or change request", async () => {
+      const antes = await laboralDe(service, legajo);
+      const valores = await laboralCompleto(service, "EMP");
 
-        const upsert = await empleado.client
-          .from("legajos")
-          .upsert({ profile_id: empleado.id, ...valor }, { onConflict: "profile_id" })
-          .select("id");
-        expect(upsert.error?.code).toBe(PERMISSION_DENIED);
+      const update = await empleado.client.from("legajos_laborales").update(valores).eq("legajo_id", legajo).select("legajo_id");
+      expect(update.error).toBeNull();
+      expect(update.data).toEqual([]);
 
+      const insert = await empleado.client.from("legajos_laborales").insert({ legajo_id: legajo, ...valores }).select("legajo_id");
+      expect(insert.error?.code).toBe(PERMISSION_DENIED);
+
+      const upsert = await empleado.client
+        .from("legajos_laborales")
+        .upsert({ legajo_id: legajo, ...valores }, { onConflict: "legajo_id" })
+        .select("legajo_id");
+      expect(upsert.error?.code).toBe(PERMISSION_DENIED);
+
+      for (const campo of [...CAMPOS_E, "area", "puesto", "sede", "sucursal", "modalidad", "tarea", "convenio", "categoria", "bruto_mensual"]) {
         const solicitud = await empleado.client.rpc("crear_solicitud", {
           p_legajo_id: legajo,
-          p_items: [{ campo, valor_propuesto: String(OTROS_E[campo]) }],
+          p_items: [{ campo, valor_propuesto: "1" }],
         });
-        expect(solicitud.error?.code).toBe(CHECK_VIOLATION);
+        expect(solicitud.error?.code, campo).toBe(CHECK_VIOLATION);
+      }
 
-        expect(await legajoDe(legajo)).toEqual(antes);
-        const { count } = await service.from("solicitudes_cambio").select("id", { count: "exact" }).eq("legajo_id", legajo);
-        expect(count).toBe(0);
-      },
-    );
+      expect(await laboralDe(service, legajo)).toEqual(antes);
+      const { count } = await service.from("solicitudes_cambio").select("id", { count: "exact" }).eq("legajo_id", legajo);
+      expect(count).toBe(0);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -525,7 +507,8 @@ describe("triggers and internal functions (GAP-03)", () => {
       const { data: perfil } = await service.from("profiles").select("role, estado_cuenta, debe_cambiar_password").eq("id", id).single();
       expect(perfil).toEqual({ role: "empleado", estado_cuenta: "activa", debe_cambiar_password: false });
       const { data: nuevo } = await service.from("legajos").select("*").eq("profile_id", id).single();
-      expect(nuevo).toMatchObject({ nombres: null, apellido: null, numero_legajo: null, bruto_mensual: null });
+      expect(nuevo).toMatchObject({ nombres: null, apellido: null });
+      expect(await laboralDe(service, nuevo!.id)).toMatchObject({ numero_legajo: null, area_id: null });
 
       const client = anonClient();
       expect((await client.auth.signInWithPassword({ email, password: TEST_PASSWORD })).error).toBeNull();

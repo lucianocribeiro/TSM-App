@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
-import { filaHistorial, nombresDeActores, type EventoCatalogo } from "./historial";
+import { filaHistorial, nombreDeActor, nombresDeActores, type EventoCatalogo } from "./historial";
 
 const t = copy.configuracion.historial;
 const ACTOR = "11111111-1111-4111-8111-111111111111";
@@ -115,5 +115,26 @@ describe("nombresDeActores", () => {
       ["a", "Ana Pérez"],
       ["b", "beto@mitsm.test"],
     ]);
+  });
+});
+
+// The Usuarios account history (CR-2, carried over from AUDCR1-01) shows its
+// actors through the same helper.
+describe("nombreDeActor", () => {
+  const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+  it("names a known actor and never shows an unknown one's id", () => {
+    const otro = "22222222-2222-4222-8222-222222222222";
+    const lista = nombresDeActores([
+      { id: ACTOR, nombre: null, email: "ana@example.test" },
+      { id: otro, nombre: "  ", email: " " },
+    ]);
+    expect(nombreDeActor(lista, ACTOR)).toBe("ana@example.test");
+    for (const id of [otro, "33333333-3333-4333-8333-333333333333"]) {
+      expect(nombreDeActor(lista, id)).toBe(t.usuarioNoDisponible);
+      expect(nombreDeActor(lista, id)).not.toMatch(UUID);
+    }
+    // The account lookup failed: nobody can be named.
+    expect(nombreDeActor(nombresDeActores([]), ACTOR)).toBe(t.usuarioNoDisponible);
   });
 });

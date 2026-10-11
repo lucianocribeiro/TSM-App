@@ -110,16 +110,32 @@ const GRUPO_B = {
   telefono_celular: "11 4444-5555",
   email_personal: "prueba@example.test",
 };
+// Group E: list items by id, checked against the lists (CR-2).
+const AREA = "66666666-6666-4666-8666-666666666666";
+const PUESTO = "77777777-7777-4777-8777-777777777777";
+const SUCURSAL = "88888888-8888-4888-8888-888888888888";
+const CATALOGO = [
+  { id: AREA, lista: "area", nombre: "Ventas", area_id: null, posicion: 1, activo: true, version: 1 },
+  { id: PUESTO, lista: "puesto", nombre: "Mostrador", area_id: AREA, posicion: 1, activo: true, version: 1 },
+  { id: SUCURSAL, lista: "sucursal", nombre: "Casa Central", area_id: null, posicion: 1, activo: true, version: 1 },
+];
 const LABORALES = {
   numero_legajo: "L-1",
-  area: "Operaciones",
-  puesto: "Chofer",
+  area_id: AREA,
+  puesto_id: PUESTO,
   fecha_ingreso: "2020-03-01",
   estado_laboral: "activo",
-  sede: "San Martín",
-  modalidad: "Presencial",
-  convenio: "Camioneros",
-  bruto_mensual: 1000,
+  sucursal_id: SUCURSAL,
+  tarea_id: null,
+  convenio_id: null,
+  categoria_id: null,
+};
+// The legajo with its (empty) group E row, and the lists; the write answers
+// with `escritura`.
+const laborales = (escritura: Result) => (table: string): Result => {
+  if (table === "legajos") return { data: { id: "legajo-1", legajos_laborales: { legajo_id: "legajo-1" } }, error: null };
+  if (table === "catalogo_items") return { data: CATALOGO, error: null };
+  return escritura;
 };
 
 describe("role boundary", () => {
@@ -178,14 +194,38 @@ describe("pending change request lock", () => {
     expect(result).toEqual({ ok: false, error: copy.legajos.errors.solicitudPendiente });
   });
 
-  it("group E does not look at pending requests", async () => {
-    state.resolve = () => ({ data: { id: "legajo-1" }, error: null, count: 1 });
+  it("group E does not look at pending requests, and writes its own table", async () => {
+    state.resolve = laborales({ data: { legajo_id: "legajo-1" }, error: null, count: 1 });
     expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({ ok: true });
     expect(state.queries.some((q) => q.table === "solicitudes_cambio")).toBe(false);
+    expect(state.queries.find((q) => q.table === "legajos_laborales")?.ops).toContain("update");
+    expect(state.queries.find((q) => q.table === "legajos")?.ops).not.toContain("update");
+  });
+
+  it("refuses an incomplete group E or an item from another list before writing", async () => {
+    state.resolve = laborales({ data: { legajo_id: "legajo-1" }, error: null });
+    const incompleto = await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: { ...LABORALES, sucursal_id: null } });
+    expect(incompleto).toMatchObject({ ok: false, fieldErrors: { sucursal_id: copy.legajo.validation.required } });
+    const otraLista = await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: { ...LABORALES, sucursal_id: AREA } });
+    expect(otraLista).toMatchObject({ ok: false, fieldErrors: { sucursal_id: copy.legajo.validation.optionInvalid } });
+    expect(state.queries.some((q) => q.table === "legajos_laborales")).toBe(false);
+  });
+
+  it("maps the database refusals of an item made inactive meanwhile, or an incomplete row", async () => {
+    state.resolve = laborales({ data: null, error: { code: "23514", hint: "item_inactivo", message: "x" } });
+    expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({
+      ok: false,
+      error: copy.legajo.validation.itemInactivo,
+    });
+    state.resolve = laborales({ data: null, error: { code: "23514", hint: "laborales_incompletos", message: "x" } });
+    expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({
+      ok: false,
+      error: copy.miLegajo.errors.revisarCampos,
+    });
   });
 
   it("reports a repeated número de legajo on its field", async () => {
-    state.resolve = () => ({ data: null, error: { code: "23505", message: "dup" } });
+    state.resolve = laborales({ data: null, error: { code: "23505", message: "dup" } });
     const result = await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES });
     expect(result).toEqual({
       ok: false,

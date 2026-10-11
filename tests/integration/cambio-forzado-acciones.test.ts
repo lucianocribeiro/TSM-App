@@ -7,6 +7,7 @@ import { claveMarca, firmarMarca, MARCA_COOKIE, sesionIdDeToken } from "@/lib/se
 import { updateSession } from "@/lib/supabase/middleware";
 import type { Database } from "@/lib/supabase/database.types";
 import { createTestUser, deleteTestUsers, serviceClient, TEST_PASSWORD, type TestUser } from "./helpers";
+import { laboralCompleto } from "./laborales";
 
 // AUD10-02: a user with a pending forced password change (PRD US-9, US-11)
 // can call no Server Action except changing the password and signing out,
@@ -48,17 +49,6 @@ const GRUPO_B = {
   telefono_celular: "11 4444-5555",
   email_personal: "prueba@example.test",
 };
-const LABORALES = {
-  numero_legajo: `CF-${Date.now()}`,
-  area: "Operaciones",
-  puesto: "Chofer",
-  fecha_ingreso: "2020-03-01",
-  estado_laboral: "activo",
-  sede: "San Martín",
-  modalidad: "Presencial",
-  convenio: "Camioneros",
-  bruto_mensual: 1000,
-};
 const SUBIDA = { tipo: "dni_frente", fileName: "dni.pdf", mimeType: "application/pdf", sizeBytes: 100 };
 
 function form(fields: Record<string, string>) {
@@ -80,12 +70,17 @@ describe("forced password change blocks every action but the change and sign-out
       .eq("legajos.profile_id", id);
     return count ?? 0;
   }
-  const areaDe = async (id: string) => (await service.from("legajos").select("area").eq("profile_id", id).single()).data?.area;
+  // Group E, by the target's profile id (CR-2: its own table).
+  const numeroDe = async (id: string) =>
+    (await service.from("legajos").select("legajos_laborales(numero_legajo)").eq("profile_id", id).single()).data?.legajos_laborales
+      ?.numero_legajo;
+  let LABORALES: Awaited<ReturnType<typeof laboralCompleto>>;
 
   beforeAll(async () => {
     empleado = await createTestUser(service, "forzado-empleado");
     admin = await createTestUser(service, "forzado-admin", "admin");
     objetivo = await createTestUser(service, "forzado-objetivo");
+    LABORALES = await laboralCompleto(service, "CF");
     const { error } = await service.from("profiles").update({ debe_cambiar_password: true }).in("id", [empleado.id, admin.id]);
     expect(error).toBeNull();
   });
@@ -106,11 +101,11 @@ describe("forced password change blocks every action but the change and sign-out
 
   it("refuses the forced-change Admin's actions, with no data change", async () => {
     session.client = admin.client;
-    const antes = await areaDe(objetivo.id);
+    const antes = await numeroDe(objetivo.id);
     expect(await legajos.actualizarDatosLaborales({ profileId: objetivo.id, valores: LABORALES })).toEqual(noAutorizado);
     expect(await legajos.prepararSubidaAdmin({ profileId: objetivo.id, ...SUBIDA })).toEqual(noAutorizado);
     expect(await aprobaciones.contarPendientesCampana()).toEqual(noAutorizado);
-    expect(await areaDe(objetivo.id)).toBe(antes);
+    expect(await numeroDe(objetivo.id)).toBe(antes);
   });
 
   it("still lets them change the password; afterwards the same actions work", async () => {
@@ -125,7 +120,7 @@ describe("forced password change blocks every action but the change and sign-out
     session.client = admin.client;
     await expect(auth.cambiarPassword(null, form({ password: NUEVA, confirmacion: NUEVA }))).rejects.toThrow("NEXT_REDIRECT:/mi-legajo");
     expect(await legajos.actualizarDatosLaborales({ profileId: objetivo.id, valores: LABORALES })).toEqual({ ok: true });
-    expect(await areaDe(objetivo.id)).toBe("Operaciones");
+    expect(await numeroDe(objetivo.id)).toBe(LABORALES.numero_legajo);
     expect((await aprobaciones.contarPendientesCampana()).ok).toBe(true);
   });
 });

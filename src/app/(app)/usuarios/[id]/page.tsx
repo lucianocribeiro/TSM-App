@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { rowClassName, Table, Td, Th } from "@/components/ui/Table";
 import { listarCuentas } from "@/lib/admin/cuentas";
 import { requireRole } from "@/lib/auth/require-role";
+import { nombreDeActor, nombresDeActores } from "@/lib/configuracion/historial";
 import { copy } from "@/lib/copy/es-AR";
 import { obtenerHistorial } from "@/lib/cuentas/historial";
 import { formatearFechaHora } from "@/lib/format/fecha";
@@ -27,8 +28,10 @@ export default async function UsuarioDetallePage({ params }: DetallePageProps) {
   const cuenta = lista.find((item) => item.id === id);
   if (cuentas.ok && !cuenta) notFound();
 
-  // Who did it: the name from their legajo, else their email.
-  const nombres = new Map(lista.map((item) => [item.id, item.nombre ?? item.email]));
+  // Who did it: the name from their legajo, else their email; an actor who
+  // cannot be named shows the fallback copy, never their id (as in
+  // Configuración).
+  const nombres = nombresDeActores(lista);
 
   return (
     <>
@@ -98,7 +101,7 @@ export default async function UsuarioDetallePage({ params }: DetallePageProps) {
                   <tr key={evento.id} data-testid="evento-row" className={rowClassName(false)}>
                     <Td>{copy.cuentas.eventos[evento.tipo]}</Td>
                     <Td className="whitespace-nowrap tabular-nums text-ink-soft">{formatearFechaHora(evento.fecha)}</Td>
-                    <Td className="text-ink-soft">{nombres.get(evento.actorId) ?? evento.actorId}</Td>
+                    <Td className="text-ink-soft">{nombreDeActor(nombres, evento.actorId)}</Td>
                     <Td className="text-ink-soft">{evento.motivo ?? ""}</Td>
                   </tr>
                 ))}

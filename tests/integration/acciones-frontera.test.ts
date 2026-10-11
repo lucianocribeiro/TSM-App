@@ -73,16 +73,18 @@ const GRUPO_D = {
   emergencia_domicilio: "Calle 2",
   emergencia_telefono: "11 5555-6666",
 };
+// Group E in its shape since CR-2 (list item ids). Every call here is refused
+// before the values are read, so the ids need not exist.
 const LABORALES = {
   numero_legajo: `FR-${Date.now()}`,
-  area: "Operaciones",
-  puesto: "Chofer",
+  area_id: "00000000-0000-4000-8000-0000000000a1",
+  puesto_id: "00000000-0000-4000-8000-0000000000a2",
   fecha_ingreso: "2020-03-01",
   estado_laboral: "activo",
-  sede: "San Martín",
-  modalidad: "Presencial",
-  convenio: "Camioneros",
-  bruto_mensual: 1000,
+  sucursal_id: "00000000-0000-4000-8000-0000000000a3",
+  tarea_id: null,
+  convenio_id: null,
+  categoria_id: null,
 };
 const SUBIDA = { tipo: "licencia_conducir", fileName: "a.pdf", mimeType: "application/pdf", sizeBytes: 10 };
 

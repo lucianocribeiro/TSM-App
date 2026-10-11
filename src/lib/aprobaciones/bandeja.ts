@@ -15,7 +15,8 @@ export type EmpleadoFila = {
   profile_id: string;
   nombres: string | null;
   apellido: string | null;
-  numero_legajo: string | null;
+  // Group E (Admin only): the número de legajo.
+  legajos_laborales: { numero_legajo: string | null } | null;
   profiles: { estado_cuenta: CuentaEstado };
 };
 
@@ -53,7 +54,7 @@ function base(id: string, enviadoEn: string, legajo: EmpleadoFila, adminId: stri
     id,
     profileId: legajo.profile_id,
     nombre: nombreCompleto(legajo.nombres, legajo.apellido),
-    numeroLegajo: legajo.numero_legajo,
+    numeroLegajo: legajo.legajos_laborales?.numero_legajo ?? null,
     enviadoEn,
     dadoDeBaja: legajo.profiles.estado_cuenta !== "activa",
     propio: legajo.profile_id === adminId,

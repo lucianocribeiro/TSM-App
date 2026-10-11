@@ -79,12 +79,20 @@ describe("reorder", () => {
 });
 
 describe("enUso", () => {
-  it("an Área with Puestos is in use; an empty Área and the other lists are not (until CR-2)", () => {
-    expect(enUso(ITEMS, ventas)).toBe(true);
-    expect(enUso(ITEMS, gerencia)).toBe(true);
-    expect(enUso(ITEMS, logistica)).toBe(false);
-    expect(enUso(ITEMS, norte)).toBe(false);
-    expect(enUso(ITEMS, cuentas)).toBe(false);
+  it("an Área with Puestos is in use; an empty Área and unreferenced items are not", () => {
+    const ninguno = new Set<string>();
+    expect(enUso(ITEMS, ventas, ninguno)).toBe(true);
+    expect(enUso(ITEMS, gerencia, ninguno)).toBe(true);
+    expect(enUso(ITEMS, logistica, ninguno)).toBe(false);
+    expect(enUso(ITEMS, norte, ninguno)).toBe(false);
+    expect(enUso(ITEMS, cuentas, ninguno)).toBe(false);
+  });
+
+  it("any item a legajo references is in use (CR-2)", () => {
+    const referenciados = new Set([norte.id, cuentas.id, logistica.id]);
+    expect(enUso(ITEMS, norte, referenciados)).toBe(true);
+    expect(enUso(ITEMS, cuentas, referenciados)).toBe(true);
+    expect(enUso(ITEMS, logistica, referenciados)).toBe(true);
   });
 });
 

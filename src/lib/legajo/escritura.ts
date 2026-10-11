@@ -4,10 +4,12 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { CAMPO_HIJOS, type CampoSolicitudColumna } from "@/lib/aprobaciones/campos";
 import { solicitudErrorMessage } from "@/lib/aprobaciones/solicitudes";
+import { listarItems } from "@/lib/configuracion/datos";
 import { copy } from "@/lib/copy/es-AR";
 import type { Database } from "@/lib/supabase/database.types";
 import { camposDelGrupo, ESQUEMA_GRUPO, isGrupoEditable, type GrupoEditable } from "./grupos";
-import { datosLaboralesSchema, fieldErrors } from "./validation";
+import { fieldErrors } from "./validation";
+import { validarDatosLaborales } from "./laborales";
 
 // Direct writes to a legajo (Admin: their own from /mi-legajo, anyone's from
 // /legajos). Values are validated with the shared schemas of PRD 5.7 before
@@ -91,22 +93,40 @@ export async function aplicarGrupo(
   return { ok: true };
 }
 
-// Validates and writes group E (PRD 5.5). Antigüedad is calculated, never
-// stored. A número de legajo already used by another employee is its own error.
+// HINTs of legajos_laborales_validar (CR-2).
+const LABORALES_INCOMPLETOS_HINT = "laborales_incompletos";
+const ITEM_INACTIVO_HINT = "item_inactivo";
+
+// Validates and writes group E (PRD 5.5) to legajos_laborales, against the
+// Configuración lists as they are now (validarDatosLaborales). Antigüedad is
+// calculated, never stored. A número de legajo already used by another
+// employee is its own error. The database applies the same rules
+// (legajos_laborales_validar), so a list changed meanwhile is still refused.
 export async function aplicarDatosLaborales(client: Client, profileId: string, valores: unknown): Promise<ActionResult> {
-  const parsed = datosLaboralesSchema.safeParse(valores);
-  if (!parsed.success) {
-    return { ok: false, error: copy.miLegajo.errors.revisarCampos, fieldErrors: fieldErrors(parsed.error) };
-  }
+  const [legajo, items] = await Promise.all([
+    client.from("legajos").select("id, legajos_laborales(*)").eq("profile_id", profileId).maybeSingle(),
+    listarItems(client),
+  ]);
+  if (legajo.error || !legajo.data?.legajos_laborales || !items) return { ok: false, error: aprobacionErrors.guardarFallo };
+
+  const validado = validarDatosLaborales(valores, items, legajo.data.legajos_laborales);
+  if (!validado.ok) return { ok: false, error: copy.miLegajo.errors.revisarCampos, fieldErrors: validado.fieldErrors };
+
   const { data, error } = await client
-    .from("legajos")
-    .update(parsed.data)
-    .eq("profile_id", profileId)
-    .select("id")
+    .from("legajos_laborales")
+    .update(validado.datos)
+    .eq("legajo_id", legajo.data.id)
+    .select("legajo_id")
     .maybeSingle();
   if (error?.code === UNIQUE_VIOLATION) {
     const mensaje = copy.legajos.errors.numeroLegajoDuplicado;
     return { ok: false, error: mensaje, fieldErrors: { numero_legajo: mensaje } };
+  }
+  if (error?.code === CHECK_VIOLATION && error.hint === ITEM_INACTIVO_HINT) {
+    return { ok: false, error: copy.legajo.validation.itemInactivo };
+  }
+  if (error?.code === CHECK_VIOLATION && error.hint === LABORALES_INCOMPLETOS_HINT) {
+    return { ok: false, error: copy.miLegajo.errors.revisarCampos };
   }
   if (error || !data) return { ok: false, error: error ? dbErrorMessage(error) : aprobacionErrors.guardarFallo };
   return { ok: true };

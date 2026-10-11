@@ -1,9 +1,11 @@
 import { nombreCompleto, normalizarBusqueda } from "@/lib/cuentas/listado";
+import { disponibleParaSeleccion, itemsDeGrupo, type CatalogoItem, type CatalogoLista } from "@/lib/configuracion/listas";
 import type { Database } from "@/lib/supabase/database.types";
+import { nombreItem, type Opcion } from "./laborales";
 
 // Employee list of /legajos (PRD US-4, US-8). Pure helpers: the rows come
 // from cargarListadoLegajos (./admin-legajos.ts), one narrow query without
-// children or documents.
+// children or documents, plus the Configuración lists for the names.
 
 type EstadoLaboral = Database["public"]["Enums"]["estado_laboral"];
 type CuentaEstado = Database["public"]["Enums"]["cuenta_estado"];
@@ -17,10 +19,14 @@ export type LegajoListItem = {
   dni: string | null;
   cuil: string | null;
   numeroLegajo: string | null;
+  // List items: the id (for the filters) and the name shown.
+  areaId: string | null;
   area: string | null;
   puesto: string | null;
-  sede: string | null;
-  modalidad: string | null;
+  sucursalId: string | null;
+  sucursal: string | null;
+  tareaId: string | null;
+  tarea: string | null;
   estadoLaboral: EstadoLaboral | null;
   // YYYY-MM-DD, for the "Ingresos del mes" card.
   fechaIngreso: string | null;
@@ -29,11 +35,11 @@ export type LegajoListItem = {
 
 export type FiltrosLegajos = {
   busqueda: string;
-  // "" = any value.
+  // "" = any value. Área, Sucursal and Tarea by list item id.
   estadoLaboral: EstadoLaboral | "";
-  area: string;
-  sede: string;
-  modalidad: string;
+  areaId: string;
+  sucursalId: string;
+  tareaId: string;
   // Deactivated accounts are hidden unless this is on (PRD US-8).
   mostrarBajas: boolean;
 };
@@ -41,29 +47,48 @@ export type FiltrosLegajos = {
 export const FILTROS_INICIALES: FiltrosLegajos = {
   busqueda: "",
   estadoLaboral: "",
-  area: "",
-  sede: "",
-  modalidad: "",
+  areaId: "",
+  sucursalId: "",
+  tareaId: "",
   mostrarBajas: false,
 };
 
-export type CampoTextoLibre = "area" | "sede" | "modalidad";
+// The list filters on these lists.
+export type ListaFiltro = Extract<CatalogoLista, "area" | "sucursal" | "tarea">;
+const CAMPO_FILTRO = { area: "areaId", sucursal: "sucursalId", tarea: "tareaId" } as const satisfies Record<
+  ListaFiltro,
+  keyof LegajoListItem & keyof FiltrosLegajos
+>;
 
-export function itemDesdeFila(fila: {
-  profile_id: string;
-  nombres: string | null;
-  apellido: string | null;
-  dni: string | null;
-  cuil: string | null;
+export type FilaLaboral = {
   numero_legajo: string | null;
-  area: string | null;
-  puesto: string | null;
-  sede: string | null;
-  modalidad: string | null;
+  area_id: string | null;
+  puesto_id: string | null;
+  sucursal_id: string | null;
+  tarea_id: string | null;
   estado_laboral: EstadoLaboral | null;
   fecha_ingreso: string | null;
-  estado_cuenta: CuentaEstado;
-}): LegajoListItem {
+};
+
+export function itemDesdeFila(
+  fila: {
+    profile_id: string;
+    nombres: string | null;
+    apellido: string | null;
+    dni: string | null;
+    cuil: string | null;
+    // Group E; null when it could not be joined.
+    laboral: FilaLaboral | null;
+    estado_cuenta: CuentaEstado;
+  },
+  items: readonly CatalogoItem[],
+): LegajoListItem {
+  const porId = new Map(items.map((item) => [item.id, item]));
+  const nombre = (id: string | null | undefined) => {
+    const item = id ? porId.get(id) : undefined;
+    return item ? nombreItem(item) : null;
+  };
+  const laboral = fila.laboral;
   return {
     profileId: fila.profile_id,
     nombre: nombreCompleto(fila.nombres, fila.apellido),
@@ -71,29 +96,28 @@ export function itemDesdeFila(fila: {
     apellido: fila.apellido?.trim() || null,
     dni: fila.dni,
     cuil: fila.cuil,
-    numeroLegajo: fila.numero_legajo,
-    area: fila.area,
-    puesto: fila.puesto,
-    sede: fila.sede,
-    modalidad: fila.modalidad,
-    estadoLaboral: fila.estado_laboral,
-    fechaIngreso: fila.fecha_ingreso,
+    numeroLegajo: laboral?.numero_legajo ?? null,
+    areaId: laboral?.area_id ?? null,
+    area: nombre(laboral?.area_id),
+    puesto: nombre(laboral?.puesto_id),
+    sucursalId: laboral?.sucursal_id ?? null,
+    sucursal: nombre(laboral?.sucursal_id),
+    tareaId: laboral?.tarea_id ?? null,
+    tarea: nombre(laboral?.tarea_id),
+    estadoLaboral: laboral?.estado_laboral ?? null,
+    fechaIngreso: laboral?.fecha_ingreso ?? null,
     estadoCuenta: fila.estado_cuenta,
   };
 }
 
-// The distinct values of a free-text field (area, sede, modalidad), trimmed,
-// compared without case or accents, sorted es-AR. The first spelling found
-// is the one shown.
-export function opcionesDistintas(items: readonly LegajoListItem[], campo: CampoTextoLibre): string[] {
-  const porClave = new Map<string, string>();
-  for (const item of items) {
-    const valor = item[campo]?.trim();
-    if (!valor) continue;
-    const clave = normalizarBusqueda(valor);
-    if (!porClave.has(clave)) porClave.set(clave, valor);
-  }
-  return [...porClave.values()].sort((a, b) => a.localeCompare(b, "es-AR"));
+// A filter's options: the items offered in Configuración, in order, plus any
+// inactive item a legajo of the list still has, marked "(inactivo)".
+export function opcionesFiltro(items: readonly CatalogoItem[], legajos: readonly LegajoListItem[], lista: ListaFiltro): Opcion[] {
+  const campo = CAMPO_FILTRO[lista];
+  const enUso = new Set(legajos.map((legajo) => legajo[campo]).filter((id): id is string => Boolean(id)));
+  return itemsDeGrupo(items, lista)
+    .filter((item) => disponibleParaSeleccion(items, item) || enUso.has(item.id))
+    .map((item) => ({ value: item.id, label: nombreItem(item) }));
 }
 
 const soloDigitos = (value: string) => value.replace(/\D/g, "");
@@ -115,16 +139,15 @@ export function coincideBusqueda(item: LegajoListItem, busqueda: string): boolea
   return [item.dni, item.cuil].some((value) => value !== null && soloDigitos(value).includes(digitos));
 }
 
-const mismoTexto = (valor: string | null, filtro: string) =>
-  !filtro || normalizarBusqueda(valor ?? "") === normalizarBusqueda(filtro);
+const mismoItem = (valor: string | null, filtro: string) => !filtro || valor === filtro;
 
 export function filtrarLegajos(items: readonly LegajoListItem[], filtros: FiltrosLegajos): LegajoListItem[] {
   return items
     .filter((item) => filtros.mostrarBajas || item.estadoCuenta === "activa")
     .filter((item) => !filtros.estadoLaboral || item.estadoLaboral === filtros.estadoLaboral)
-    .filter((item) => mismoTexto(item.area, filtros.area))
-    .filter((item) => mismoTexto(item.sede, filtros.sede))
-    .filter((item) => mismoTexto(item.modalidad, filtros.modalidad))
+    .filter((item) => mismoItem(item.areaId, filtros.areaId))
+    .filter((item) => mismoItem(item.sucursalId, filtros.sucursalId))
+    .filter((item) => mismoItem(item.tareaId, filtros.tareaId))
     .filter((item) => coincideBusqueda(item, filtros.busqueda))
     .sort(compararLegajos);
 }

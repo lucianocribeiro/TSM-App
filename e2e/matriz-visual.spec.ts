@@ -78,8 +78,14 @@ async function sinScrollHorizontal(page: Page, combinacion: string) {
   expect(scroll.scroll, `${combinacion}: horizontal scroll; ${scroll.culpables.join(" | ")}`).toBeLessThanOrEqual(scroll.client);
 }
 
-// Screens reached once, then reloaded for every width and theme.
-type Pantalla = { nombre: string; abrir: (page: Page) => Promise<void>; lista: (page: Page) => Locator };
+// Screens reached once, then reloaded for every width and theme. trasCargar
+// brings the screen back to the state shown after each reload (an open form).
+type Pantalla = {
+  nombre: string;
+  abrir: (page: Page) => Promise<void>;
+  trasCargar?: (page: Page) => Promise<void>;
+  lista: (page: Page) => Locator;
+};
 
 const PANTALLAS: Pantalla[] = [
   {
@@ -130,6 +136,19 @@ const PANTALLAS: Pantalla[] = [
       await page.goto(`/legajos/${emp.id}`);
     },
     lista: (page) => page.getByTestId("grupo-E"),
+  },
+  // CR-2: group E as a form of Configuración dropdowns.
+  {
+    nombre: "legajo-detalle-laborales",
+    abrir: async (page) => {
+      const emp = await empleadoCompleto("visual-laborales", cuentas.add);
+      await loginAs(page, await adminNuevo("visual-laborales-admin", cuentas.add));
+      await page.goto(`/legajos/${emp.id}`);
+    },
+    trasCargar: async (page) => {
+      await page.getByTestId("grupo-E").getByRole("button", { name: copy.miLegajo.editar }).click();
+    },
+    lista: (page) => page.getByTestId("grupo-E").getByRole("combobox", { name: /Puesto/ }),
   },
   {
     nombre: "aprobaciones",
@@ -189,6 +208,7 @@ for (const pantalla of PANTALLAS) {
       for (const tema of TEMAS) {
         await page.context().addCookies([{ name: THEME_COOKIE, value: tema, url: baseURL() }]);
         await page.reload();
+        await pantalla.trasCargar?.(page);
         await expect(pantalla.lista(page)).toBeVisible();
         await comprobarYCapturar(page, pantalla.nombre, ancho, tema);
       }
@@ -205,6 +225,7 @@ for (const pantalla of PANTALLAS) {
     for (const tema of TEMAS) {
       await page.context().addCookies([{ name: THEME_COOKIE, value: tema, url: baseURL() }]);
       await page.reload();
+      await pantalla.trasCargar?.(page);
       await expect(pantalla.lista(page)).toBeVisible();
       await sinScrollHorizontal(page, `${pantalla.nombre} 390px ${tema}`);
     }

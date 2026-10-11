@@ -46,14 +46,14 @@ function validPersonal() {
 function validLaboral() {
   return {
     numero_legajo: "TEST-002",
-    area: "Operaciones",
-    puesto: "Técnico",
+    area_id: "11111111-1111-4111-8111-111111111111",
+    puesto_id: "22222222-2222-4222-8222-222222222222",
     fecha_ingreso: "2021-09-15",
     estado_laboral: "activo",
-    sede: "Sede de Prueba",
-    modalidad: "Presencial",
-    convenio: "Convenio de Prueba",
-    bruto_mensual: 950000,
+    sucursal_id: "33333333-3333-4333-8333-333333333333",
+    tarea_id: null as string | null,
+    convenio_id: null as string | null,
+    categoria_id: null as string | null,
   };
 }
 
@@ -69,10 +69,7 @@ const REQUIRED_PERSONAL = [
   "emergencia_nombre", "emergencia_parentesco", "emergencia_domicilio", "emergencia_telefono",
 ] as const;
 
-const REQUIRED_LABORAL = [
-  "numero_legajo", "area", "puesto", "fecha_ingreso", "estado_laboral",
-  "sede", "modalidad", "convenio", "bruto_mensual",
-] as const;
+const REQUIRED_LABORAL = ["numero_legajo", "area_id", "puesto_id", "fecha_ingreso", "estado_laboral", "sucursal_id"] as const;
 
 describe("legajoPersonalSchema (groups A to D)", () => {
   it("accepts a valid payload and normalizes optional text", () => {
@@ -220,10 +217,7 @@ describe("PRD 5.7 rules added in F1-08", () => {
     });
     expect(fieldErrors(child.error!)["hijos.0.fecha_nacimiento"]).toBe(m.fechaFutura);
 
-    const ingreso = datosLaboralesSchema.safeParse({
-      numero_legajo: "1", area: "A", puesto: "P", fecha_ingreso: future, estado_laboral: "activo",
-      sede: "S", modalidad: "M", convenio: "C", bruto_mensual: 1,
-    });
+    const ingreso = datosLaboralesSchema.safeParse({ ...validLaboral(), fecha_ingreso: future });
     expect(fieldErrors(ingreso.error!).fecha_ingreso).toBe(m.fechaFutura);
   });
 
@@ -253,9 +247,10 @@ describe("group schemas", () => {
 });
 
 describe("datosLaboralesSchema (group E)", () => {
-  it("accepts a valid payload, including zero salary", () => {
+  it("accepts a valid payload; Tarea, Convenio and Categoría are optional", () => {
     expect(datosLaboralesSchema.safeParse(validLaboral()).success).toBe(true);
-    expect(datosLaboralesSchema.safeParse({ ...validLaboral(), bruto_mensual: 0 }).success).toBe(true);
+    const sinOpcionales = datosLaboralesSchema.safeParse({ ...validLaboral(), tarea_id: "", convenio_id: undefined });
+    expect(sinOpcionales.success && sinOpcionales.data).toMatchObject({ tarea_id: null, convenio_id: null, categoria_id: null });
   });
 
   it.each(REQUIRED_LABORAL)("fails when %s is missing", (field) => {
@@ -266,16 +261,18 @@ describe("datosLaboralesSchema (group E)", () => {
     expect(issuesFor(result, field)).toContain(m.required);
   });
 
-  it("rejects a negative bruto_mensual", () => {
-    const result = datosLaboralesSchema.safeParse({ ...validLaboral(), bruto_mensual: -1 });
-    expect(issuesFor(result, "bruto_mensual")).toContain(m.brutoMensualNegative);
+  it("takes list items by id only", () => {
+    for (const campo of ["area_id", "puesto_id", "sucursal_id", "tarea_id", "categoria_id"]) {
+      const result = datosLaboralesSchema.safeParse({ ...validLaboral(), [campo]: "Ventas" });
+      expect(issuesFor(result, campo), campo).toContain(m.optionInvalid);
+    }
   });
 
-  it("rejects a non-numeric bruto_mensual", () => {
-    for (const bruto_mensual of ["950000", Number.NaN]) {
-      const result = datosLaboralesSchema.safeParse({ ...validLaboral(), bruto_mensual });
-      expect(issuesFor(result, "bruto_mensual")).toContain(m.numberInvalid);
-    }
+  it("has no bruto mensual or modalidad any more", () => {
+    const result = datosLaboralesSchema.safeParse({ ...validLaboral(), bruto_mensual: 1, modalidad: "Presencial", sede: "X" });
+    expect(result.success && Object.keys(result.data).sort()).toEqual(
+      ["area_id", "categoria_id", "convenio_id", "estado_laboral", "fecha_ingreso", "numero_legajo", "puesto_id", "sucursal_id", "tarea_id"],
+    );
   });
 
   it("rejects an invalid estado_laboral", () => {

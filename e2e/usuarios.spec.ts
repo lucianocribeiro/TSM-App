@@ -290,6 +290,10 @@ test.describe("Usuarios (Admin)", () => {
       await expect(events.nth(i)).toContainText("Prueba Admin Ficticio");
       await expect(events.nth(i)).toContainText(/\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/);
     }
+    // No internal id reaches the page (CR-2, as AUDCR1-01 in Configuración).
+    // Test accounts' emails carry a random UUID, so the emails are taken out first.
+    const texto = (await page.locator("main").innerText()).replace(/\S+@mitsm\.test/g, "");
+    expect(texto).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     await screenshotBoth(page, "usuarios-detalle");
 
     await page.getByRole("link", { name: t.detalle.volver }).click();

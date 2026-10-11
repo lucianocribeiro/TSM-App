@@ -14,6 +14,7 @@ import {
   type Semilla,
 } from "./actores";
 import { createTestUser, deleteTestUsers, serviceClient, type TestUser, type TypedClient } from "./helpers";
+import { laboralCompleto } from "./laborales";
 import { ACTORES_ESTADO, ejecutarCelda, OPS, TABLAS, type Llamante, type Titular } from "./matriz-acceso";
 
 // F1-11A, GAP-01: account state at the database (Constitution §4 and §10,
@@ -178,9 +179,15 @@ describe("account state at the database (GAP-01)", () => {
       );
       expect((await c.storage.from(DOCUMENTOS_BUCKET).download(propio.docPendientePath)).data).not.toBeNull();
 
-      const actualizado = await c.from("legajos").update({ area: "Baja (prueba)" }).eq("profile_id", desactivado.id).select("area");
+      // Group E too (its own table, CR-2).
+      const laboral = await laboralCompleto(service, "BAJA");
+      const actualizado = await c
+        .from("legajos_laborales")
+        .update(laboral)
+        .eq("legajo_id", propio.legajoId)
+        .select("numero_legajo");
       expect(actualizado.error).toBeNull();
-      expect(actualizado.data).toEqual([{ area: "Baja (prueba)" }]);
+      expect(actualizado.data).toEqual([{ numero_legajo: laboral.numero_legajo }]);
     });
 
     // Every function in the public schema, as the generated types list them:
@@ -195,6 +202,11 @@ describe("account state at the database (GAP-01)", () => {
       aprobar_documento: { esperado: "42501", llamar: (c, x) => c.rpc("aprobar_documento", { p_documento_id: x.victima.docPendienteId }) },
       aprobar_solicitud: { esperado: "42501", llamar: (c, x) => c.rpc("aprobar_solicitud", { p_solicitud_id: x.victima.solicitudId }) },
       campos_solicitud_permitidos: { esperado: "pura", llamar: (c) => c.rpc("campos_solicitud_permitidos") },
+      // Service role only (CR-2 data migration).
+      catalogo_item_por_texto: {
+        esperado: "42501",
+        llamar: (c) => c.rpc("catalogo_item_por_texto", { p_lista: "area", p_area_id: randomUUID(), p_texto: "Ventas" }),
+      },
       cerrar_sesiones_cuenta: { esperado: "42501", llamar: (c, x) => c.rpc("cerrar_sesiones_cuenta", { p_profile_id: x.victima.id }) },
       confirmar_cambio_password: { esperado: "42501", llamar: (c) => c.rpc("confirmar_cambio_password") },
       crear_solicitud: {

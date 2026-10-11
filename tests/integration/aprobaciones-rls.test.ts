@@ -13,6 +13,7 @@ import {
   type TestUser,
   type TypedClient,
 } from "./helpers";
+import { escribirLaboral, laboralCompleto, laboralDe } from "./laborales";
 
 // F1-06B: change requests, document review and the decision functions
 // (Constitution §9, PRD US-7). Assertions run through user sessions; the
@@ -38,18 +39,6 @@ const PERSONAL: LegajoUpdate = {
   estado_civil: "soltero",
   tiene_hijos: true,
   alergias: "Ninguna",
-};
-
-const LABORAL: LegajoUpdate = {
-  numero_legajo: "APR-E-001",
-  area: "Área de Prueba",
-  puesto: "Puesto de Prueba",
-  fecha_ingreso: "2020-01-02",
-  estado_laboral: "activo",
-  sede: "Sede de Prueba",
-  modalidad: "Presencial",
-  convenio: "Convenio de Prueba",
-  bruto_mensual: 500000,
 };
 
 const HIJOS_INICIALES = [
@@ -170,6 +159,9 @@ describe("change requests and document approval", () => {
     employeeIds.push(empleadoA.id, empleadoB.id);
     legajoA = await legajoIdOf(empleadoA.id);
     legajoB = await legajoIdOf(empleadoB.id);
+    // Legajo A has a complete group E (in its own table, CR-2); legajo B's
+    // stays empty, as a new account's.
+    await escribirLaboral(service, legajoA, await laboralCompleto(service, "APR-E"));
   });
 
   // Every test starts from the same legajo A and no requests or documents.
@@ -179,7 +171,7 @@ describe("change requests and document approval", () => {
       await service.from("legajo_documentos").delete().eq("legajo_id", legajoId);
       await service.from("legajo_hijos").delete().eq("legajo_id", legajoId);
     }
-    const reset = await service.from("legajos").update({ ...PERSONAL, ...LABORAL }).eq("id", legajoA);
+    const reset = await service.from("legajos").update(PERSONAL).eq("id", legajoA);
     if (reset.error) throw new Error(`legajo reset failed: ${reset.error.message}`);
     const hijos = await service
       .from("legajo_hijos")
@@ -202,12 +194,18 @@ describe("change requests and document approval", () => {
   describe("legajos: direct writes", () => {
     it("an Empleado can no longer update own groups A to D, and still cannot touch group E", async () => {
       const before = await storedLegajo(legajoA);
-      for (const update of [{ nombres: "Directo" }, { emergencia_telefono: "1199999999" }, { area: "Otra" }, { bruto_mensual: 1 }] as LegajoUpdate[]) {
+      for (const update of [{ nombres: "Directo" }, { emergencia_telefono: "1199999999" }] as LegajoUpdate[]) {
         const { data, error } = await empleadoA.client.from("legajos").update(update).eq("id", legajoA).select();
         expect(error, JSON.stringify(update)).toBeNull();
         expect(data, JSON.stringify(update)).toEqual([]);
       }
       expect(await storedLegajo(legajoA)).toEqual(before);
+      // Group E is in its own table since CR-2, which RLS hides from them.
+      const laboralAntes = await laboralDe(service, legajoA);
+      const e = await empleadoA.client.from("legajos_laborales").update({ numero_legajo: "Directo" }).eq("legajo_id", legajoA).select();
+      expect(e.error).toBeNull();
+      expect(e.data).toEqual([]);
+      expect(await laboralDe(service, legajoA)).toEqual(laboralAntes);
     });
   });
 
@@ -521,6 +519,7 @@ describe("change requests and document approval", () => {
         { campo: "emergencia_telefono", valor_propuesto: "1177776666" },
       ]);
       const before = await storedLegajo(legajoA);
+      const laboralAntes = await laboralDe(service, legajoA);
 
       const { error } = await admin.client.rpc("aprobar_solicitud", { p_solicitud_id: id });
       expect(error).toBeNull();
@@ -541,9 +540,7 @@ describe("change requests and document approval", () => {
       expect(after.apellido).toBe(before.apellido);
       expect(after.dni).toBe(before.dni);
       expect(after.alergias).toBe(before.alergias);
-      for (const column of Object.keys(LABORAL) as (keyof typeof after)[]) {
-        expect(after[column], column).toEqual(before[column]);
-      }
+      expect(await laboralDe(service, legajoA)).toEqual(laboralAntes);
       // No "hijos" item: the children stay.
       expect(await storedHijos(legajoA)).toEqual(HIJOS_INICIALES);
 
@@ -552,6 +549,18 @@ describe("change requests and document approval", () => {
       expect(solicitud.revisado_por).toBe(admin.id);
       expect(solicitud.revisado_en).not.toBeNull();
       expect(solicitud.motivo_rechazo).toBeNull();
+    });
+
+    it("aprobar_solicitud applies an A to D change on a legajo whose group E is incomplete (CR-2)", async () => {
+      // Legajo B's group E is the empty row of a new account.
+      const vacio = await laboralDe(service, legajoB);
+      expect(vacio).toMatchObject({ numero_legajo: null, area_id: null, puesto_id: null, sucursal_id: null });
+      const id = await crearSolicitud(empleadoB.client, legajoB, [{ campo: "alergias", valor_propuesto: "Polen (CR-2)" }]);
+      const { error } = await admin.client.rpc("aprobar_solicitud", { p_solicitud_id: id });
+      expect(error).toBeNull();
+      expect((await storedLegajo(legajoB)).alergias).toBe("Polen (CR-2)");
+      expect((await storedSolicitud(id)).estado).toBe("aprobada");
+      expect(await laboralDe(service, legajoB)).toEqual(vacio);
     });
 
     it("aprobar_solicitud replaces the children set exactly", async () => {

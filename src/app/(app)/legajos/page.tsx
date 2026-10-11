@@ -7,8 +7,15 @@ import { LegajosScreen } from "./LegajosScreen";
 // any legajo, and every action checks the role again.
 export default async function LegajosPage() {
   await requireRole("admin");
-  const legajos = await cargarListadoLegajos();
+  const listado = await cargarListadoLegajos();
   // KPI cards over the whole workforce, computed here (Argentina's month).
-  const kpis = legajos ? calcularKpis(legajos) : null;
-  return <LegajosScreen legajos={legajos ?? []} listaFallo={legajos === null} kpis={kpis} />;
+  const kpis = listado ? calcularKpis(listado.legajos) : null;
+  return (
+    <LegajosScreen
+      legajos={listado?.legajos ?? []}
+      items={listado?.items ?? []}
+      listaFallo={listado === null}
+      kpis={kpis}
+    />
+  );
 }
