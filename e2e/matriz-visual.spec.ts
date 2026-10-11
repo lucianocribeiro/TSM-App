@@ -210,7 +210,8 @@ const PANTALLAS: Pantalla[] = [
     nombre: "mi-legajo-admin",
     abrir: async (page) => {
       const admin = await adminNuevo("visual-mi-legajo-admin", cuentas.add);
-      await fillLaboral(admin.id, { numero_legajo: "V-1" });
+      // Unique: the screen opens once per test (matrix and no-scroll).
+      await fillLaboral(admin.id, { numero_legajo: `V-${admin.id.slice(0, 8)}` });
       await loginAs(page, admin);
     },
     lista: (page) => page.getByTestId("grupo-E-propio"),
