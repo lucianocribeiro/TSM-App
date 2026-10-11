@@ -344,6 +344,77 @@ export const TABLAS: Record<Tabla | typeof BUCKET_DOCUMENTOS, EspecTabla> = {
     },
   },
 
+  // Configuración lists: global (no titular), Admin only for every operation.
+  // The target is a fresh item with a unique name; the cell's attempts carry
+  // the same prefix, so estado and limpiar find them (and their history).
+  catalogo_items: {
+    preparar: async (service) => {
+      const marca = `Matriz ${randomUUID()}`;
+      const item = await primera(service.from("catalogo_items").insert({ lista: "tarea", nombre: marca }).select("id"));
+      return { id: item.id, marca };
+    },
+    estado: async (service, _titular, o) => ({
+      items: await filas(service.from("catalogo_items").select("*").like("nombre", `${o.marca}%`).order("id")),
+      eventos: await filas(service.from("catalogo_eventos").select("*").like("item_nombre", `${o.marca}%`).order("id")),
+    }),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("catalogo_items").select("id").eq("id", o.id)),
+      insert: (c, _l, _t, o) => r(c.from("catalogo_items").insert({ lista: "tarea", nombre: `${o.marca} intento` }).select("id")),
+      update: (c, _l, _t, o) => r(c.from("catalogo_items").update({ nombre: `${o.marca} cambiado` }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("catalogo_items").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async (service, _titular, o) => {
+      await service.from("catalogo_eventos").delete().like("item_nombre", `${o.marca}%`);
+      await service.from("catalogo_items").delete().like("nombre", `${o.marca}%`);
+    },
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, V, V),
+      "empleado-ajeno": e(V, N, V, V),
+      admin: e(P, P, P, P),
+      ...inactivo(e(V, N, V, V)),
+      "cambio-forzado-propio": e(V, N, V, V),
+    },
+  },
+
+  // Read only, and for an active Admin only; written by the trigger.
+  catalogo_eventos: {
+    preparar: async (service, titular) => {
+      const marca = `Matriz ${randomUUID()}`;
+      const evento = await primera(
+        service
+          .from("catalogo_eventos")
+          .insert({ item_id: randomUUID(), lista: "tarea", item_nombre: marca, accion: "alta", valor_nuevo: marca, actor_id: titular.id })
+          .select("id"),
+      );
+      return { id: evento.id, marca };
+    },
+    estado: (service, _titular, o) => filas(service.from("catalogo_eventos").select("*").like("item_nombre", `${o.marca}%`).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("catalogo_eventos").select("id").eq("id", o.id)),
+      insert: (c, l, t, o) =>
+        r(
+          c
+            .from("catalogo_eventos")
+            .insert({ item_id: randomUUID(), lista: "tarea", item_nombre: `${o.marca} intento`, accion: "alta", actor_id: l.id ?? t.id })
+            .select("id"),
+        ),
+      update: (c, _l, _t, o) => r(c.from("catalogo_eventos").update({ valor_nuevo: "Cambiado" }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("catalogo_eventos").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async (service, _titular, o) => {
+      await service.from("catalogo_eventos").delete().like("item_nombre", `${o.marca}%`);
+    },
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(V, N, N, N),
+    },
+  },
+
   // The target is an object with a pending document row (an Empleado may
   // overwrite or delete it). SELECT is a download; INSERT an upload to a new
   // path in the titular's folder; UPDATE an overwrite; DELETE a removal.
