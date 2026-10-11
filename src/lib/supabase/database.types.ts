@@ -76,8 +76,8 @@ export type Database = {
         Insert: {
           activo?: boolean
           area_id?: string | null
-          area_lista?: never
-          clave?: never
+          area_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          clave?: string | null
           created_at?: string
           id?: string
           lista: Database["public"]["Enums"]["catalogo_lista"]
@@ -89,8 +89,8 @@ export type Database = {
         Update: {
           activo?: boolean
           area_id?: string | null
-          area_lista?: never
-          clave?: never
+          area_lista?: Database["public"]["Enums"]["catalogo_lista"] | null
+          clave?: string | null
           created_at?: string
           id?: string
           lista?: Database["public"]["Enums"]["catalogo_lista"]
