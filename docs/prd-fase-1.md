@@ -276,3 +276,4 @@ Adjustments after the F1-12 deploy (user testing), before F1-13. The version is 
 - Menú: botón de menú a la derecha; logo e ítems alineados a la izquierda.
 - Datos de emergencia: etiquetas de campo sin la aclaración 'contacto de emergencia' (implícita por el título de la sección).
 - Email y rol del usuario en la esquina superior derecha, a la derecha de la campana.
+- Títulos y etiquetas en color de acento un 30% más grandes y en negrita.

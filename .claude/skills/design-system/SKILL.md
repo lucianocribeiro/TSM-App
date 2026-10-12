@@ -32,6 +32,8 @@ Self-hosted in `src/app/fonts/` and loaded with `next/font/local` in the root la
   --space-1: 4.6px; --space-2: 9.2px; --space-3: 13.8px;
   --space-4: 18.4px; --space-6: 27.6px; --space-8: 36.8px;
   --radius-sm: 2px; --radius-md: 4px; --radius-lg: 7px;
+
+  --text-label: 14px; --text-label-leading: 1.3;
 }
 :root, :root[data-theme="light"] {
   --bg: #f3f2f2; --surface: #fbfafa; --ink: #00072e;
@@ -68,7 +70,7 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 - **Sidebar top:** only the TSM logo (`public/logotsm.png`), left-aligned. No tagline or subtitle.
 - **Panels:** border 1px `--line`, radius `--radius-md`, background `--surface`, padding 22px.
 - **Buttons:** primary = transparent background, 1px `--accent` border, `--accent-deep` text, 13px, padding `8px 16px`, radius `--radius-md`, hover background `--accent-soft`. Secondary = 1px `--line` border, `--ink` text, hover border `--accent` and text `--accent-deep`. Disabled opacity .45.
-- **Inputs:** transparent background, 1px `--line` border, radius `--radius-md`, padding `9px 12px`, 14px; focus border `--accent`. Labels: 10.5px uppercase, letter-spacing .16em, `--accent-deep` (field names stand apart from their values).
+- **Inputs:** transparent background, 1px `--line` border, radius `--radius-md`, padding `9px 12px`, 14px; focus border `--accent`. Labels: utility `label-accent` = `--text-label` (14px, line-height `--text-label-leading` 1.3), weight 700, uppercase, letter-spacing .16em, `--accent-deep`, long labels wrap (field names stand apart from their values). Every accent-colored label or title uses `label-accent`; never set its size per page. Page titles (38px) and section titles (20 to 26px) stay larger.
 - **Status badge:** inline-flex, gap 7px, padding `3px 9px`, 1px `--line` border, radius `--radius-md`, 11.5px, with a 6px dot (`--accent` for active; `--ink-soft` for secondary states).
 - Numbers use `font-variant-numeric: tabular-nums`. Secondary text uses `--ink-soft`; helper text may be italic 12.5px.
 
