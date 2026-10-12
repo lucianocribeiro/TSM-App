@@ -10,9 +10,18 @@ import { laboralRow, legajoRow } from "./fixtures.test-helpers";
 const state = vi.hoisted(() => ({
   filas: [] as unknown[],
   rpc: null as unknown as Mock<(...args: unknown[]) => Promise<unknown>>,
+  // Bytes of a synthetic workbook, in place of the real one (size cap tests).
+  bytes: null as number | null,
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("./xlsx", async (original) => {
+  const real = await original<typeof import("./xlsx")>();
+  return {
+    escribirXlsx: async (...args: Parameters<typeof real.escribirXlsx>) =>
+      state.bytes === null ? real.escribirXlsx(...args) : Buffer.alloc(state.bytes),
+  };
+});
 vi.mock("@/lib/configuracion/datos", () => ({ listarItems: async () => [] }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
@@ -21,7 +30,7 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-const { exportarLegajos } = await import("./exportar");
+const { excedeTamano, exportarLegajos, MAX_CONTENIDO_BASE64 } = await import("./exportar");
 const errors = copy.exportacion.errors;
 const FILTROS = { busqueda: "", estadoLaboral: "", areaId: "", sucursalId: "", tareaId: "", mostrarBajas: false };
 const SELECCION = { campos: ["numero_legajo", "nombres"], hijos: true };
@@ -41,6 +50,7 @@ let log: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   state.filas = [fila(1, "Zeta", "activa"), fila(2, "Alfa", "activa"), fila(3, "Baja", "inactiva")];
   state.rpc = vi.fn(async () => ({ data: "id", error: null }));
+  state.bytes = null;
   log = vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
@@ -75,6 +85,9 @@ describe("exportarLegajos", () => {
       { filtros: FILTROS, seleccion: { campos: ["nombres", "x"], hijos: false } },
       { filtros: { ...FILTROS, extra: true }, seleccion: SELECCION },
       { filtros: FILTROS },
+      { filtros: FILTROS, seleccion: SELECCION, filas: [{ nombres: "inyectado" }] },
+      { filtros: FILTROS, seleccion: { ...SELECCION, extra: true } },
+      [FILTROS, SELECCION],
       null,
     ]) {
       expect(await exportarLegajos(input)).toEqual({ ok: false, error: errors.seleccion });
@@ -96,5 +109,46 @@ describe("exportarLegajos", () => {
     const escrito = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(escrito).toContain("export log failed");
     for (const dato of ["Zeta", "zeta", "L-1", "Ana", "pérez"]) expect(escrito).not.toContain(dato);
+  });
+
+  it("accepts exactly { filtros, seleccion } unchanged", async () => {
+    const result = await exportarLegajos({ filtros: FILTROS, seleccion: SELECCION });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("response size cap", () => {
+  it("is a base64 length safely below Vercel's 4.5 MB response limit", () => {
+    expect(MAX_CONTENIDO_BASE64).toBeLessThanOrEqual(3.5 * 1000 * 1000);
+    expect(excedeTamano("A".repeat(MAX_CONTENIDO_BASE64))).toBe(false);
+    expect(excedeTamano("A".repeat(MAX_CONTENIDO_BASE64 + 1))).toBe(true);
+  });
+
+  // base64 of n bytes is 4 * ceil(n / 3) characters: 2,625,000 bytes are
+  // exactly the cap, one byte more goes over it.
+  it("returns a file just below the cap", async () => {
+    state.bytes = (MAX_CONTENIDO_BASE64 / 4) * 3;
+    const result = await exportarLegajos({ filtros: FILTROS, seleccion: SELECCION });
+    expect(result.ok && result.data!.contenido.length).toBe(MAX_CONTENIDO_BASE64);
+    expect(state.rpc.mock.calls[0][1]).toMatchObject({ p_resultado: "ok" });
+  });
+
+  it("refuses a file just above the cap: the message, no file, an 'error' row with the real count and fields", async () => {
+    state.bytes = (MAX_CONTENIDO_BASE64 / 4) * 3 + 1;
+    expect(await exportarLegajos({ filtros: FILTROS, seleccion: SELECCION })).toEqual({ ok: false, error: errors.demasiadoGrande });
+    expect(state.rpc).toHaveBeenCalledTimes(1);
+    expect(state.rpc).toHaveBeenCalledWith("registrar_exportacion", {
+      p_campos: ["nombres", "numero_legajo"],
+      p_incluye_hijos: true,
+      p_cantidad: 2,
+      p_filtros: FILTROS,
+      p_resultado: "error",
+    });
+  });
+
+  it("still refuses an oversized file when even its log fails", async () => {
+    state.bytes = MAX_CONTENIDO_BASE64;
+    state.rpc = vi.fn(async () => ({ data: null, error: { message: "x" } }));
+    expect(await exportarLegajos({ filtros: FILTROS, seleccion: SELECCION })).toEqual({ ok: false, error: errors.demasiadoGrande });
   });
 });

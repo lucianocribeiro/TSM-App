@@ -13,13 +13,23 @@ import { escribirLaboral, itemId, laboralCompleto } from "./laborales";
 const session = vi.hoisted(() => ({
   client: null as unknown,
   user: null as null | { id: string; email: string; role: "empleado" | "admin"; cuenta: unknown },
+  // Bytes of a synthetic workbook in place of the real one (size cap).
+  bytes: null as number | null,
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => session.client }));
+vi.mock("@/lib/exportacion/xlsx", async (original) => {
+  const real = await original<typeof import("@/lib/exportacion/xlsx")>();
+  return {
+    escribirXlsx: async (...args: Parameters<typeof real.escribirXlsx>) =>
+      session.bytes === null ? real.escribirXlsx(...args) : Buffer.alloc(session.bytes),
+  };
+});
 vi.mock("@/lib/auth/session", () => ({ getSessionUser: async () => session.user }));
 
 const legajos = await import("@/app/(app)/legajos/actions");
+const { MAX_CONTENIDO_BASE64 } = await import("@/lib/exportacion/exportar");
 
 const ACTIVA = { estadoCuenta: "activa", debeCambiarPassword: false };
 const noAutorizado = { ok: false, error: copy.cuentas.errors.noAutorizado };
@@ -148,6 +158,8 @@ describe("Excel export (CR-4)", () => {
     for (const input of [
       { filtros: FILTROS, seleccion: { campos: ["nombres", "profile_id"], hijos: false } },
       { filtros: { ...FILTROS, filas: [{ nombres: "inyectado" }] }, seleccion: { campos: ["nombres"], hijos: false } },
+      { filtros: FILTROS, seleccion: { campos: ["nombres"], hijos: false }, filas: [{ nombres: "inyectado" }] },
+      { filtros: FILTROS, seleccion: { campos: ["nombres"], hijos: false, extra: true } },
     ]) {
       expect((await exportar(input)).result).toEqual({ ok: false, error: errors.seleccion });
     }
@@ -174,6 +186,21 @@ describe("Excel export (CR-4)", () => {
     const antes = await logDe(admin.id);
     expect((await exportar({ filtros: FILTROS, seleccion: { campos: ["nombres"], hijos: false } })).result).toEqual({ ok: false, error: errors.fallo });
     expect(await logDe(admin.id)).toEqual(antes);
+  });
+
+  it("refuses a file over the response size cap: the message, no file, an 'error' row", async () => {
+    as(admin, "admin");
+    const antes = (await logDe(admin.id)).length;
+    session.bytes = (MAX_CONTENIDO_BASE64 / 4) * 3 + 1;
+    try {
+      const { result } = await exportar({ filtros: FILTROS, seleccion: { campos: ["nombres", "area"], hijos: true } });
+      expect(result).toEqual({ ok: false, error: errors.demasiadoGrande });
+    } finally {
+      session.bytes = null;
+    }
+    const filas = await logDe(admin.id);
+    expect(filas).toHaveLength(antes + 1);
+    expect(filas.at(-1)).toMatchObject({ resultado: "error", campos: ["nombres", "area"], incluye_hijos: true, cantidad: 2 });
   });
 
   it("an Empleado or no session gets no file and logs nothing", async () => {

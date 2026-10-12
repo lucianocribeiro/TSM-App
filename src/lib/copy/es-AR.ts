@@ -710,6 +710,7 @@ export type Copy = {
       fallo: string;
       seleccion: string;
       sinEmpleados: string;
+      demasiadoGrande: string;
     };
     historial: {
       kicker: string;
@@ -1494,6 +1495,7 @@ export const copy = {
       fallo: "No pudimos generar el archivo. Intentá de nuevo.",
       seleccion: "Revisá los datos elegidos e intentá de nuevo.",
       sinEmpleados: "No hay empleados para exportar con estos filtros.",
+      demasiadoGrande: "La exportación es demasiado grande. Elegí menos datos o aplicá filtros para exportar menos empleados.",
     },
     historial: {
       kicker: "Legajos",

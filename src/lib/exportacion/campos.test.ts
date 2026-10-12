@@ -64,6 +64,13 @@ describe("validarSeleccion", () => {
       expect(validarSeleccion(input), JSON.stringify(input)).toBeNull();
     }
   });
+
+  it("refuses a property other than campos and hijos, instead of ignoring it", () => {
+    expect(validarSeleccion({ campos: ["nombres"], hijos: false, filas: [] })).toBeNull();
+    expect(validarSeleccion({ campos: ["nombres"], hijos: false, extra: undefined })).toBeNull();
+    expect(validarSeleccion([["nombres"], false])).toBeNull();
+    expect(validarSeleccion({ campos: ["nombres"], hijos: false })).toEqual({ campos: ["nombres"], hijos: false });
+  });
 });
 
 describe("validarFiltros", () => {

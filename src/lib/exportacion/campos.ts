@@ -61,15 +61,25 @@ export function camposDelGrupo(grupo: GrupoExportacion): CampoExportacion[] {
 
 export type Seleccion = { campos: CampoExportacion[]; hijos: boolean };
 
-// The selection as the server takes it: at least one field, every key from
-// the allow-list, none repeated; returned in column order. Anything else is
-// refused (null), never trimmed to what is allowed.
+const CLAVES_SELECCION = ["campos", "hijos"];
+
+// The selection as the server takes it: exactly { campos, hijos }, at least
+// one field, every key from the allow-list, none repeated; returned in column
+// order. Anything else (an extra property included) is refused (null), never
+// trimmed to what is allowed.
 export function validarSeleccion(input: unknown): Seleccion | null {
-  if (!input || typeof input !== "object") return null;
+  if (!tieneSoloClaves(input, CLAVES_SELECCION)) return null;
   const { campos, hijos } = input as { campos?: unknown; hijos?: unknown };
   if (!Array.isArray(campos) || campos.length === 0 || typeof hijos !== "boolean") return null;
   if (!campos.every(esCampoExportacion)) return null;
   if (new Set(campos).size !== campos.length) return null;
   const elegidos = new Set<string>(campos);
   return { campos: CAMPOS_EXPORTACION.filter((config) => elegidos.has(config.campo)).map((config) => config.campo), hijos };
+}
+
+// True for a plain object whose own properties are exactly these keys.
+export function tieneSoloClaves(input: unknown, claves: readonly string[]): input is Record<string, unknown> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return false;
+  const propias = Object.keys(input);
+  return propias.length === claves.length && claves.every((clave) => propias.includes(clave));
 }

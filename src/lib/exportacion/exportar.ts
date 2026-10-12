@@ -7,7 +7,7 @@ import { hoyEnArgentina } from "@/lib/legajo/fechas";
 import { filtrarLegajos, itemDesdeFila, type FiltrosLegajos } from "@/lib/legajo/listado";
 import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
-import { validarSeleccion, type Seleccion } from "./campos";
+import { tieneSoloClaves, validarSeleccion, type Seleccion } from "./campos";
 import { validarFiltros } from "./filtros";
 import { armarLibro, nombreArchivo, type LegajoExportable } from "./planilla";
 import { escribirXlsx } from "./xlsx";
@@ -26,6 +26,18 @@ export type ArchivoExportado = { nombre: string; contenido: string };
 
 const errors = copy.exportacion.errors;
 const ORIGEN = "[legajos/exportacion]";
+const CLAVES_PEDIDO = ["filtros", "seleccion"];
+
+// The largest file the action returns, measured as the base64 text it travels
+// in. Vercel caps a function's response at 4.5 MB, and the Server Action wraps
+// the text in its RSC response (file name, framing; base64 needs no escaping),
+// so 3.5 MB leaves about 1 MB of margin. It is about 2.6 MB of .xlsx, far
+// beyond the list's size today; a larger export is refused with a message.
+export const MAX_CONTENIDO_BASE64 = 3_500_000;
+
+export function excedeTamano(contenido: string): boolean {
+  return contenido.length > MAX_CONTENIDO_BASE64;
+}
 
 async function registrar(
   client: Client,
@@ -64,9 +76,10 @@ async function leerLegajos(client: Client, filtros: FiltrosLegajos) {
 }
 
 export async function exportarLegajos(input: unknown, ahora: Date = new Date()): Promise<ActionResult<ArchivoExportado>> {
-  const pedido = (input ?? {}) as { filtros?: unknown; seleccion?: unknown };
-  const filtros = validarFiltros(pedido.filtros);
-  const seleccion = validarSeleccion(pedido.seleccion);
+  // Exactly { filtros, seleccion }: any other property is refused, never ignored.
+  if (!tieneSoloClaves(input, CLAVES_PEDIDO)) return { ok: false, error: errors.seleccion };
+  const filtros = validarFiltros(input.filtros);
+  const seleccion = validarSeleccion(input.seleccion);
   if (!filtros || !seleccion) return { ok: false, error: errors.seleccion };
 
   const client = await createClient();
@@ -85,9 +98,17 @@ export async function exportarLegajos(input: unknown, ahora: Date = new Date()):
     return { ok: false, error: errors.fallo };
   }
 
+  const contenido = archivo.toString("base64");
+  if (excedeTamano(contenido)) {
+    // Too large to return: not sent, logged as a failed attempt.
+    if (!(await registrar(client, seleccion, filtros, cantidad, "error"))) console.error(`${ORIGEN} export log failed`);
+    console.error(`${ORIGEN} workbook over the response size cap`);
+    return { ok: false, error: errors.demasiadoGrande };
+  }
+
   if (!(await registrar(client, seleccion, filtros, cantidad, "ok"))) {
     console.error(`${ORIGEN} export log failed; export refused`);
     return { ok: false, error: errors.fallo };
   }
-  return { ok: true, data: { nombre: nombreArchivo(ahora), contenido: archivo.toString("base64") } };
+  return { ok: true, data: { nombre: nombreArchivo(ahora), contenido } };
 }
