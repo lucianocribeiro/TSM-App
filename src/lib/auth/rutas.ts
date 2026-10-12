@@ -22,6 +22,7 @@ export const RUTAS = [
   { patron: "/cambiar-password", clase: "autenticada" },
   // Admin only.
   { patron: "/legajos", clase: "admin" },
+  { patron: "/legajos/exportaciones", clase: "admin" },
   { patron: "/legajos/[id]", clase: "admin" },
   { patron: "/usuarios", clase: "admin" },
   { patron: "/usuarios/[id]", clase: "admin" },

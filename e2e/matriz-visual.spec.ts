@@ -4,7 +4,7 @@ import { THEME_COOKIE, type Theme } from "../src/lib/theme/theme";
 import { adminNuevo, altaAfipCargada, empleadoCompleto, registro, solicitudPendiente } from "./datos";
 import { fillLogin, loginAs } from "./helpers";
 import { assertNoSecretOnPage } from "./secrets";
-import { createE2EUser, localServiceClient } from "./service";
+import { createE2EUser, fillLaboral, localServiceClient } from "./service";
 
 // F1-11B, GAP-08 (partial): the main screens in light and dark, at desktop
 // (1280px) and mobile (390px) widths. Screenshots go to VISUAL_DIR, uploaded
@@ -172,6 +172,49 @@ const PANTALLAS: Pantalla[] = [
       await page.goto(`/legajos/${emp.id}`);
     },
     lista: (page) => page.getByTestId("documento-alta_afip").getByRole("button", { name: copy.legajos.documentos.reemplazar }),
+  },
+  // CR-4: the export dialog over the Legajos list (the list itself, with the
+  // button, is "legajos"), the export history, and an Admin's own Mi Legajo
+  // with group E read only.
+  {
+    nombre: "legajos-exportar",
+    abrir: async (page) => {
+      await empleadoCompleto("visual-exportar", cuentas.add);
+      await loginAs(page, await adminNuevo("visual-exportar-admin", cuentas.add));
+      await page.goto("/legajos");
+    },
+    trasCargar: async (page) => {
+      await page.getByRole("button", { name: copy.exportacion.boton }).click();
+    },
+    lista: (page) => page.getByRole("dialog", { name: copy.exportacion.dialogo.title }).getByTestId("exportar-grupo-E"),
+  },
+  {
+    nombre: "legajos-exportaciones",
+    abrir: async (page) => {
+      const admin = await adminNuevo("visual-exportaciones", cuentas.add);
+      const { error } = await localServiceClient().from("exportaciones").insert({
+        actor_id: admin.id,
+        campos: ["nombres", "apellido", "cuil", "numero_legajo", "area"],
+        incluye_hijos: true,
+        cantidad: 12,
+        filtros: { busqueda: "", estadoLaboral: "activo", areaId: "", sucursalId: "", tareaId: "", mostrarBajas: true },
+        resultado: "ok",
+      });
+      expect(error).toBeNull();
+      await loginAs(page, admin);
+      await page.goto("/legajos/exportaciones");
+    },
+    lista: (page) => page.getByTestId("exportacion-row").first(),
+  },
+  {
+    nombre: "mi-legajo-admin",
+    abrir: async (page) => {
+      const admin = await adminNuevo("visual-mi-legajo-admin", cuentas.add);
+      // Unique: the screen opens once per test (matrix and no-scroll).
+      await fillLaboral(admin.id, { numero_legajo: `V-${admin.id.slice(0, 8)}` });
+      await loginAs(page, admin);
+    },
+    lista: (page) => page.getByTestId("grupo-E-propio"),
   },
   {
     nombre: "aprobaciones",

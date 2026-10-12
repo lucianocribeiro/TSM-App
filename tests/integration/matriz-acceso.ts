@@ -490,6 +490,44 @@ export const TABLAS: Record<
     },
   },
 
+  // CR-4. Read only, and for an active Admin only; written by
+  // registrar_exportacion (no INSERT, UPDATE or DELETE grant).
+  exportaciones: {
+    preparar: async (service, titular) => {
+      const fila = await primera(
+        service
+          .from("exportaciones")
+          .insert({ actor_id: titular.id, campos: ["nombres"], incluye_hijos: false, cantidad: 1, filtros: {}, resultado: "ok" })
+          .select("id"),
+      );
+      return { id: fila.id };
+    },
+    estado: (service, titular) => filas(service.from("exportaciones").select("*").eq("actor_id", titular.id).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("exportaciones").select("id").eq("id", o.id)),
+      insert: (c, l, t) =>
+        r(
+          c
+            .from("exportaciones")
+            .insert({ actor_id: l.id ?? t.id, campos: ["nombres"], incluye_hijos: false, cantidad: 9, filtros: {}, resultado: "ok" })
+            .select("id"),
+        ),
+      update: (c, _l, _t, o) => r(c.from("exportaciones").update({ cantidad: 2 }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("exportaciones").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async (service, titular) => {
+      await service.from("exportaciones").delete().eq("actor_id", titular.id);
+    },
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(V, N, N, N),
+    },
+  },
+
   // Read only, and for an active Admin only; written by the trigger.
   catalogo_eventos: {
     preparar: async (service, titular) => {
