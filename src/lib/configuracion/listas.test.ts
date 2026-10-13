@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   disponibleParaSeleccion,
   enUso,
+  esItemSistema,
   esLista,
+  esSinConvenio,
   itemsDeGrupo,
   mover,
   nombresDelGrupo,
   opcionesDisponibles,
+  sucursalPorDefecto,
   vecinoDe,
   type CatalogoItem,
 } from "./listas";
@@ -115,5 +118,37 @@ describe("selection rules", () => {
   it("lists the options in order", () => {
     expect(opcionesDisponibles(ITEMS, "sucursal").map((i) => i.id)).toEqual(["norte", "centro"]);
     expect(opcionesDisponibles(ITEMS, "area").map((i) => i.id)).toEqual(["ventas", "logistica"]);
+  });
+});
+
+// CR-5: the "No" convenio and a Puesto's Sucursal por defecto.
+describe("system item and Sucursal por defecto", () => {
+  const comercio = item("comercio", { lista: "convenio" });
+  const no = item("no", { lista: "convenio", sinConvenio: true });
+  const conNorte = item("con-norte", { lista: "puesto", areaId: "ventas", sucursalDefectoId: "norte" });
+  const conSur = item("con-sur", { lista: "puesto", areaId: "ventas", sucursalDefectoId: "sur" });
+  const todos = [...ITEMS, comercio, no, conNorte, conSur];
+
+  it("marks only the No convenio as a system item", () => {
+    expect(esItemSistema(no)).toBe(true);
+    expect(esItemSistema(comercio)).toBe(false);
+    expect(esSinConvenio(todos, "no")).toBe(true);
+    expect(esSinConvenio(todos, "comercio")).toBe(false);
+    expect(esSinConvenio(todos, null)).toBe(false);
+    expect(esSinConvenio(todos, "desconocido")).toBe(false);
+  });
+
+  it("prefills a Puesto's default only while that Sucursal is active", () => {
+    expect(sucursalPorDefecto(todos, "con-norte")).toBe("norte");
+    expect(sucursalPorDefecto(todos, "con-sur")).toBeNull();
+    expect(sucursalPorDefecto(todos, "mostrador")).toBeNull();
+    expect(sucursalPorDefecto(todos, "")).toBeNull();
+  });
+
+  it("a Sucursal that is a Puesto's default is in use", () => {
+    const ninguno = new Set<string>();
+    expect(enUso(todos, norte, ninguno)).toBe(true);
+    expect(enUso(todos, sur, ninguno)).toBe(true);
+    expect(enUso(todos, centro, ninguno)).toBe(false);
   });
 });

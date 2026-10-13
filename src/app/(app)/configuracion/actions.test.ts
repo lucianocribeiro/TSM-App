@@ -9,6 +9,7 @@ import { copy } from "@/lib/copy/es-AR";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const AREA = "22222222-2222-4222-8222-222222222222";
+const SUCURSAL = "33333333-3333-4333-8333-333333333333";
 
 type Result = { data?: unknown; error?: unknown };
 
@@ -70,6 +71,7 @@ const CASOS = [
   ["reactivarItem", actions.reactivarItem, { id: ID, version: 1 }],
   ["moverItem", actions.moverItem, { id: ID, version: 1, direccion: "arriba" }],
   ["eliminarItem", actions.eliminarItem, { id: ID, version: 1 }],
+  ["asignarSucursalDefecto", actions.asignarSucursalDefecto, { id: ID, version: 1, sucursalId: SUCURSAL }],
 ] as const;
 
 describe.each(CASOS)("%s", (_nombre, action, input) => {
@@ -88,6 +90,7 @@ describe.each(CASOS)("%s", (_nombre, action, input) => {
     if ("lista" in input) malos.push({ ...input, lista: "otra" });
     if ("nombre" in input) malos.push({ ...input, nombre: 3 });
     if ("direccion" in input) malos.push({ ...input, direccion: "costado" });
+    if ("sucursalId" in input) malos.push({ ...input, sucursalId: "no-es-uuid" }, { id: ID, version: 1 });
     for (const malo of malos) {
       await expect(action(malo), JSON.stringify(malo)).resolves.toEqual(fallo(errors.accionFallo));
     }
@@ -191,5 +194,89 @@ describe("moverItem", () => {
       mocks.rpc.mockResolvedValueOnce({ data: null, error });
       await expect(actions.moverItem({ id: ID, version: 2, direccion: "arriba" })).resolves.toEqual(fallo(mensaje));
     }
+  });
+});
+
+// CR-5: the "No" convenio is a system item.
+describe("the system item (No convenio)", () => {
+  const sistema = { id: ID, lista: "convenio", area_id: null, nombre: "No", version: 2, sin_convenio: true };
+
+  it("cannot be renamed, deactivated or deleted: refused before any write", async () => {
+    mocks.resolve = () => ({ data: sistema, error: null });
+    await expect(actions.renombrarItem({ id: ID, version: 2, nombre: "Ninguno" })).resolves.toEqual(fallo(errors.itemSistema));
+    await expect(actions.desactivarItem({ id: ID, version: 2 })).resolves.toEqual(fallo(errors.itemSistema));
+    await expect(actions.eliminarItem({ id: ID, version: 2 })).resolves.toEqual(fallo(errors.itemSistema));
+    expect(escrituras()).toEqual([]);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("can be reordered and reactivated", async () => {
+    mocks.resolve = () => ({ data: [{ id: ID }], error: null });
+    await expect(actions.moverItem({ id: ID, version: 2, direccion: "arriba" })).resolves.toEqual({ ok: true });
+    await expect(actions.reactivarItem({ id: ID, version: 2 })).resolves.toEqual({ ok: true });
+  });
+
+  it("maps the database refusal (55000 item_sistema)", async () => {
+    mocks.resolve = (_table, ops) =>
+      tiene(ops, "delete") ? { data: null, error: { code: "55000", hint: "item_sistema" } } : { data: { sin_convenio: false }, error: null };
+    await expect(actions.eliminarItem({ id: ID, version: 2 })).resolves.toEqual(fallo(errors.itemSistema));
+  });
+});
+
+// CR-5: a Puesto's Sucursal por defecto.
+describe("asignarSucursalDefecto", () => {
+  const puesto = { id: ID, lista: "puesto", version: 3, sucursal_defecto_id: null };
+
+  // Reads: the item (first maybeSingle), then the Sucursal (second).
+  function base(sucursal: unknown, escritura: Result = { data: [{ id: ID }], error: null }, item: unknown = puesto) {
+    let lecturas = 0;
+    mocks.resolve = (_table, ops) => {
+      if (tiene(ops, "update")) return escritura;
+      if (tiene(ops, "maybeSingle")) return { data: lecturas++ === 0 ? item : sucursal, error: null };
+      return { data: [], error: null };
+    };
+  }
+
+  it("sets an active Sucursal with the version it checked", async () => {
+    base({ id: SUCURSAL });
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: SUCURSAL })).resolves.toEqual({ ok: true });
+    const [cambio] = escrituras();
+    expect(cambio.ops).toContainEqual(["update", [{ sucursal_defecto_id: SUCURSAL }]]);
+    expect(cambio.ops).toContainEqual(["eq", ["version", 3]]);
+    // The Sucursal was looked up as an active Sucursal.
+    const lectura = mocks.queries.find((q) => q.ops.some(([op, args]) => op === "eq" && args[0] === "lista" && args[1] === "sucursal"));
+    expect(lectura?.ops).toContainEqual(["eq", ["activo", true]]);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/configuracion", "layout");
+  });
+
+  it("clears it with null", async () => {
+    base(null, { data: [{ id: ID }], error: null }, { ...puesto, sucursal_defecto_id: SUCURSAL });
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: null })).resolves.toEqual({ ok: true });
+    expect(escrituras()[0].ops).toContainEqual(["update", [{ sucursal_defecto_id: null }]]);
+  });
+
+  it("refuses an inactive or unknown Sucursal, a non-Puesto item, a stale version or a missing item before writing", async () => {
+    base(null);
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: SUCURSAL })).resolves.toEqual(fallo(errors.sucursalInvalida));
+    base({ id: SUCURSAL }, undefined, { ...puesto, lista: "convenio" });
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: SUCURSAL })).resolves.toEqual(fallo(errors.accionFallo));
+    base({ id: SUCURSAL });
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 2, sucursalId: SUCURSAL })).resolves.toEqual(fallo(errors.cambioConcurrente));
+    base({ id: SUCURSAL }, undefined, null);
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: SUCURSAL })).resolves.toEqual(fallo(errors.noEncontrado));
+    expect(escrituras()).toEqual([]);
+  });
+
+  it("the same value writes nothing", async () => {
+    base(null, undefined, { ...puesto, sucursal_defecto_id: SUCURSAL });
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: SUCURSAL })).resolves.toEqual({ ok: true });
+    expect(escrituras()).toEqual([]);
+  });
+
+  it("maps the database refusals", async () => {
+    base({ id: SUCURSAL }, { data: null, error: { code: "23514", hint: "item_inactivo" } });
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: SUCURSAL })).resolves.toEqual(fallo(errors.sucursalInvalida));
+    base({ id: SUCURSAL }, { data: null, error: { code: "23503" } });
+    await expect(actions.asignarSucursalDefecto({ id: ID, version: 3, sucursalId: SUCURSAL })).resolves.toEqual(fallo(errors.sucursalInvalida));
   });
 });

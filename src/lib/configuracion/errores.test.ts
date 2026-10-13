@@ -21,6 +21,9 @@ describe("mensajeBase", () => {
     expect(mensajeBase({ code: "P0002" }, null)).toBe(errors.noEncontrado);
     expect(mensajeBase({ code: "55000", hint: "version" }, null)).toBe(errors.cambioConcurrente);
     expect(mensajeBase({ code: "55000", hint: "extremo" }, null)).toBe(errors.extremo);
+    expect(mensajeBase({ code: "55000", hint: "item_sistema" }, null)).toBe(errors.itemSistema);
+    expect(mensajeBase({ code: "23514", hint: "item_inactivo" }, null)).toBe(errors.sucursalInvalida);
+    expect(mensajeBase({ code: "23514" }, "sucursal")).toBe(errors.accionFallo);
   });
 
   it("never passes a database message through", () => {

@@ -16,7 +16,7 @@ export async function listarItems(client?: SupabaseClient<Database>): Promise<Ca
   const supabase = client ?? (await createClient());
   const { data, error } = await supabase
     .from("catalogo_items")
-    .select("id, lista, nombre, area_id, posicion, activo, version")
+    .select("id, lista, nombre, area_id, posicion, activo, version, sin_convenio, sucursal_defecto_id")
     .order("posicion");
   if (error) return null;
   return (data ?? []).map((row) => ({
@@ -27,6 +27,8 @@ export async function listarItems(client?: SupabaseClient<Database>): Promise<Ca
     posicion: row.posicion,
     activo: row.activo,
     version: row.version,
+    sinConvenio: row.sin_convenio,
+    sucursalDefectoId: row.sucursal_defecto_id,
   }));
 }
 

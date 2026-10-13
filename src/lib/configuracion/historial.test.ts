@@ -64,6 +64,15 @@ describe("filaHistorial", () => {
     ]);
   });
 
+  it("shows a Puesto's Sucursal por defecto by name, or none in words (CR-5)", () => {
+    const fila = filaHistorial(
+      evento({ lista: "puesto", areaNombre: "Ventas", itemNombre: "Mostrador (PA)", accion: "sucursal_defecto", valorAnterior: null, valorNuevo: "Pacheco" }),
+      nombres,
+    );
+    expect([fila.accion, fila.antes, fila.despues]).toEqual([t.acciones.sucursal_defecto, copy.configuracion.sucursalDefecto.ninguna, "Pacheco"]);
+    const quitada = filaHistorial(evento({ accion: "sucursal_defecto", valorAnterior: "Pacheco", valorNuevo: null }), nombres);
+    expect([quitada.antes, quitada.despues]).toEqual(["Pacheco", copy.configuracion.sucursalDefecto.ninguna]);
+  });
 });
 
 // AUDCR1-01: an actor who cannot be named is never shown by id.

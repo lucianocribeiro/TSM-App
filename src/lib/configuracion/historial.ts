@@ -34,8 +34,10 @@ export type FilaHistorial = {
 
 const t = copy.configuracion.historial;
 
-// A stored value as the user reads it: positions and states in words.
+// A stored value as the user reads it: positions and states in words; a
+// Sucursal por defecto by its name, or "Sin sucursal por defecto" (CR-5).
 function valor(accion: CatalogoAccion, crudo: string | null): string {
+  if (accion === "sucursal_defecto") return crudo ?? copy.configuracion.sucursalDefecto.ninguna;
   if (crudo === null) return t.sinValor;
   if (accion === "reorden") return formatCopy(t.posicion, { n: crudo });
   if (accion === "desactivacion" || accion === "reactivacion") {

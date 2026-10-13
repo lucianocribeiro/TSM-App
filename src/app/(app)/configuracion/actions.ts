@@ -15,7 +15,9 @@ import { createClient } from "@/lib/supabase/server";
 // the Admin's own session, so RLS (Admin only) and the table's constraints
 // apply as well. Every change but an addition carries the version the
 // screen showed; a stale one is refused as a concurrent change. The history
-// is written by the database (trigger), not here.
+// is written by the database (trigger), not here. The "No" convenio is a
+// system item (CR-5): renaming, deactivating and deleting it are refused
+// here and by the database.
 
 const errors = copy.configuracion.errors;
 const noAutorizado = { ok: false as const, error: copy.cuentas.errors.noAutorizado };
@@ -30,6 +32,7 @@ const agregarInput = z.object({ lista: z.enum(LISTAS), areaId: z.uuid().nullish(
 const renombrarInput = z.object({ id, version, nombre: z.string() });
 const itemInput = z.object({ id, version });
 const moverInput = z.object({ id, version, direccion: z.enum(["arriba", "abajo"]) });
+const sucursalDefectoInput = z.object({ id, version, sucursalId: z.uuid().nullable() });
 
 async function run<S extends z.ZodType>(
   schema: S,
@@ -53,6 +56,21 @@ async function nombresDelGrupo(supabase: Supabase, lista: CatalogoLista, areaId:
   const { data, error } = await consulta;
   if (error) return null;
   return (data ?? []).filter((item) => item.id !== sinId).map((item) => item.nombre);
+}
+
+// True when the item is the system "No" convenio, null when it cannot be read.
+async function esSistema(supabase: Supabase, itemId: string): Promise<boolean | null> {
+  const { data, error } = await supabase.from("catalogo_items").select("sin_convenio").eq("id", itemId).maybeSingle();
+  if (error) return null;
+  return data?.sin_convenio === true;
+}
+
+// The refusal for a system item, or null to go on (a missing item is left
+// to the write, which reports it).
+async function rechazoSistema(supabase: Supabase, itemId: string): Promise<ActionResult | null> {
+  const sistema = await esSistema(supabase, itemId);
+  if (sistema === null) return fallo(errors.accionFallo);
+  return sistema ? fallo(errors.itemSistema) : null;
 }
 
 // After a write that matched no row: the item is gone, or its version moved on.
@@ -88,10 +106,11 @@ export async function renombrarItem(input: unknown): Promise<ActionResult> {
     const supabase = await createClient();
     const { data: item } = await supabase
       .from("catalogo_items")
-      .select("id, lista, area_id, nombre, version")
+      .select("id, lista, area_id, nombre, version, sin_convenio")
       .eq("id", itemId)
       .maybeSingle();
     if (!item) return fallo(errors.noEncontrado);
+    if (item.sin_convenio) return fallo(errors.itemSistema);
     if (item.version !== vista) return fallo(errors.cambioConcurrente);
 
     const existentes = await nombresDelGrupo(supabase, item.lista, item.area_id, item.id);
@@ -114,6 +133,10 @@ export async function renombrarItem(input: unknown): Promise<ActionResult> {
 
 async function cambiarEstado(itemId: string, vista: number, activo: boolean): Promise<ActionResult> {
   const supabase = await createClient();
+  if (!activo) {
+    const rechazo = await rechazoSistema(supabase, itemId);
+    if (rechazo) return rechazo;
+  }
   const { data, error } = await supabase
     .from("catalogo_items")
     .update({ activo })
@@ -151,9 +174,50 @@ export async function moverItem(input: unknown): Promise<ActionResult> {
 export async function eliminarItem(input: unknown): Promise<ActionResult> {
   return run(itemInput, input, async ({ id: itemId, version: vista }) => {
     const supabase = await createClient();
+    const rechazo = await rechazoSistema(supabase, itemId);
+    if (rechazo) return rechazo;
     const { data, error } = await supabase.from("catalogo_items").delete().eq("id", itemId).eq("version", vista).select("id");
     if (error) return fallo(mensajeBase(error, null));
     if (!data?.length) return sinFilas(supabase, itemId);
+    return { ok: true };
+  });
+}
+
+// A Puesto's Sucursal por defecto (CR-5), or none (null). A newly chosen
+// Sucursal must be active; the one the Puesto already has stays valid. The
+// database checks the same (catalogo_items_reglas) and records the change.
+export async function asignarSucursalDefecto(input: unknown): Promise<ActionResult> {
+  return run(sucursalDefectoInput, input, async ({ id: itemId, version: vista, sucursalId }) => {
+    const supabase = await createClient();
+    const { data: item } = await supabase
+      .from("catalogo_items")
+      .select("id, lista, version, sucursal_defecto_id")
+      .eq("id", itemId)
+      .maybeSingle();
+    if (!item) return fallo(errors.noEncontrado);
+    if (item.lista !== "puesto") return fallo(errors.accionFallo);
+    if (item.version !== vista) return fallo(errors.cambioConcurrente);
+    if (sucursalId === item.sucursal_defecto_id) return { ok: true };
+
+    if (sucursalId !== null) {
+      const { data: sucursal } = await supabase
+        .from("catalogo_items")
+        .select("id")
+        .eq("id", sucursalId)
+        .eq("lista", "sucursal")
+        .eq("activo", true)
+        .maybeSingle();
+      if (!sucursal) return fallo(errors.sucursalInvalida);
+    }
+
+    const { data, error } = await supabase
+      .from("catalogo_items")
+      .update({ sucursal_defecto_id: sucursalId })
+      .eq("id", item.id)
+      .eq("version", vista)
+      .select("id");
+    if (error) return fallo(error.code === "23503" ? errors.sucursalInvalida : mensajeBase(error, null));
+    if (!data?.length) return sinFilas(supabase, item.id);
     return { ok: true };
   });
 }

@@ -21,7 +21,34 @@ export type CatalogoItem = {
   posicion: number;
   activo: boolean;
   version: number;
+  // Convenio only: the system item "No" (no convenio). Absent means false.
+  sinConvenio?: boolean;
+  // Puesto only: its Sucursal por defecto (CR-5), the Sucursal item id.
+  sucursalDefectoId?: string | null;
 };
+
+// The "No" convenio is a system item: it can be reordered, but not renamed,
+// deactivated or deleted (the database refuses it too).
+export function esItemSistema(item: CatalogoItem): boolean {
+  return item.sinConvenio === true;
+}
+
+// True when the convenio item id is the "No" convenio: Tarea and Categoría
+// do not apply.
+export function esSinConvenio(items: readonly CatalogoItem[], convenioId: string | null | undefined): boolean {
+  if (!convenioId) return false;
+  return items.some((item) => item.id === convenioId && item.lista === "convenio" && esItemSistema(item));
+}
+
+// The Sucursal a Puesto prefills: its default, only while that Sucursal is
+// active. Null otherwise.
+export function sucursalPorDefecto(items: readonly CatalogoItem[], puestoId: string | null | undefined): string | null {
+  const puesto = puestoId ? items.find((item) => item.id === puestoId && item.lista === "puesto") : undefined;
+  const sucursalId = puesto?.sucursalDefectoId;
+  if (!sucursalId) return null;
+  const sucursal = items.find((item) => item.id === sucursalId && item.lista === "sucursal");
+  return sucursal?.activo ? sucursal.id : null;
+}
 
 // The items of one list (of one Área, for Puesto), in their order.
 export function itemsDeGrupo(items: readonly CatalogoItem[], lista: CatalogoLista, areaId: string | null = null): CatalogoItem[] {
@@ -65,11 +92,13 @@ export function mover(grupo: readonly CatalogoItem[], id: string, direccion: Dir
     .sort((a, b) => a.posicion - b.posicion);
 }
 
-// An item is in use while something references it: an Área its Puestos,
-// and any item a legajo's group E (referenciados: the item ids the legajos
-// hold). The database refuses the deletion either way (ON DELETE RESTRICT).
+// An item is in use while something references it: an Área its Puestos, a
+// Sucursal the Puestos that have it as default, and any item a legajo's
+// group E (referenciados: the item ids the legajos hold). The database
+// refuses the deletion either way (ON DELETE RESTRICT).
 export function enUso(items: readonly CatalogoItem[], item: CatalogoItem, referenciados: ReadonlySet<string>): boolean {
   if (referenciados.has(item.id)) return true;
+  if (item.lista === "sucursal") return items.some((otro) => otro.lista === "puesto" && otro.sucursalDefectoId === item.id);
   return item.lista === "area" && items.some((otro) => otro.lista === "puesto" && otro.areaId === item.id);
 }
 

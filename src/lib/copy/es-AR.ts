@@ -602,6 +602,21 @@ export type Copy = {
     areaInactiva: string;
     sinAreas: string;
     nombreHint: string;
+    // A system item (the "No" convenio, CR-5): badge and note.
+    sistema: string;
+    sistemaHint: string;
+    // A Puesto's Sucursal por defecto (CR-5).
+    sucursalDefecto: {
+      valor: string;
+      ninguna: string;
+      inactiva: string;
+      accion: string;
+      title: string;
+      label: string;
+      hint: string;
+      confirm: string;
+      saving: string;
+    };
     agregar: {
       label: string;
       labelPuesto: string;
@@ -645,6 +660,7 @@ export type Copy = {
       reactivado: string;
       movido: string;
       eliminado: string;
+      sucursalDefecto: string;
     };
     errors: {
       nombreVacio: string;
@@ -656,6 +672,8 @@ export type Copy = {
       noEncontrado: string;
       extremo: string;
       areaInvalida: string;
+      itemSistema: string;
+      sucursalInvalida: string;
       accionFallo: string;
     };
     historial: {
@@ -675,7 +693,7 @@ export type Copy = {
         antes: string;
         despues: string;
       };
-      acciones: Record<"alta" | "renombre" | "reorden" | "desactivacion" | "reactivacion" | "baja", string>;
+      acciones: Record<"alta" | "renombre" | "reorden" | "desactivacion" | "reactivacion" | "baja" | "sucursal_defecto", string>;
       listaConArea: string;
       posicion: string;
       sinValor: string;
@@ -1380,6 +1398,19 @@ export const copy = {
     areaInactiva: "Área inactiva: sus puestos no aparecen en nuevas selecciones.",
     sinAreas: "Primero agregá un área para poder cargar puestos.",
     nombreHint: "Hasta 60 caracteres.",
+    sistema: "Sistema",
+    sistemaHint: "Ítem del sistema: podés cambiarlo de orden, pero no renombrarlo, desactivarlo ni eliminarlo.",
+    sucursalDefecto: {
+      valor: "Sucursal por defecto: {nombre}",
+      ninguna: "Sin sucursal por defecto",
+      inactiva: "{nombre} (inactiva)",
+      accion: "Sucursal por defecto",
+      title: "Sucursal por defecto de «{nombre}»",
+      label: "Sucursal por defecto",
+      hint: "Cuando elijas este puesto en un legajo, la sucursal se va a completar con esta. Siempre la podés cambiar en el legajo.",
+      confirm: "Guardar",
+      saving: "Guardando…",
+    },
     agregar: {
       label: "Nuevo ítem",
       labelPuesto: "Nuevo puesto en {area}",
@@ -1424,6 +1455,7 @@ export const copy = {
       reactivado: "Reactivaste «{nombre}».",
       movido: "Cambiaste el orden de «{nombre}».",
       eliminado: "Eliminaste «{nombre}».",
+      sucursalDefecto: "Guardaste la sucursal por defecto de «{nombre}».",
     },
     errors: {
       nombreVacio: "Ingresá un nombre.",
@@ -1435,6 +1467,8 @@ export const copy = {
       noEncontrado: "El ítem ya no existe. Actualizamos la lista.",
       extremo: "El ítem ya está en esa punta de la lista.",
       areaInvalida: "Elegí un área válida.",
+      itemSistema: "Este ítem es del sistema: no se puede renombrar, desactivar ni eliminar.",
+      sucursalInvalida: "Elegí una sucursal activa de la lista.",
       accionFallo: "No pudimos guardar el cambio. Intentá de nuevo.",
     },
     historial: {
@@ -1461,6 +1495,7 @@ export const copy = {
         desactivacion: "Desactivación",
         reactivacion: "Reactivación",
         baja: "Eliminación",
+        sucursal_defecto: "Cambio de sucursal por defecto",
       },
       listaConArea: "{lista} ({area})",
       posicion: "Posición {n}",
