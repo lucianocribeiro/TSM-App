@@ -82,8 +82,8 @@ const LABORALES = {
   fecha_ingreso: "2020-03-01",
   estado_laboral: "activo",
   sucursal_id: "00000000-0000-4000-8000-0000000000a3",
+  convenio_id: "00000000-0000-4000-8000-0000000000a4",
   tarea_id: null,
-  convenio_id: null,
   categoria_id: null,
 };
 const SUBIDA = { tipo: "licencia_conducir", fileName: "a.pdf", mimeType: "application/pdf", sizeBytes: 10 };
@@ -461,6 +461,18 @@ const CASOS: Record<string, Caso> = {
     rechazo: noAutorizado,
     llamar: () => configuracion.eliminarItem(itemFrontera),
     invalido: { llamar: () => configuracion.eliminarItem({ id: "x" }), esperado: fallo(configErrors.accionFallo) },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
+  // CR-5: a Puesto's Sucursal por defecto.
+  [`${C}asignarSucursalDefecto`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.asignarSucursalDefecto({ ...itemFrontera, sucursalId: null }),
+    invalido: {
+      llamar: () => configuracion.asignarSucursalDefecto({ ...itemFrontera, sucursalId: "no-es-uuid" }),
+      esperado: fallo(configErrors.accionFallo),
+    },
     noAplica: { ajeno: CATALOGO },
     despues: catalogoSinCambios,
   },

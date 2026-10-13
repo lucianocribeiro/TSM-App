@@ -234,17 +234,21 @@ describe("datos laborales (CR-2)", () => {
       }
     });
 
-    it("on a complete row, clearing a required field is refused; an optional one may be cleared", async () => {
+    it("on a complete row, clearing a required field is refused (Convenio too, CR-5); an optional one may be cleared", async () => {
       const antes = await laboralDe(service, legajo);
-      for (const campo of ["numero_legajo", "area_id", "puesto_id", "fecha_ingreso", "estado_laboral", "sucursal_id"] as const) {
+      for (const campo of ["numero_legajo", "area_id", "puesto_id", "fecha_ingreso", "estado_laboral", "sucursal_id", "convenio_id"] as const) {
         const { error } = await admin.client.from("legajos_laborales").update({ [campo]: null } as LaboralUpdate).eq("legajo_id", legajo);
         expect(error?.hint, campo).toBe("laborales_incompletos");
       }
       expect(await laboralDe(service, legajo)).toEqual(antes);
-      const opcional = await admin.client.from("legajos_laborales").update({ convenio_id: null }).eq("legajo_id", legajo).select("convenio_id");
+      const opcional = await admin.client
+        .from("legajos_laborales")
+        .update({ tarea_id: null, categoria_id: null })
+        .eq("legajo_id", legajo)
+        .select("tarea_id, categoria_id");
       expect(opcional.error).toBeNull();
-      expect(opcional.data).toEqual([{ convenio_id: null }]);
-      await escribirLaboral(service, legajo, { convenio_id: completo.convenio_id });
+      expect(opcional.data).toEqual([{ tarea_id: null, categoria_id: null }]);
+      await escribirLaboral(service, legajo, { tarea_id: completo.tarea_id, categoria_id: completo.categoria_id });
     });
   });
 
