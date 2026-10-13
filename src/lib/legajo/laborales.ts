@@ -40,7 +40,8 @@ const optionalId = () =>
     .transform((value) => value || null)
     .pipe(z.uuid({ error: v.optionInvalid }).nullable());
 
-export const datosLaboralesSchema = z.object({
+// Strict: a field outside group E is refused (AUDCR5-01).
+export const datosLaboralesSchema = z.strictObject({
   numero_legajo: requiredText(),
   area_id: requiredId(),
   puesto_id: requiredId(),
@@ -68,6 +69,13 @@ export const CAMPOS_LABORALES = [
   "categoria_id",
 ] as const;
 export type CampoLaboral = (typeof CAMPOS_LABORALES)[number];
+
+// The keys group E takes, values unchecked: the action refuses any other key
+// before reading the legajo or the lists; the values are then validated by
+// validarDatosLaborales (AUDCR5-01).
+export const clavesLaboralesSchema = z.strictObject(
+  Object.fromEntries(CAMPOS_LABORALES.map((campo) => [campo, z.unknown().optional()])) as Record<CampoLaboral, z.ZodOptional<z.ZodUnknown>>,
+);
 
 // The list behind each dropdown field.
 export const LISTA_DE_CAMPO = {

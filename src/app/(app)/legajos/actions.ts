@@ -11,6 +11,7 @@ import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
 import { exportarLegajos as exportar, type ArchivoExportado } from "@/lib/exportacion/exportar";
 import type { Database } from "@/lib/supabase/database.types";
 import { aplicarDatosLaborales, aplicarGrupo, tieneSolicitudPendiente, validarGrupo } from "@/lib/legajo/escritura";
+import { clavesLaboralesSchema } from "@/lib/legajo/laborales";
 import { createClient } from "@/lib/supabase/server";
 
 // Server Actions of /legajos (PRD US-4, 5.6). Admin only: every action
@@ -24,6 +25,9 @@ const docErrors = copy.miLegajo.documentos.errors;
 const noAutorizado: ActionResult<never> = { ok: false, error: copy.cuentas.errors.noAutorizado };
 
 const conPerfil = z.object({ profileId: z.uuid() });
+// Group E: no key besides the employee and group E's own fields, at either
+// level, checked before any read or write (AUDCR5-01).
+const datosLaboralesEntrada = z.strictObject({ profileId: z.uuid(), valores: clavesLaboralesSchema });
 
 function revalidar(profileId: string) {
   revalidatePath("/legajos");
@@ -69,9 +73,10 @@ export async function actualizarDatosLaborales(input: unknown): Promise<ActionRe
   const found = await destino(input);
   if (!found) return noAutorizado;
   if (found === "invalido") return { ok: false, error: copy.aprobaciones.errors.guardarFallo };
+  const entrada = datosLaboralesEntrada.safeParse(input);
+  if (!entrada.success) return { ok: false, error: copy.aprobaciones.errors.guardarFallo };
 
-  const valores = (input as { valores?: unknown }).valores;
-  const result = await aplicarDatosLaborales(await createClient(), found.profileId, valores);
+  const result = await aplicarDatosLaborales(await createClient(), found.profileId, entrada.data.valores);
   if (!result.ok) return result;
   revalidar(found.profileId);
   return { ok: true };

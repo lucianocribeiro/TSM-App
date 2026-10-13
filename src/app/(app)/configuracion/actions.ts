@@ -28,11 +28,13 @@ const CONFIGURACION_PATH = "/configuracion";
 const id = z.uuid();
 const version = z.number().int().positive();
 
-const agregarInput = z.object({ lista: z.enum(LISTAS), areaId: z.uuid().nullish(), nombre: z.string() });
-const renombrarInput = z.object({ id, version, nombre: z.string() });
-const itemInput = z.object({ id, version });
-const moverInput = z.object({ id, version, direccion: z.enum(["arriba", "abajo"]) });
-const sucursalDefectoInput = z.object({ id, version, sucursalId: z.uuid().nullable() });
+// Strict: an unknown property (even one set to undefined) is refused before
+// anything is read or written (AUDCR5-01).
+const agregarInput = z.strictObject({ lista: z.enum(LISTAS), areaId: z.uuid().nullish(), nombre: z.string() });
+const renombrarInput = z.strictObject({ id, version, nombre: z.string() });
+const itemInput = z.strictObject({ id, version });
+const moverInput = z.strictObject({ id, version, direccion: z.enum(["arriba", "abajo"]) });
+const sucursalDefectoInput = z.strictObject({ id, version, sucursalId: z.uuid().nullable() });
 
 async function run<S extends z.ZodType>(
   schema: S,
