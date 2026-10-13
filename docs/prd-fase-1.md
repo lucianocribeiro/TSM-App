@@ -1,6 +1,6 @@
 # PRD Fase 1 — Legajo del Empleado
-Version: 0.13 (draft) | Governed by: `docs/constitucion.md`
-Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation. v0.10 — Configuración (section 8, client change request CR-1): Admin-maintained lists (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) with add, rename, reorder, deactivate, reactivate and delete-if-never-used, a change history and initial values; Configuración in the menu. The legajo fields keep their current form until CR-2. v0.11 — Datos laborales from the Configuración lists (client change request CR-2): Área, Puesto (within the Área), Sucursal (was Sede), Tarea (replaces Modalidad), Convenio and Categoría (new) are list items; Bruto mensual and Modalidad are removed with their data; group E is Admin only, also in the database, and the Empleado no longer sees it (US-3, US-4, 5.5 to 5.7, section 8). v0.12 — Alta de AFIP document (client change request CR-3): an optional document type that only an Admin uploads, replaces and deletes, approved at once and never in the approvals inbox or the bell; the employee sees and downloads their own current one, never its replaced history, and cannot upload, replace or delete it, also in the database (scope item 6, US-3, US-4, US-7, 5.6). v0.13 — Exportación a Excel (client change request CR-4, section 9): an Admin exports the employees the Legajos list shows, with the fields they choose (groups A to E, children as a second sheet), built on the server and never stored, every export logged and listed in Historial de exportaciones; an Admin's own Mi Legajo shows their group E read only, with a link to edit it in Legajos (US-3, US-4); the export request has an exact shape (any other property is refused) and a size limit: a file too large to return is not sent, is logged as failed and the Admin is told to choose less (9.1).
+Version: 0.14 (draft) | Governed by: `docs/constitucion.md`
+Change log: v0.5 — CUIL accepts only the prefixes 20, 23, 24 and 27 (5.7). v0.6 — The Fase 1 KPI cards of the Legajos list are defined (US-4); Activos counts only estado laboral Activo or En prueba, so legajos without estado laboral are excluded. v0.7 — Approvals inbox and bell (US-7), Admin replacement modes and replaced history (US-4), and the pending-request lock enforced in the database (5.6). v0.8 — Session rules (US-11): route classes with default deny, the order of access checks, safe return after sign-in, and the 15-minute inactivity limit with its warning, multi-tab behavior and server-side enforcement, signed with a dedicated server secret (fail closed without it); a pending forced password change blocks every action except changing the password and signing out; while it is pending, only loading the change page or completing the change keeps the session alive; the inactivity warning closes only through its buttons; Aprobaciones in the menu. v0.9 — Account state at the database (US-2, US-8, US-11): an inactive account is refused by the database even with an unexpired session, except reading its own profile; a pending forced password change is enforced by the app only, by design; RLS tests cover both states and every denied operation. v0.10 — Configuración (section 8, client change request CR-1): Admin-maintained lists (Área, Puesto, Sucursal, Convenio, Tarea, Categoría) with add, rename, reorder, deactivate, reactivate and delete-if-never-used, a change history and initial values; Configuración in the menu. The legajo fields keep their current form until CR-2. v0.11 — Datos laborales from the Configuración lists (client change request CR-2): Área, Puesto (within the Área), Sucursal (was Sede), Tarea (replaces Modalidad), Convenio and Categoría (new) are list items; Bruto mensual and Modalidad are removed with their data; group E is Admin only, also in the database, and the Empleado no longer sees it (US-3, US-4, 5.5 to 5.7, section 8). v0.12 — Alta de AFIP document (client change request CR-3): an optional document type that only an Admin uploads, replaces and deletes, approved at once and never in the approvals inbox or the bell; the employee sees and downloads their own current one, never its replaced history, and cannot upload, replace or delete it, also in the database (scope item 6, US-3, US-4, US-7, 5.6). v0.13 — Exportación a Excel (client change request CR-4, section 9): an Admin exports the employees the Legajos list shows, with the fields they choose (groups A to E, children as a second sheet), built on the server and never stored, every export logged and listed in Historial de exportaciones; an Admin's own Mi Legajo shows their group E read only, with a link to edit it in Legajos (US-3, US-4); the export request has an exact shape (any other property is refused) and a size limit: a file too large to return is not sent, is logged as failed and the Admin is told to choose less (9.1). v0.14 — Datos laborales rules (client change request CR-5): Convenio is required (the seventh required field of group E) and comes before Tarea and Categoría in the form, the read views and the export; the Convenio list has a system item "No" that cannot be renamed, deactivated or deleted, and with it Tarea and Categoría do not apply (disabled and empty, read "No aplica", empty in the export); each Puesto can have a Sucursal por defecto in Configuración, which fills in the Sucursal when the Admin picks that Puesto in a legajo (still editable). Existing legajos are not migrated: they are completed on their next save (US-4, 5.5, 5.7, 8, 9.1).
 
 ## 1. Objective
 Deliver the Legajo module plus the auth, roles and data-isolation foundation that Fases 2 and 3 rely on, deployed to production.
@@ -46,7 +46,7 @@ As an Empleado, I see my legajo and submit changes to my personal data (groups A
 
 ### US-4 Legajos (Admin)
 As Admin, I see the list of employees and open any legajo.
-- I can edit all legajo data (groups A to E); my changes apply directly, with no approval step. Group E is a form of dropdowns from Configuración (section 8): Área, Puesto (only the Puestos of the chosen Área; changing the Área clears the Puesto), Sucursal, Tarea, Convenio and Categoría offer the active items in Configuración order. A value the legajo already has that is inactive now stays selected, marked "(inactivo)", and is not offered to other legajos. Required fields are marked, and an incomplete save is refused with an error per field. My own group E is edited here too; my own Mi Legajo shows it read only, with a link "Editar en Legajos" to my legajo here.
+- I can edit all legajo data (groups A to E); my changes apply directly, with no approval step. Group E is a form of dropdowns from Configuración (section 8): Área, Puesto (only the Puestos of the chosen Área; changing the Área clears the Puesto), Sucursal, Convenio, Tarea and Categoría offer the active items in Configuración order. Picking a Puesto that has an active Sucursal por defecto (8.2) fills in the Sucursal with it, and I can still change it; opening a legajo never changes its values. Choosing Convenio "No" disables and clears Tarea and Categoría, with a note that they do not apply; any other convenio enables them. A value the legajo already has that is inactive now stays selected, marked "(inactivo)", and is not offered to other legajos. Required fields are marked, and an incomplete save is refused with an error per field. My own group E is edited here too; my own Mi Legajo shows it read only, with a link "Editar en Legajos" to my legajo here.
 - I review pending changes and document uploads from employees and approve or reject them (detail in US-7).
 - I can upload, replace, delete and download documents for any employee; files go to a private bucket. This includes the Alta de AFIP (optional), which only an Admin manages, my own included.
 - Replacing a current document asks how: **Conservar historial** keeps the previous document as replaced, or **Reemplazar definitivamente** deletes it and its file for good, after an explicit confirmation. While the employee has a pending document of that type, I cannot upload or replace that type; it is decided in the approvals inbox first.
@@ -171,10 +171,14 @@ Admin only (5.6). The list fields take an item of the Configuración list of the
 - Antigüedad — calculated from Fecha de ingreso, not stored
 - Estado laboral* — options: Activo, En prueba ("En licencia" is added with the Licencias module in Fase 3)
   Estado laboral describes the employment situation and is independent of Estado de la cuenta (US-8), which controls access to the portal.
-- Sucursal* — list Sucursal (was "Sede")
-- Tarea — list Tarea (replaces "Modalidad")
-- Convenio — list Convenio
-- Categoría — list Categoría
+- Sucursal* — list Sucursal (was "Sede"); filled in with the Puesto's Sucursal por defecto when the Admin picks the Puesto (8.2), and editable
+- Convenio* — list Convenio, which includes the system item "No" (sin convenio)
+- Tarea — list Tarea (replaces "Modalidad"); does not apply with Convenio "No"
+- Categoría — list Categoría; does not apply with Convenio "No"
+
+Field order in the form, the read views (Legajos and an Admin's own Mi Legajo) and the export: Número de legajo, Área, Puesto, Fecha de ingreso, Antigüedad (read views and export), Estado laboral, Sucursal, Convenio, Tarea, Categoría. With Convenio "No", Tarea and Categoría are disabled and empty in the form, read "No aplica" in the read views, and are empty in the export.
+
+Convenio became required, and the "No" rule was added, in CR-5. Legajos saved before were not migrated: one without Convenio, or with "No" and a Tarea or Categoría, keeps its values until its group E is next saved, when the save asks the Admin to complete or correct them in the same form.
 
 Bruto mensual and Modalidad were removed in CR-2, with their data. Values stored as free text before CR-2 were matched to the list items by name (ignoring case, accents and spaces; a Puesto within its matched Área); values without a match were left empty, to be completed the next time the Admin saves group E.
 
@@ -198,7 +202,8 @@ Group E is stored apart from groups A to D and only an active Admin reads or wri
 - Email personal: valid email format.
 - Teléfonos (celular and emergency): 8 to 20 characters, digits plus optional spaces, hyphens, parentheses and a leading `+`. No country-specific format enforced.
 - Grupo sanguíneo: free text.
-- Área, Puesto, Sucursal, Tarea, Convenio, Categoría: dropdowns of Configuración (section 8). The value must be an item of that list (a Puesto of the selected Área); a newly chosen item must be active (a Puesto, of an active Área); the item a legajo already has stays valid if it was deactivated since. Checked by the server with the same rules as the form, and by the database.
+- Área, Puesto, Sucursal, Convenio, Tarea, Categoría: dropdowns of Configuración (section 8). The value must be an item of that list (a Puesto of the selected Área); a newly chosen item must be active (a Puesto, of an active Área); the item a legajo already has stays valid if it was deactivated since. Checked by the server with the same rules as the form, and by the database.
+- Convenio "No": Tarea and Categoría must be empty. Any other convenio leaves them optional. Checked by the server (whatever the form sent) and by the database.
 - Fecha de nacimiento and Fecha de ingreso: valid dates, not in the future.
 
 ## 6. Open decisions
@@ -221,7 +226,7 @@ Group E is stored apart from groups A to D and only an active Admin reads or wri
 Client change request CR-1. A menu section for Admin only, numbered like the other entries, to maintain the lists the legajo uses. This section defines the lists and their rules; the legajo fields that use them are in 5.5 (CR-2).
 
 ### 8.1 Lists
-Área, Puesto, Sucursal, Convenio, Tarea and Categoría. Each Puesto belongs to one Área. Only an active Admin can read or change the lists (database and server guards); an Empleado never reaches them.
+Área, Puesto, Sucursal, Convenio, Tarea and Categoría. Each Puesto belongs to one Área, and can have a Sucursal por defecto (8.2). Only an active Admin can read or change the lists (database and server guards); an Empleado never reaches them.
 
 ### 8.2 Rules
 - The Admin can add, rename, reorder, deactivate and reactivate items, and delete an item that was never used.
@@ -232,9 +237,11 @@ Client change request CR-1. A menu section for Admin only, numbered like the oth
 - Deactivate: the item no longer appears for new selections; records that already have it keep it. Deactivating an Área hides its Puestos from new selections too, without changing their own state; reactivating the Área shows them again. Deactivation asks for confirmation.
 - Delete: only for an item not in use, and it asks for confirmation. An item in use (an Área with Puestos, or any item a legajo references) is refused by the database with a message suggesting deactivation, and the screen does not offer it. Once no legajo uses it any more, it can be deleted.
 - A change made from a stale screen (another Admin changed the item in between) is refused with a message, and the list reloads.
+- Sucursal por defecto (CR-5): each Puesto may name one Sucursal, chosen among the active ones (or none); the Puesto list shows it, an inactive one marked "(inactiva)". It is prefilled in a legajo only while that Sucursal is active. A Sucursal used as a default is in use: it cannot be deleted (it can be deactivated).
+- System item (CR-5): the Convenio "No" is created by the system and marked "Sistema". It can be reordered, but not renamed, deactivated or deleted; the database refuses it for every caller. There is only one.
 
 ### 8.3 History
-Every change (add, rename, reorder, deactivate, reactivate, delete) is recorded by the database with date, user, list, item, action, and the value before and after (names, positions or state). Admin only, read only; nobody can write or change it from the app. The Historial view lists the changes newest first, with the date in Argentina time. The values loaded initially are not recorded as changes. An Admin named in this history cannot be purged (US-8).
+Every change (add, rename, reorder, deactivate, reactivate, delete, and a Puesto's Sucursal por defecto) is recorded by the database with date, user, list, item, action, and the value before and after (names, positions, state, or the Sucursal por defecto by name). Admin only, read only; nobody can write or change it from the app. The Historial view lists the changes newest first, with the date in Argentina time. The values loaded initially are not recorded as changes. An Admin named in this history cannot be purged (US-8).
 
 ### 8.4 Initial values
 In this order:
@@ -247,7 +254,7 @@ In this order:
 | Puesto — Logística | Depósito, Distribución |
 | Puesto — Gerencia | Gerencia |
 | Sucursal | Casa Central, San Martín, Pacheco, San Justo |
-| Convenio | Comercio |
+| Convenio | Comercio, No (system item, CR-5) |
 | Tarea | Administrativo, Ventas, Maestranza y Servicios, Cajero |
 | Categoría | A, B, C, D, E, F |
 
@@ -263,7 +270,7 @@ Client change request CR-4. Admin only.
 - File `legajos-AAAA-MM-DD-HHmm.xlsx` (Argentina time):
   - Sheet "Legajos": one row per employee, the chosen fields in group order, headers with the screens' labels (bold, frozen), reasonable column widths.
   - Sheet "Hijos", when chosen: one row per child, with the employee's número de legajo, apellido and nombres.
-  - Área, Puesto, Sucursal, Tarea, Convenio and Categoría by name (an inactive item by its name); dates as date cells shown DD/MM/AAAA; CUIL as XX-XXXXXXXX-X; antigüedad calculated on the export day.
+  - Área, Puesto, Sucursal, Convenio, Tarea and Categoría by name (an inactive item by its name; with Convenio "No", Tarea and Categoría empty); dates as date cells shown DD/MM/AAAA; CUIL as XX-XXXXXXXX-X; antigüedad calculated on the export day.
   - Text that a spreadsheet would read as a formula (starting with =, +, -, @, tab or carriage return) is written as text with a leading apostrophe, never evaluated.
 
 ### 9.2 Export log
