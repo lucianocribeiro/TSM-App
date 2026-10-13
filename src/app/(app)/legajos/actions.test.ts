@@ -230,6 +230,24 @@ describe("pending change request lock", () => {
     expect(state.queries.some((q) => q.table === "legajos_laborales")).toBe(false);
   });
 
+  it("refuses an extra key at the root or in valores, even undefined, before any read or write (AUDCR5-01)", async () => {
+    state.resolve = laborales({ data: { legajo_id: "legajo-1" }, error: null });
+    for (const input of [
+      { profileId: EMPLEADO, valores: LABORALES, extra: 1 },
+      { profileId: EMPLEADO, valores: LABORALES, extra: undefined },
+      { profileId: EMPLEADO, valores: { ...LABORALES, bruto_mensual: 1 } },
+      { profileId: EMPLEADO, valores: { ...LABORALES, legajo_id: undefined } },
+    ]) {
+      expect(await actions.actualizarDatosLaborales(input), JSON.stringify(Object.keys(input))).toEqual({
+        ok: false,
+        error: copy.aprobaciones.errors.guardarFallo,
+      });
+    }
+    expect(state.queries).toEqual([]);
+    // Without them, as before.
+    expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({ ok: true });
+  });
+
   it("saves the No convenio without Tarea and Categoría, and Comercio with a Tarea", async () => {
     state.resolve = laborales({ data: { legajo_id: "legajo-1" }, error: null });
     expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: { ...LABORALES, convenio_id: SIN_CONVENIO } })).toEqual({ ok: true });

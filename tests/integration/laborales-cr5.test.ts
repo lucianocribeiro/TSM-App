@@ -183,6 +183,22 @@ describe("datos laborales rules (CR-5)", () => {
       ]);
     });
 
+    it("refuses an extra key, even one set to undefined, with no version bump and no history row (AUDCR5-01)", async () => {
+      const area = await nuevoItem("area", "Estricto");
+      const puesto = await nuevoItem("puesto", "Estricto", area.id);
+      const sucursal = await nuevoItem("sucursal", "Estricta");
+      const valido = { id: puesto.id, version: puesto.version, sucursalId: sucursal.id };
+      for (const extra of [{ extra: 1 }, { extra: undefined }, { version_nueva: 9 }]) {
+        expect(await configuracion.asignarSucursalDefecto({ ...valido, ...extra }), Object.keys(extra)[0]).toEqual(fallo(errors.accionFallo));
+      }
+      expect(await fila(puesto.id)).toEqual(puesto);
+      expect(await eventos(puesto.id)).toEqual([]);
+      // The same input without the extra key is applied as before.
+      expect(await configuracion.asignarSucursalDefecto(valido)).toEqual({ ok: true });
+      expect(await fila(puesto.id)).toMatchObject({ sucursal_defecto_id: sucursal.id, version: puesto.version + 1 });
+      expect(await eventos(puesto.id)).toHaveLength(1);
+    });
+
     it("is for a Puesto only, and names a Sucursal only", async () => {
       const norte = await nuevoItem("sucursal", "Solo puesto");
       const tarea = await nuevoItem("tarea", "No es puesto");

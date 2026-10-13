@@ -98,6 +98,25 @@ describe.each(CASOS)("%s", (_nombre, action, input) => {
   });
 });
 
+// AUDCR5-01: an unknown root key is refused like any wrong shape, before
+// the database is reached; the same input without it goes on.
+describe.each(CASOS)("%s with an extra key", (_nombre, action, input) => {
+  it("is refused before any read or write, even when the key is undefined", async () => {
+    for (const extra of [{ extra: 1 }, { extra: undefined }, { sucursal_defecto_id: SUCURSAL }]) {
+      await expect(action({ ...input, ...extra }), JSON.stringify(Object.keys(extra))).resolves.toEqual(fallo(errors.accionFallo));
+    }
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.queries).toEqual([]);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("without it, reaches the database", async () => {
+    await action(input);
+    expect(mocks.createClient).toHaveBeenCalled();
+  });
+});
+
 describe("agregarItem", () => {
   it("validates the name against its list before writing, and stores it normalized", async () => {
     mocks.resolve = (_table, ops) => (tiene(ops, "insert") ? { data: null, error: null } : { data: [{ id: ID, nombre: "Casa Central" }], error: null });

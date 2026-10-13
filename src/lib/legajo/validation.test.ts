@@ -272,8 +272,11 @@ describe("datosLaboralesSchema (group E)", () => {
     }
   });
 
-  it("has no bruto mensual or modalidad any more", () => {
-    const result = datosLaboralesSchema.safeParse({ ...validLaboral(), bruto_mensual: 1, modalidad: "Presencial", sede: "X" });
+  it("has no bruto mensual or modalidad any more, and refuses any key outside group E (AUDCR5-01)", () => {
+    for (const extra of [{ bruto_mensual: 1 }, { modalidad: "Presencial" }, { sede: "X" }, { legajo_id: undefined }]) {
+      expect(datosLaboralesSchema.safeParse({ ...validLaboral(), ...extra }).success, Object.keys(extra)[0]).toBe(false);
+    }
+    const result = datosLaboralesSchema.safeParse(validLaboral());
     expect(result.success && Object.keys(result.data).sort()).toEqual(
       ["area_id", "categoria_id", "convenio_id", "estado_laboral", "fecha_ingreso", "numero_legajo", "puesto_id", "sucursal_id", "tarea_id"],
     );
