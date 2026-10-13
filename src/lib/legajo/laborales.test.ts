@@ -3,6 +3,11 @@ import type { CatalogoItem, CatalogoLista } from "@/lib/configuracion/listas";
 import { copy } from "@/lib/copy/es-AR";
 import { copyLaborales } from "@/lib/copy/laborales";
 import {
+  bloqueadoSinConvenio,
+  cambiarCampoLaboral,
+  CAMPOS_LABORALES,
+  CAMPOS_OBLIGATORIOS,
+  datosLaboralesVista,
   formLaboralInicial,
   nombreItem,
   opcionesCampo,
@@ -31,8 +36,15 @@ const central = item("sucursal", "Casa Central");
 const pacheco = item("sucursal", "Pacheco", { activo: false });
 const cajero = item("tarea", "Cajero");
 const comercio = item("convenio", "Comercio");
+const sinConvenio = item("convenio", "No", { sinConvenio: true });
 const categoriaA = item("categoria", "A");
-const ITEMS = [ventas, logistica, cerrada, mostrador, cajaVieja, deposito, huerfano, central, pacheco, cajero, comercio, categoriaA];
+const sanJusto = item("sucursal", "San Justo");
+// CR-5: Puestos with a Sucursal por defecto, active or inactive now.
+const mostradorSj = item("puesto", "Mostrador (SJ)", { areaId: ventas.id, sucursalDefectoId: sanJusto.id });
+const mostradorPa = item("puesto", "Mostrador (PA)", { areaId: ventas.id, sucursalDefectoId: pacheco.id });
+const ITEMS = [ventas, logistica, cerrada, mostrador, cajaVieja, deposito, huerfano, central, pacheco, cajero, comercio, sinConvenio, categoriaA];
+// With the CR-5 Puestos too.
+const ITEMS_CR5 = [...ITEMS, sanJusto, mostradorSj, mostradorPa];
 
 const completo: ActualLaboral = {
   numero_legajo: "L-1",
@@ -42,7 +54,7 @@ const completo: ActualLaboral = {
   estado_laboral: "activo",
   sucursal_id: central.id,
   tarea_id: cajero.id,
-  convenio_id: null,
+  convenio_id: comercio.id,
   categoria_id: categoriaA.id,
 };
 
@@ -51,7 +63,7 @@ const valores = (cambios: ActualLaboral = {}, base: ActualLaboral = completo) =>
 
 describe("group E form", () => {
   it("starts from the stored values, empty for nulls or a missing row", () => {
-    expect(formLaboralInicial(completo)).toMatchObject({ area_id: ventas.id, convenio_id: "" });
+    expect(formLaboralInicial({ ...completo, convenio_id: null })).toMatchObject({ area_id: ventas.id, convenio_id: "" });
     expect(formLaboralInicial(null)).toEqual({
       numero_legajo: "",
       area_id: "",
@@ -59,14 +71,70 @@ describe("group E form", () => {
       fecha_ingreso: "",
       estado_laboral: "",
       sucursal_id: "",
-      tarea_id: "",
       convenio_id: "",
+      tarea_id: "",
       categoria_id: "",
     });
   });
 
   it("sends an empty select as null", () => {
-    expect(valores({ tarea_id: null })).toMatchObject({ tarea_id: null, convenio_id: null, area_id: ventas.id });
+    expect(valores({ tarea_id: null, convenio_id: null })).toMatchObject({ tarea_id: null, convenio_id: null, area_id: ventas.id });
+  });
+
+  it("orders Convenio before Tarea and Categoría, and requires it (seven fields)", () => {
+    expect(CAMPOS_LABORALES.slice(-4)).toEqual(["sucursal_id", "convenio_id", "tarea_id", "categoria_id"]);
+    expect([...CAMPOS_OBLIGATORIOS]).toEqual([
+      "numero_legajo",
+      "area_id",
+      "puesto_id",
+      "fecha_ingreso",
+      "estado_laboral",
+      "sucursal_id",
+      "convenio_id",
+    ]);
+  });
+
+  it("does not change anything on load: an incomplete or pre-CR-5 legajo opens as stored", () => {
+    const viejo = { ...completo, puesto_id: mostradorSj.id, sucursal_id: central.id, convenio_id: sinConvenio.id };
+    expect(formLaboralInicial(viejo)).toMatchObject({ sucursal_id: central.id, tarea_id: cajero.id, categoria_id: categoriaA.id });
+    expect(formLaboralInicial({ ...completo, convenio_id: null }).convenio_id).toBe("");
+  });
+});
+
+describe("cambiarCampoLaboral (CR-5)", () => {
+  const form = formLaboralInicial(completo);
+
+  it("a new Área clears the Puesto", () => {
+    expect(cambiarCampoLaboral(form, "area_id", logistica.id, ITEMS_CR5)).toMatchObject({ area_id: logistica.id, puesto_id: "" });
+  });
+
+  it("a Puesto with an active Sucursal por defecto sets the Sucursal, which stays editable", () => {
+    const elegido = cambiarCampoLaboral(form, "puesto_id", mostradorSj.id, ITEMS_CR5);
+    expect(elegido).toMatchObject({ puesto_id: mostradorSj.id, sucursal_id: sanJusto.id });
+    expect(cambiarCampoLaboral(elegido, "sucursal_id", central.id, ITEMS_CR5)).toMatchObject({ puesto_id: mostradorSj.id, sucursal_id: central.id });
+  });
+
+  it("does not prefill with an inactive default, or without one", () => {
+    expect(cambiarCampoLaboral(form, "puesto_id", mostradorPa.id, ITEMS_CR5).sucursal_id).toBe(central.id);
+    const sinDefecto = cambiarCampoLaboral({ ...form, puesto_id: mostradorSj.id, sucursal_id: sanJusto.id }, "puesto_id", mostrador.id, ITEMS_CR5);
+    expect(sinDefecto.sucursal_id).toBe(sanJusto.id);
+  });
+
+  it("the same value again changes nothing", () => {
+    const actual = { ...form, puesto_id: mostradorSj.id };
+    expect(cambiarCampoLaboral(actual, "puesto_id", mostradorSj.id, ITEMS_CR5)).toBe(actual);
+  });
+
+  it("the No convenio clears and disables Tarea and Categoría; another convenio enables them", () => {
+    const sin = cambiarCampoLaboral(form, "convenio_id", sinConvenio.id, ITEMS_CR5);
+    expect(sin).toMatchObject({ convenio_id: sinConvenio.id, tarea_id: "", categoria_id: "" });
+    expect(bloqueadoSinConvenio(sin, "tarea_id", ITEMS_CR5)).toBe(true);
+    expect(bloqueadoSinConvenio(sin, "categoria_id", ITEMS_CR5)).toBe(true);
+    expect(bloqueadoSinConvenio(sin, "sucursal_id", ITEMS_CR5)).toBe(false);
+    const con = cambiarCampoLaboral(sin, "convenio_id", comercio.id, ITEMS_CR5);
+    expect(con).toMatchObject({ convenio_id: comercio.id, tarea_id: "", categoria_id: "" });
+    expect(bloqueadoSinConvenio(con, "tarea_id", ITEMS_CR5)).toBe(false);
+    expect(cambiarCampoLaboral(con, "tarea_id", cajero.id, ITEMS_CR5).tarea_id).toBe(cajero.id);
   });
 });
 
@@ -103,12 +171,12 @@ function formatInactivo(nombre: string) {
 }
 
 describe("validarDatosLaborales", () => {
-  it("accepts a complete group E with optional fields empty", () => {
+  it("accepts a complete group E with Tarea and Categoría empty", () => {
     const result = validarDatosLaborales(valores({ tarea_id: null, categoria_id: null }), ITEMS, null);
     expect(result.ok && result.datos).toMatchObject({ area_id: ventas.id, tarea_id: null, numero_legajo: "L-1" });
   });
 
-  it("requires número de legajo, Área, Puesto, fecha de ingreso, estado laboral and Sucursal", () => {
+  it("requires número de legajo, Área, Puesto, fecha de ingreso, estado laboral, Sucursal and Convenio", () => {
     const result = validarDatosLaborales(valores({}, {}), ITEMS, null);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -119,8 +187,22 @@ describe("validarDatosLaborales", () => {
         fecha_ingreso: v.required,
         estado_laboral: v.required,
         sucursal_id: v.required,
+        convenio_id: v.required,
       });
     }
+  });
+
+  it("refuses Tarea or Categoría with the No convenio; Comercio takes them or not", () => {
+    const conTarea = validarDatosLaborales(valores({ convenio_id: sinConvenio.id, categoria_id: null }), ITEMS, completo);
+    expect(!conTarea.ok && conTarea.fieldErrors).toEqual({ tarea_id: copyLaborales.errors.sinConvenio });
+    const ambas = validarDatosLaborales(valores({ convenio_id: sinConvenio.id }), ITEMS, completo);
+    expect(!ambas.ok && ambas.fieldErrors).toEqual({
+      tarea_id: copyLaborales.errors.sinConvenio,
+      categoria_id: copyLaborales.errors.sinConvenio,
+    });
+    expect(validarDatosLaborales(valores({ convenio_id: sinConvenio.id, tarea_id: null, categoria_id: null }), ITEMS, completo).ok).toBe(true);
+    expect(validarDatosLaborales(valores(), ITEMS, completo).ok).toBe(true);
+    expect(validarDatosLaborales(valores({ tarea_id: null, categoria_id: null }), ITEMS, completo).ok).toBe(true);
   });
 
   it("refuses an id from another list, or one that does not exist", () => {
@@ -156,5 +238,21 @@ describe("validarDatosLaborales", () => {
     // With no current values at all (a first save), nothing inactive is allowed.
     const primera = validarDatosLaborales(valores({ sucursal_id: pacheco.id }), ITEMS, null);
     expect(!primera.ok && primera.fieldErrors.sucursal_id).toBe(v.itemInactivo);
+  });
+});
+
+describe("datosLaboralesVista", () => {
+  it("lists Convenio before Tarea and Categoría", () => {
+    expect(datosLaboralesVista(completo, ITEMS).map((dato) => dato.key).slice(-4)).toEqual(["sucursal", "convenio", "tarea", "categoria"]);
+  });
+
+  it("shows No aplica for Tarea and Categoría with the No convenio, even if a pre-CR-5 value is stored", () => {
+    const vista = datosLaboralesVista({ ...completo, convenio_id: sinConvenio.id }, ITEMS);
+    const valor = (key: string) => vista.find((dato) => dato.key === key)?.value;
+    expect(valor("convenio")).toBe("No");
+    expect(valor("tarea")).toBe(copyLaborales.form.noAplica);
+    expect(valor("categoria")).toBe(copyLaborales.form.noAplica);
+    const comun = datosLaboralesVista(completo, ITEMS);
+    expect(comun.find((dato) => dato.key === "tarea")?.value).toBe("Cajero");
   });
 });

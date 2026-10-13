@@ -11,6 +11,8 @@ import { copy } from "@/lib/copy/es-AR";
 import { copyLaborales } from "@/lib/copy/laborales";
 import { formatCopy } from "@/lib/copy/format";
 import {
+  bloqueadoSinConvenio,
+  cambiarCampoLaboral,
   CAMPOS_LABORALES,
   CAMPOS_OBLIGATORIOS,
   esCampoLista,
@@ -36,8 +38,8 @@ const ETIQUETA: Record<CampoLaboral, keyof typeof copyLaborales.campos> = {
   fecha_ingreso: "fecha_ingreso",
   estado_laboral: "estado_laboral",
   sucursal_id: "sucursal",
-  tarea_id: "tarea",
   convenio_id: "convenio",
+  tarea_id: "tarea",
   categoria_id: "categoria",
 };
 
@@ -54,7 +56,8 @@ type GrupoLaboralPanelProps = {
 
 // Group E (PRD 5.5), Admin only, edited directly. The list fields are
 // dropdowns of Configuración; antigüedad is shown, calculated from the fecha
-// de ingreso, and never edited.
+// de ingreso, and never edited. Picking a Puesto prefills its Sucursal por
+// defecto; the "No" convenio disables and clears Tarea and Categoría (CR-5).
 export function GrupoLaboralPanel({ profileId, laborales, inicial, actual, items, onGuardado }: GrupoLaboralPanelProps) {
   const [editando, setEditando] = useState(false);
   const titleId = "grupo-E-title";
@@ -114,9 +117,8 @@ function LaboralForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // A new Área clears the Puesto: Puestos belong to one Área.
-  const set = (campo: CampoLaboral, value: string) =>
-    setForm((prev) => (campo === "area_id" && value !== prev.area_id ? { ...prev, area_id: value, puesto_id: "" } : { ...prev, [campo]: value }));
+  // The Admin's change, with its effects on other fields (cambiarCampoLaboral).
+  const set = (campo: CampoLaboral, value: string) => setForm((prev) => cambiarCampoLaboral(prev, campo, value, items));
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -166,15 +168,26 @@ function LaboralForm({
           }
           if (esCampoLista(campo)) {
             const sinArea = campo === "puesto_id" && !form.area_id;
-            return (
+            // With the "No" convenio, Tarea and Categoría are disabled once
+            // empty. A legajo saved before CR-5 may still have one: it stays
+            // editable so the Admin can empty it (the save refuses it).
+            const sinConvenio = bloqueadoSinConvenio(form, campo, items);
+            const select = (
               <Select
                 key={campo}
                 {...common}
                 placeholder={sinArea ? tl.elegirAreaPrimero : t.elegir}
-                disabled={sinArea}
+                disabled={sinArea || (sinConvenio && !form[campo])}
                 options={opcionesCampo(items, campo, { actual: actual?.[campo], areaId: form.area_id || null })}
                 onChange={(event) => set(campo, event.target.value)}
               />
+            );
+            if (!sinConvenio) return select;
+            return (
+              <div key={campo} className="flex flex-col gap-1">
+                {select}
+                <p className="text-[12.5px] italic text-ink-soft">{tl.sinConvenioNota}</p>
+              </div>
             );
           }
           if (campo === "fecha_ingreso") {
