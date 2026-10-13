@@ -557,11 +557,11 @@ describe("action boundary matrix (GAP-04)", () => {
     return resultado;
   }
 
-  it("covers exactly the inventory's actions (38), each with every applicable column or a reason", () => {
+  it("covers exactly the inventory's actions (39), each with every applicable column or a reason", () => {
     const claves = inventarioAcciones()
       .map((accion) => accion.clave)
       .sort();
-    expect(claves).toHaveLength(38);
+    expect(claves).toHaveLength(39);
     expect(Object.keys(CASOS).sort()).toEqual(claves);
     for (const [clave, caso] of Object.entries(CASOS)) {
       if (caso.clase !== "empleado" && caso.clase !== "admin") continue;
