@@ -7,7 +7,12 @@ import { armarLibro, celdaDe, celdaFecha, FORMATO_FECHA, hojaHijos, hojaLegajos,
 const ventas = item("area", "Ventas");
 const mostrador = item("puesto", "Mostrador", { areaId: ventas.id });
 const pacheco = item("sucursal", "Pacheco", { activo: false });
-const ITEMS = [ventas, mostrador, pacheco];
+// CR-5: the "No" convenio.
+const comercio = item("convenio", "Comercio");
+const sinConvenio = item("convenio", "No", { sinConvenio: true });
+const cajero = item("tarea", "Cajero");
+const categoriaA = item("categoria", "A");
+const ITEMS = [ventas, mostrador, pacheco, comercio, sinConvenio, cajero, categoriaA];
 const NOMBRES = new Map(ITEMS.map((i) => [i.id, i.nombre]));
 const HOY = "2026-10-11";
 
@@ -85,6 +90,27 @@ describe("row builder", () => {
       [copyLaborales.campos.numero_legajo, copy.aprobaciones.campos.apellido, copy.aprobaciones.campos.nombres, copy.miLegajo.hijos.nombre, copy.miLegajo.hijos.fecha],
       ["L-1", "Prueba", "Ana", "Abril", "2015-01-20"],
       ["L-1", "Prueba", "Ana", "Benjamín", "2018-04-02"],
+    ]);
+  });
+});
+
+describe("Convenio No (CR-5)", () => {
+  const con = (convenio_id: string) =>
+    exportable({ laboral: laboralRow({ convenio_id, tarea_id: cajero.id, categoria_id: categoriaA.id }) });
+
+  it("exports the convenio by name and leaves Tarea and Categoría empty with No, even if a value is stored", () => {
+    expect(celdaDe("convenio", con(sinConvenio.id), NOMBRES, HOY, sinConvenio.id)).toEqual({ value: "No", type: String });
+    expect(celdaDe("tarea", con(sinConvenio.id), NOMBRES, HOY, sinConvenio.id)).toBeNull();
+    expect(celdaDe("categoria", con(sinConvenio.id), NOMBRES, HOY, sinConvenio.id)).toBeNull();
+    expect(celdaDe("tarea", con(comercio.id), NOMBRES, HOY, sinConvenio.id)).toEqual({ value: "Cajero", type: String });
+    expect(celdaDe("categoria", con(comercio.id), NOMBRES, HOY, sinConvenio.id)).toEqual({ value: "A", type: String });
+  });
+
+  it("armarLibro finds the No convenio in the lists", () => {
+    const [hoja] = armarLibro([con(sinConvenio.id), con(comercio.id)], { campos: ["convenio", "tarea", "categoria"], hijos: false }, ITEMS, HOY);
+    expect(hoja.data.slice(1).map((fila) => fila.map((celda) => celda?.value ?? null))).toEqual([
+      ["No", null, null],
+      ["Comercio", "Cajero", "A"],
     ]);
   });
 });
