@@ -97,6 +97,8 @@ export async function aplicarGrupo(
 // HINTs of legajos_laborales_validar (CR-2).
 const LABORALES_INCOMPLETOS_HINT = "laborales_incompletos";
 const ITEM_INACTIVO_HINT = "item_inactivo";
+// CR-5: the "No" convenio with Tarea or Categoría.
+const SIN_CONVENIO_HINT = "sin_convenio";
 
 // Validates and writes group E (PRD 5.5) to legajos_laborales, against the
 // Configuración lists as they are now (validarDatosLaborales). Antigüedad is
@@ -125,6 +127,10 @@ export async function aplicarDatosLaborales(client: Client, profileId: string, v
   }
   if (error?.code === CHECK_VIOLATION && error.hint === ITEM_INACTIVO_HINT) {
     return { ok: false, error: copy.legajo.validation.itemInactivo };
+  }
+  if (error?.code === CHECK_VIOLATION && error.hint === SIN_CONVENIO_HINT) {
+    const mensaje = copyLaborales.errors.sinConvenio;
+    return { ok: false, error: copy.miLegajo.errors.revisarCampos, fieldErrors: { tarea_id: mensaje, categoria_id: mensaje } };
   }
   if (error?.code === CHECK_VIOLATION && error.hint === LABORALES_INCOMPLETOS_HINT) {
     return { ok: false, error: copy.miLegajo.errors.revisarCampos };

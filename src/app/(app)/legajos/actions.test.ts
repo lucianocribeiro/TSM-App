@@ -115,10 +115,20 @@ const GRUPO_B = {
 const AREA = "66666666-6666-4666-8666-666666666666";
 const PUESTO = "77777777-7777-4777-8777-777777777777";
 const SUCURSAL = "88888888-8888-4888-8888-888888888888";
+// CR-5: Convenio is required; "No" (sin_convenio) leaves Tarea and Categoría empty.
+const COMERCIO = "99999999-9999-4999-8999-999999999991";
+const SIN_CONVENIO = "99999999-9999-4999-8999-999999999992";
+const TAREA = "99999999-9999-4999-8999-999999999993";
+const fila = (id: string, lista: string, nombre: string, extra: Record<string, unknown> = {}) => ({
+  id, lista, nombre, area_id: null, posicion: 1, activo: true, version: 1, sin_convenio: false, sucursal_defecto_id: null, ...extra,
+});
 const CATALOGO = [
-  { id: AREA, lista: "area", nombre: "Ventas", area_id: null, posicion: 1, activo: true, version: 1 },
-  { id: PUESTO, lista: "puesto", nombre: "Mostrador", area_id: AREA, posicion: 1, activo: true, version: 1 },
-  { id: SUCURSAL, lista: "sucursal", nombre: "Casa Central", area_id: null, posicion: 1, activo: true, version: 1 },
+  fila(AREA, "area", "Ventas"),
+  fila(PUESTO, "puesto", "Mostrador", { area_id: AREA }),
+  fila(SUCURSAL, "sucursal", "Casa Central"),
+  fila(COMERCIO, "convenio", "Comercio"),
+  fila(SIN_CONVENIO, "convenio", "No", { posicion: 2, sin_convenio: true }),
+  fila(TAREA, "tarea", "Cajero"),
 ];
 const LABORALES = {
   numero_legajo: "L-1",
@@ -128,7 +138,7 @@ const LABORALES = {
   estado_laboral: "activo",
   sucursal_id: SUCURSAL,
   tarea_id: null,
-  convenio_id: null,
+  convenio_id: COMERCIO,
   categoria_id: null,
 };
 // The legajo with its (empty) group E row, and the lists; the write answers
@@ -209,7 +219,39 @@ describe("pending change request lock", () => {
     expect(incompleto).toMatchObject({ ok: false, fieldErrors: { sucursal_id: copy.legajo.validation.required } });
     const otraLista = await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: { ...LABORALES, sucursal_id: AREA } });
     expect(otraLista).toMatchObject({ ok: false, fieldErrors: { sucursal_id: copy.legajo.validation.optionInvalid } });
+    const sinConvenio = await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: { ...LABORALES, convenio_id: null } });
+    expect(sinConvenio).toMatchObject({ ok: false, fieldErrors: { convenio_id: copy.legajo.validation.required } });
+    // The "No" convenio with a Tarea, whatever the form disabled (CR-5).
+    const noConTarea = await actions.actualizarDatosLaborales({
+      profileId: EMPLEADO,
+      valores: { ...LABORALES, convenio_id: SIN_CONVENIO, tarea_id: TAREA },
+    });
+    expect(noConTarea).toMatchObject({ ok: false, fieldErrors: { tarea_id: copyLaborales.errors.sinConvenio } });
     expect(state.queries.some((q) => q.table === "legajos_laborales")).toBe(false);
+  });
+
+  it("refuses an extra key at the root or in valores, even undefined, before any read or write (AUDCR5-01)", async () => {
+    state.resolve = laborales({ data: { legajo_id: "legajo-1" }, error: null });
+    for (const input of [
+      { profileId: EMPLEADO, valores: LABORALES, extra: 1 },
+      { profileId: EMPLEADO, valores: LABORALES, extra: undefined },
+      { profileId: EMPLEADO, valores: { ...LABORALES, bruto_mensual: 1 } },
+      { profileId: EMPLEADO, valores: { ...LABORALES, legajo_id: undefined } },
+    ]) {
+      expect(await actions.actualizarDatosLaborales(input), JSON.stringify(Object.keys(input))).toEqual({
+        ok: false,
+        error: copy.aprobaciones.errors.guardarFallo,
+      });
+    }
+    expect(state.queries).toEqual([]);
+    // Without them, as before.
+    expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({ ok: true });
+  });
+
+  it("saves the No convenio without Tarea and Categoría, and Comercio with a Tarea", async () => {
+    state.resolve = laborales({ data: { legajo_id: "legajo-1" }, error: null });
+    expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: { ...LABORALES, convenio_id: SIN_CONVENIO } })).toEqual({ ok: true });
+    expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: { ...LABORALES, tarea_id: TAREA } })).toEqual({ ok: true });
   });
 
   it("maps the database refusals of an item made inactive meanwhile, or an incomplete row", async () => {
@@ -222,6 +264,12 @@ describe("pending change request lock", () => {
     expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({
       ok: false,
       error: copy.miLegajo.errors.revisarCampos,
+    });
+    state.resolve = laborales({ data: null, error: { code: "23514", hint: "sin_convenio", message: "x" } });
+    expect(await actions.actualizarDatosLaborales({ profileId: EMPLEADO, valores: LABORALES })).toEqual({
+      ok: false,
+      error: copy.miLegajo.errors.revisarCampos,
+      fieldErrors: { tarea_id: copyLaborales.errors.sinConvenio, categoria_id: copyLaborales.errors.sinConvenio },
     });
   });
 

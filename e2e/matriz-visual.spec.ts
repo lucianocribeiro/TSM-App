@@ -1,10 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
+import { formatCopy } from "../src/lib/copy/format";
 import { THEME_COOKIE, type Theme } from "../src/lib/theme/theme";
 import { adminNuevo, altaAfipCargada, empleadoCompleto, registro, solicitudPendiente } from "./datos";
 import { fillLogin, loginAs } from "./helpers";
 import { assertNoSecretOnPage } from "./secrets";
-import { createE2EUser, fillLaboral, localServiceClient } from "./service";
+import { createE2EUser, fillLaboral, itemIdE2E, localServiceClient } from "./service";
 
 // F1-11B, GAP-08 (partial): the main screens in light and dark, at desktop
 // (1280px) and mobile (390px) widths. Screenshots go to VISUAL_DIR, uploaded
@@ -29,7 +31,14 @@ const FONDO: Record<Theme, { token: string; body: string }> = {
 };
 
 const cuentas = registro();
-test.afterAll(cuentas.limpiar);
+// CR-5: the Área and Puesto created for the Sucursal por defecto screen.
+const MARCA = `Visual CR5 ${randomUUID().slice(0, 8)}`;
+test.afterAll(async () => {
+  await cuentas.limpiar();
+  const service = localServiceClient();
+  await service.from("catalogo_items").delete().like("nombre", `${MARCA}%`).eq("lista", "puesto");
+  await service.from("catalogo_items").delete().like("nombre", `${MARCA}%`);
+});
 
 function baseURL(): string {
   const url = test.info().project.use.baseURL;
@@ -150,6 +159,20 @@ const PANTALLAS: Pantalla[] = [
     },
     lista: (page) => page.getByTestId("grupo-E").getByRole("combobox", { name: /Puesto/ }),
   },
+  // CR-5: group E with Convenio "No": Tarea and Categoría disabled.
+  {
+    nombre: "legajo-detalle-sin-convenio",
+    abrir: async (page) => {
+      const emp = await empleadoCompleto("visual-sin-convenio", cuentas.add);
+      await fillLaboral(emp.id, { numero_legajo: `V5-${emp.id.slice(0, 8)}`, convenio: "No", tarea: null, categoria: null });
+      await loginAs(page, await adminNuevo("visual-sin-convenio-admin", cuentas.add));
+      await page.goto(`/legajos/${emp.id}`);
+    },
+    trasCargar: async (page) => {
+      await page.getByTestId("grupo-E").getByRole("button", { name: copy.miLegajo.editar }).click();
+    },
+    lista: (page) => page.getByTestId("grupo-E").getByRole("combobox", { name: /Tarea/ }),
+  },
   // CR-3: the documents with an Alta de AFIP, download only for the
   // employee, and among the Admin's documents in the legajo.
   {
@@ -253,6 +276,38 @@ const PANTALLAS: Pantalla[] = [
       await page.goto("/configuracion?lista=puesto");
     },
     lista: (page) => page.getByRole("heading", { level: 2, name: copy.configuracion.titulos.puesto }),
+  },
+  // CR-5: a Puesto with its Sucursal por defecto, and the Convenio list
+  // with the system item "No".
+  {
+    nombre: "configuracion-puesto-defecto",
+    abrir: async (page) => {
+      const service = localServiceClient();
+      const sufijo = randomUUID().slice(0, 8);
+      const { data: area } = await service.from("catalogo_items").insert({ lista: "area", nombre: `${MARCA} ${sufijo}` }).select("id").single();
+      const { error } = await service
+        .from("catalogo_items")
+        .insert({ lista: "puesto", area_id: area!.id, nombre: `${MARCA} Mostrador ${sufijo}` });
+      expect(error).toBeNull();
+      const { error: defecto } = await service
+        .from("catalogo_items")
+        .update({ sucursal_defecto_id: await itemIdE2E("sucursal", "San Justo") })
+        .eq("lista", "puesto")
+        .eq("area_id", area!.id);
+      expect(defecto).toBeNull();
+      await loginAs(page, await adminNuevo("visual-configuracion-defecto", cuentas.add));
+      await page.goto("/configuracion?lista=puesto");
+    },
+    lista: (page) =>
+      page.getByText(formatCopy(copy.configuracion.sucursalDefecto.valor, { nombre: "San Justo" }), { exact: true }).first(),
+  },
+  {
+    nombre: "configuracion-convenio",
+    abrir: async (page) => {
+      await loginAs(page, await adminNuevo("visual-configuracion-convenio", cuentas.add));
+      await page.goto("/configuracion?lista=convenio");
+    },
+    lista: (page) => page.getByText(copy.configuracion.sistema, { exact: true }),
   },
   {
     nombre: "configuracion-historial",

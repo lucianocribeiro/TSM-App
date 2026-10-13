@@ -17,8 +17,8 @@ const CAMPOS_E = [
   "antiguedad",
   "estado_laboral",
   "sucursal",
-  "tarea",
   "convenio",
+  "tarea",
   "categoria",
 ] as const satisfies readonly (keyof typeof copyLaborales.campos)[];
 

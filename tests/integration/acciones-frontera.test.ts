@@ -82,8 +82,8 @@ const LABORALES = {
   fecha_ingreso: "2020-03-01",
   estado_laboral: "activo",
   sucursal_id: "00000000-0000-4000-8000-0000000000a3",
+  convenio_id: "00000000-0000-4000-8000-0000000000a4",
   tarea_id: null,
-  convenio_id: null,
   categoria_id: null,
 };
 const SUBIDA = { tipo: "licencia_conducir", fileName: "a.pdf", mimeType: "application/pdf", sizeBytes: 10 };
@@ -464,6 +464,18 @@ const CASOS: Record<string, Caso> = {
     noAplica: { ajeno: CATALOGO },
     despues: catalogoSinCambios,
   },
+  // CR-5: a Puesto's Sucursal por defecto.
+  [`${C}asignarSucursalDefecto`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => configuracion.asignarSucursalDefecto({ ...itemFrontera, sucursalId: null }),
+    invalido: {
+      llamar: () => configuracion.asignarSucursalDefecto({ ...itemFrontera, sucursalId: "no-es-uuid" }),
+      esperado: fallo(configErrors.accionFallo),
+    },
+    noAplica: { ajeno: CATALOGO },
+    despues: catalogoSinCambios,
+  },
 
   // Session and the intentional exceptions (their own describe blocks).
   [`${S}mantenerSesion`]: { clase: "sesion", llamar: () => auth.mantenerSesion() },
@@ -545,11 +557,11 @@ describe("action boundary matrix (GAP-04)", () => {
     return resultado;
   }
 
-  it("covers exactly the inventory's actions (38), each with every applicable column or a reason", () => {
+  it("covers exactly the inventory's actions (39), each with every applicable column or a reason", () => {
     const claves = inventarioAcciones()
       .map((accion) => accion.clave)
       .sort();
-    expect(claves).toHaveLength(38);
+    expect(claves).toHaveLength(39);
     expect(Object.keys(CASOS).sort()).toEqual(claves);
     for (const [clave, caso] of Object.entries(CASOS)) {
       if (caso.clase !== "empleado" && caso.clase !== "admin") continue;

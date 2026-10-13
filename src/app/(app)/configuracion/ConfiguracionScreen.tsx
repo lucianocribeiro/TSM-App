@@ -14,10 +14,12 @@ import type { ActionResult } from "@/lib/action-result";
 import { mensajeNombre } from "@/lib/configuracion/errores";
 import {
   enUso,
+  esItemSistema,
   esLista,
   itemsDeGrupo,
   LISTAS,
   nombresDelGrupo,
+  opcionesDisponibles,
   vecinoDe,
   type CatalogoItem,
   type CatalogoLista,
@@ -26,11 +28,20 @@ import {
 import { NOMBRE_MAX, validarNombre } from "@/lib/configuracion/nombre";
 import { copy } from "@/lib/copy/es-AR";
 import { formatCopy } from "@/lib/copy/format";
-import { agregarItem, desactivarItem, eliminarItem, moverItem, reactivarItem, renombrarItem } from "./actions";
+import {
+  agregarItem,
+  asignarSucursalDefecto,
+  desactivarItem,
+  eliminarItem,
+  moverItem,
+  reactivarItem,
+  renombrarItem,
+} from "./actions";
 
 const t = copy.configuracion;
 
-type DialogState = { kind: "renombrar" | "desactivar" | "eliminar"; item: CatalogoItem } | null;
+type DialogKind = "renombrar" | "desactivar" | "eliminar" | "sucursal";
+type DialogState = { kind: DialogKind; item: CatalogoItem } | null;
 type Aviso = { ok: boolean; texto: string } | null;
 
 type ConfiguracionScreenProps = {
@@ -184,6 +195,22 @@ export function ConfiguracionScreen({ items, enUsoIds, listaFallo, listaInicial 
           }
         />
       ) : null}
+      {dialog?.kind === "sucursal" ? (
+        <SucursalDefectoDialog
+          key={dialog.item.id}
+          items={items}
+          item={dialog.item}
+          pending={pending}
+          onClose={() => setDialog(null)}
+          onGuardar={(sucursalId, alTerminar) =>
+            ejecutar(
+              () => asignarSucursalDefecto({ id: dialog.item.id, version: dialog.item.version, sucursalId }),
+              formatCopy(t.exito.sucursalDefecto, { nombre: dialog.item.nombre }),
+              alTerminar,
+            )
+          }
+        />
+      ) : null}
       {dialog?.kind === "desactivar" || dialog?.kind === "eliminar" ? (
         <ConfirmarDialog
           key={`${dialog.kind}-${dialog.item.id}`}
@@ -214,8 +241,17 @@ type AccionesItem = {
   pending: boolean;
   mover: (item: CatalogoItem, direccion: Direccion) => void;
   reactivar: (item: CatalogoItem) => void;
-  abrir: (kind: "renombrar" | "desactivar" | "eliminar", item: CatalogoItem) => void;
+  abrir: (kind: DialogKind, item: CatalogoItem) => void;
 };
+
+// A Puesto's Sucursal por defecto as the list shows it: its name, marked when
+// the Sucursal is inactive now (it is then not prefilled), or none.
+function textoSucursalDefecto(items: readonly CatalogoItem[], puesto: CatalogoItem): string {
+  const sucursal = puesto.sucursalDefectoId ? items.find((item) => item.id === puesto.sucursalDefectoId) : undefined;
+  if (!sucursal) return t.sucursalDefecto.ninguna;
+  const nombre = sucursal.activo ? sucursal.nombre : formatCopy(t.sucursalDefecto.inactiva, { nombre: sucursal.nombre });
+  return formatCopy(t.sucursalDefecto.valor, { nombre });
+}
 
 function ListaItems({
   items,
@@ -239,17 +275,33 @@ function ListaItems({
           data-testid="catalogo-item"
           className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line-soft py-3 last:border-b-0"
         >
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="break-words">{item.nombre}</span>
-            <StatusBadge label={item.activo ? t.estados.activo : t.estados.inactivo} tone={item.activo ? "active" : "secondary"} />
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="break-words">{item.nombre}</span>
+              <StatusBadge label={item.activo ? t.estados.activo : t.estados.inactivo} tone={item.activo ? "active" : "secondary"} />
+              {esItemSistema(item) ? <StatusBadge label={t.sistema} tone="secondary" /> : null}
+            </div>
+            {esItemSistema(item) ? <p className="text-[12.5px] italic text-ink-soft">{t.sistemaHint}</p> : null}
+            {item.lista === "puesto" ? (
+              <p data-testid="sucursal-defecto" className="text-[12.5px] italic text-ink-soft">
+                {textoSucursalDefecto(items, item)}
+              </p>
+            ) : null}
           </div>
           <div role="group" aria-label={formatCopy(t.acciones.grupo, { nombre: item.nombre })} className="flex flex-wrap gap-2">
             <BotonMover item={item} grupo={grupo} direccion="arriba" acciones={acciones} />
             <BotonMover item={item} grupo={grupo} direccion="abajo" acciones={acciones} />
-            <Button variant="secondary" disabled={acciones.pending} onClick={() => acciones.abrir("renombrar", item)}>
-              {t.acciones.renombrar}
-            </Button>
-            {item.activo ? (
+            {item.lista === "puesto" ? (
+              <Button variant="secondary" disabled={acciones.pending} onClick={() => acciones.abrir("sucursal", item)}>
+                {t.sucursalDefecto.accion}
+              </Button>
+            ) : null}
+            {esItemSistema(item) ? null : (
+              <Button variant="secondary" disabled={acciones.pending} onClick={() => acciones.abrir("renombrar", item)}>
+                {t.acciones.renombrar}
+              </Button>
+            )}
+            {esItemSistema(item) && item.activo ? null : item.activo ? (
               <Button variant="secondary" disabled={acciones.pending} onClick={() => acciones.abrir("desactivar", item)}>
                 {t.acciones.desactivar}
               </Button>
@@ -258,7 +310,7 @@ function ListaItems({
                 {t.acciones.reactivar}
               </Button>
             )}
-            {enUso(items, item, referenciados) ? null : (
+            {esItemSistema(item) || enUso(items, item, referenciados) ? null : (
               <Button variant="secondary" disabled={acciones.pending} onClick={() => acciones.abrir("eliminar", item)}>
                 {t.acciones.eliminar}
               </Button>
@@ -413,6 +465,66 @@ function RenombrarDialog({
           </Button>
           <Button type="submit" disabled={pending}>
             {pending ? t.renombrar.saving : t.renombrar.confirm}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+// A Puesto's Sucursal por defecto: the active Sucursales in order, plus the
+// current one when it is inactive now (marked), or none.
+function SucursalDefectoDialog({
+  items,
+  item,
+  pending,
+  onClose,
+  onGuardar,
+}: {
+  items: CatalogoItem[];
+  item: CatalogoItem;
+  pending: boolean;
+  onClose: () => void;
+  onGuardar: (sucursalId: string | null, alTerminar: (result: ActionResult) => void) => void;
+}) {
+  const actual = item.sucursalDefectoId ?? "";
+  const [valor, setValor] = useState(actual);
+  const [error, setError] = useState<string | null>(null);
+
+  const opciones = opcionesDisponibles(items, "sucursal").map((sucursal) => ({ value: sucursal.id, label: sucursal.nombre }));
+  const vigente = items.find((candidato) => candidato.id === actual && candidato.lista === "sucursal");
+  if (vigente && !opciones.some((opcion) => opcion.value === vigente.id)) {
+    opciones.push({ value: vigente.id, label: formatCopy(t.sucursalDefecto.inactiva, { nombre: vigente.nombre }) });
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    onGuardar(valor || null, (result) => {
+      if (result.ok) onClose();
+      else setError(result.error);
+    });
+  }
+
+  return (
+    <Dialog open onClose={onClose} title={formatCopy(t.sucursalDefecto.title, { nombre: item.nombre })}>
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <p className="text-ink-soft">{t.sucursalDefecto.hint}</p>
+        <Select
+          label={t.sucursalDefecto.label}
+          name="sucursalDefecto"
+          value={valor}
+          placeholder={t.sucursalDefecto.ninguna}
+          options={opciones}
+          onChange={(event) => setValor(event.target.value)}
+        />
+        <ErrorLine error={error} />
+        <div className="mt-2 flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t.acciones.cancelar}
+          </Button>
+          <Button type="submit" disabled={pending}>
+            {pending ? t.sucursalDefecto.saving : t.sucursalDefecto.confirm}
           </Button>
         </div>
       </form>

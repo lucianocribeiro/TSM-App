@@ -51,8 +51,8 @@ function validLaboral() {
     fecha_ingreso: "2021-09-15",
     estado_laboral: "activo",
     sucursal_id: "33333333-3333-4333-8333-333333333333",
+    convenio_id: "44444444-4444-4444-8444-444444444444",
     tarea_id: null as string | null,
-    convenio_id: null as string | null,
     categoria_id: null as string | null,
   };
 }
@@ -69,7 +69,7 @@ const REQUIRED_PERSONAL = [
   "emergencia_nombre", "emergencia_parentesco", "emergencia_domicilio", "emergencia_telefono",
 ] as const;
 
-const REQUIRED_LABORAL = ["numero_legajo", "area_id", "puesto_id", "fecha_ingreso", "estado_laboral", "sucursal_id"] as const;
+const REQUIRED_LABORAL = ["numero_legajo", "area_id", "puesto_id", "fecha_ingreso", "estado_laboral", "sucursal_id", "convenio_id"] as const;
 
 describe("legajoPersonalSchema (groups A to D)", () => {
   it("accepts a valid payload and normalizes optional text", () => {
@@ -247,10 +247,14 @@ describe("group schemas", () => {
 });
 
 describe("datosLaboralesSchema (group E)", () => {
-  it("accepts a valid payload; Tarea, Convenio and Categoría are optional", () => {
+  it("accepts a valid payload; Tarea and Categoría are optional, Convenio is required (CR-5)", () => {
     expect(datosLaboralesSchema.safeParse(validLaboral()).success).toBe(true);
-    const sinOpcionales = datosLaboralesSchema.safeParse({ ...validLaboral(), tarea_id: "", convenio_id: undefined });
-    expect(sinOpcionales.success && sinOpcionales.data).toMatchObject({ tarea_id: null, convenio_id: null, categoria_id: null });
+    const sinOpcionales = datosLaboralesSchema.safeParse({ ...validLaboral(), tarea_id: "", categoria_id: undefined });
+    expect(sinOpcionales.success && sinOpcionales.data).toMatchObject({ tarea_id: null, categoria_id: null });
+    for (const convenio_id of [null, "", undefined]) {
+      const result = datosLaboralesSchema.safeParse({ ...validLaboral(), convenio_id });
+      expect(issuesFor(result, "convenio_id"), String(convenio_id)).toContain(m.required);
+    }
   });
 
   it.each(REQUIRED_LABORAL)("fails when %s is missing", (field) => {
@@ -268,8 +272,11 @@ describe("datosLaboralesSchema (group E)", () => {
     }
   });
 
-  it("has no bruto mensual or modalidad any more", () => {
-    const result = datosLaboralesSchema.safeParse({ ...validLaboral(), bruto_mensual: 1, modalidad: "Presencial", sede: "X" });
+  it("has no bruto mensual or modalidad any more, and refuses any key outside group E (AUDCR5-01)", () => {
+    for (const extra of [{ bruto_mensual: 1 }, { modalidad: "Presencial" }, { sede: "X" }, { legajo_id: undefined }]) {
+      expect(datosLaboralesSchema.safeParse({ ...validLaboral(), ...extra }).success, Object.keys(extra)[0]).toBe(false);
+    }
+    const result = datosLaboralesSchema.safeParse(validLaboral());
     expect(result.success && Object.keys(result.data).sort()).toEqual(
       ["area_id", "categoria_id", "convenio_id", "estado_laboral", "fecha_ingreso", "numero_legajo", "puesto_id", "sucursal_id", "tarea_id"],
     );

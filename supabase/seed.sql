@@ -192,7 +192,8 @@ set
   emergencia_telefono = '1100000103'
 where profile_id = '00000000-0000-4000-a000-000000000003';
 
--- Group E (Admin only, CR-2): list items of Configuración, by name.
+-- Group E (Admin only, CR-2): list items of Configuración, by name. Every
+-- required field is filled, Convenio included since CR-5.
 update public.legajos_laborales as ll
 set
   numero_legajo = v.numero_legajo,
@@ -215,7 +216,7 @@ from public.legajos as l,
     ('00000000-0000-4000-a000-000000000002'::uuid, 'TEST-002', 'Ventas', 'Mostrador (SM)', '2021-09-15'::date,
       'activo'::public.estado_laboral, 'San Martín', 'Ventas', 'Comercio', 'B'),
     ('00000000-0000-4000-a000-000000000003'::uuid, 'TEST-003', 'Logística', 'Depósito', '2025-06-02'::date,
-      'en_prueba'::public.estado_laboral, 'Pacheco', 'Maestranza y Servicios', null, 'C')
+      'en_prueba'::public.estado_laboral, 'Pacheco', 'Maestranza y Servicios', 'Comercio', 'C')
   ) as v (profile_id, numero_legajo, area, puesto, fecha_ingreso, estado_laboral, sucursal, tarea, convenio, categoria)
 where l.profile_id = v.profile_id and ll.legajo_id = l.id;
 

@@ -14,8 +14,8 @@ export type CopyLaborales = {
     antiguedad: string;
     estado_laboral: string;
     sucursal: string;
-    tarea: string;
     convenio: string;
+    tarea: string;
     categoria: string;
   };
   estados: {
@@ -31,6 +31,10 @@ export type CopyLaborales = {
     inactivo: string;
     // The Puesto dropdown before an Área is chosen.
     elegirAreaPrimero: string;
+    // Tarea and Categoría with the "No" convenio (CR-5): the disabled
+    // fields' note, and the read view's value.
+    sinConvenioNota: string;
+    noAplica: string;
   };
   // The Legajos list.
   listado: {
@@ -52,6 +56,7 @@ export type CopyLaborales = {
   };
   errors: {
     numeroLegajoDuplicado: string;
+    sinConvenio: string;
   };
   // An Admin's own group E in Mi Legajo, read only (CR-4).
   propio: {
@@ -71,8 +76,8 @@ export const copyLaborales = {
     antiguedad: "Antigüedad",
     estado_laboral: "Estado laboral",
     sucursal: "Sucursal",
-    tarea: "Tarea",
     convenio: "Convenio",
+    tarea: "Tarea",
     categoria: "Categoría",
   },
   estados: {
@@ -85,6 +90,8 @@ export const copyLaborales = {
     obligatoriosNota: "Los datos marcados con * son obligatorios.",
     inactivo: "{nombre} (inactivo)",
     elegirAreaPrimero: "Elegí primero un área",
+    sinConvenioNota: "No aplica sin convenio.",
+    noAplica: "No aplica",
   },
   listado: {
     busquedaPlaceholder: "Nombre, DNI, CUIL o número de legajo",
@@ -105,6 +112,7 @@ export const copyLaborales = {
   },
   errors: {
     numeroLegajoDuplicado: "Ese número de legajo ya está asignado a otro empleado.",
+    sinConvenio: "Sin convenio, dejá este dato vacío.",
   },
   propio: {
     nota: "Solo lectura. Tus datos laborales se editan desde tu legajo en Legajos.",

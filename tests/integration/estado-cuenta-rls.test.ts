@@ -290,6 +290,8 @@ describe("account state at the database (GAP-01)", () => {
             p_resultado: "ok",
           }),
       },
+      // Service role only (CR-5 seed of the "No" convenio).
+      sembrar_convenio_no: { esperado: "42501", llamar: (c) => c.rpc("sembrar_convenio_no") },
     };
 
     const llamantes = [

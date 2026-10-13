@@ -1,6 +1,6 @@
 import { copy } from "@/lib/copy/es-AR";
 import { copyLaborales } from "@/lib/copy/laborales";
-import type { CatalogoItem } from "@/lib/configuracion/listas";
+import { esItemSistema, type CatalogoItem } from "@/lib/configuracion/listas";
 import { calcularAntiguedad } from "@/lib/legajo/antiguedad";
 import { ESTADOS_CIVILES } from "@/lib/legajo/options";
 import { textoAntiguedad } from "@/lib/legajo/vista";
@@ -13,7 +13,8 @@ import { campoExportacion, type CampoExportacion, type Seleccion } from "./campo
 //   the screens' labels as headers (bold, frozen).
 // - "Hijos" (only when chosen): one row per child, with the employee's
 //   número de legajo, apellido and nombres.
-// List fields by item name (an inactive item by its plain name), dates as
+// List fields by item name (an inactive item by its plain name; with the
+// "No" convenio, Tarea and Categoría empty, CR-5), dates as
 // date cells (DD/MM/AAAA), CUIL as XX-XXXXXXXX-X, antigüedad as of the
 // export day in Argentina. Every text cell is a string cell, neutralized
 // against formula injection.
@@ -70,17 +71,19 @@ const LISTA_DE_CAMPO = {
   area: "area_id",
   puesto: "puesto_id",
   sucursal: "sucursal_id",
-  tarea: "tarea_id",
   convenio: "convenio_id",
+  tarea: "tarea_id",
   categoria: "categoria_id",
 } as const;
 
 // One employee's cell for a field. hoy: YYYY-MM-DD in Argentina.
+// sinConvenio: the id of the "No" convenio, if any.
 export function celdaDe(
   campo: CampoExportacion,
   { legajo, laboral }: LegajoExportable,
   nombres: ReadonlyMap<string, string>,
   hoy: string,
+  sinConvenio: string | null = null,
 ): Celda {
   switch (campo) {
     case "fecha_nacimiento":
@@ -103,12 +106,14 @@ export function celdaDe(
     }
     case "estado_laboral":
       return laboral?.estado_laboral ? celdaTexto(copyLaborales.estados[laboral.estado_laboral]) : null;
+    case "tarea":
+    case "categoria":
+      if (sinConvenio !== null && laboral?.convenio_id === sinConvenio) return null;
+      return celdaTexto(nombres.get(laboral?.[LISTA_DE_CAMPO[campo]] ?? "") ?? null);
     case "area":
     case "puesto":
     case "sucursal":
-    case "tarea":
-    case "convenio":
-    case "categoria": {
+    case "convenio": {
       const id = laboral?.[LISTA_DE_CAMPO[campo]];
       return celdaTexto(id ? nombres.get(id) : null);
     }
@@ -135,10 +140,16 @@ function hoja(nombre: string, filas: Celda[][]): Hoja {
   return { sheet: nombre, data: filas, columns: anchos(filas, filas[0]?.length ?? 0), stickyRowsCount: 1 };
 }
 
-export function hojaLegajos(legajos: readonly LegajoExportable[], campos: readonly CampoExportacion[], nombres: ReadonlyMap<string, string>, hoy: string): Hoja {
+export function hojaLegajos(
+  legajos: readonly LegajoExportable[],
+  campos: readonly CampoExportacion[],
+  nombres: ReadonlyMap<string, string>,
+  hoy: string,
+  sinConvenio: string | null = null,
+): Hoja {
   const filas: Celda[][] = [
     campos.map((campo) => encabezado(campoExportacion(campo).label)),
-    ...legajos.map((legajo) => campos.map((campo) => celdaDe(campo, legajo, nombres, hoy))),
+    ...legajos.map((legajo) => campos.map((campo) => celdaDe(campo, legajo, nombres, hoy, sinConvenio))),
   ];
   return hoja(copy.exportacion.hojas.legajos, filas);
 }
@@ -166,7 +177,8 @@ export function hojaHijos(legajos: readonly LegajoExportable[]): Hoja {
 // The whole workbook. items: the Configuración lists (names by id).
 export function armarLibro(legajos: readonly LegajoExportable[], seleccion: Seleccion, items: readonly CatalogoItem[], hoy: string): Hoja[] {
   const nombres = new Map(items.map((item) => [item.id, item.nombre]));
-  const hojas = [hojaLegajos(legajos, seleccion.campos, nombres, hoy)];
+  const sinConvenio = items.find((item) => item.lista === "convenio" && esItemSistema(item))?.id ?? null;
+  const hojas = [hojaLegajos(legajos, seleccion.campos, nombres, hoy, sinConvenio)];
   if (seleccion.hijos) hojas.push(hojaHijos(legajos));
   return hojas;
 }

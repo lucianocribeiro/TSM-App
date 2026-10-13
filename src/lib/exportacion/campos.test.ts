@@ -17,8 +17,8 @@ describe("export fields (allow-list)", () => {
       "antiguedad",
       "estado_laboral",
       "sucursal",
-      "tarea",
       "convenio",
+      "tarea",
       "categoria",
     ]);
     expect(esCampoExportacion("hijos")).toBe(false);

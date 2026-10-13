@@ -70,6 +70,11 @@ export type Database = {
           lista: Database["public"]["Enums"]["catalogo_lista"]
           nombre: string
           posicion: number
+          sin_convenio: boolean
+          sucursal_defecto_id: string | null
+          sucursal_defecto_lista:
+            | Database["public"]["Enums"]["catalogo_lista"]
+            | null
           updated_at: string
           version: number
         }
@@ -83,6 +88,11 @@ export type Database = {
           lista: Database["public"]["Enums"]["catalogo_lista"]
           nombre: string
           posicion?: number
+          sin_convenio?: boolean
+          sucursal_defecto_id?: string | null
+          sucursal_defecto_lista?:
+            | Database["public"]["Enums"]["catalogo_lista"]
+            | null
           updated_at?: string
           version?: number
         }
@@ -96,6 +106,11 @@ export type Database = {
           lista?: Database["public"]["Enums"]["catalogo_lista"]
           nombre?: string
           posicion?: number
+          sin_convenio?: boolean
+          sucursal_defecto_id?: string | null
+          sucursal_defecto_lista?:
+            | Database["public"]["Enums"]["catalogo_lista"]
+            | null
           updated_at?: string
           version?: number
         }
@@ -103,6 +118,13 @@ export type Database = {
           {
             foreignKeyName: "catalogo_items_area_fkey"
             columns: ["area_id", "area_lista"]
+            isOneToOne: false
+            referencedRelation: "catalogo_items"
+            referencedColumns: ["id", "lista"]
+          },
+          {
+            foreignKeyName: "catalogo_items_sucursal_defecto_fkey"
+            columns: ["sucursal_defecto_id", "sucursal_defecto_lista"]
             isOneToOne: false
             referencedRelation: "catalogo_items"
             referencedColumns: ["id", "lista"]
@@ -772,6 +794,7 @@ export type Database = {
         }
         Returns: string
       }
+      sembrar_convenio_no: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "empleado" | "admin"
@@ -782,6 +805,7 @@ export type Database = {
         | "desactivacion"
         | "reactivacion"
         | "baja"
+        | "sucursal_defecto"
       catalogo_lista:
         | "area"
         | "puesto"
@@ -945,6 +969,7 @@ export const Constants = {
         "desactivacion",
         "reactivacion",
         "baja",
+        "sucursal_defecto",
       ],
       catalogo_lista: [
         "area",

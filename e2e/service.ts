@@ -65,7 +65,8 @@ export async function itemIdE2E(lista: Database["public"]["Enums"]["catalogo_lis
 }
 
 // Group E (CR-2: legajos_laborales, list items by name). A write that sets
-// any value must complete the six required fields; this fills every field.
+// any value must complete the seven required fields (Convenio since CR-5);
+// this fills every field. With convenio "No", pass tarea and categoria null.
 export async function fillLaboral(
   profileId: string,
   valores: {
