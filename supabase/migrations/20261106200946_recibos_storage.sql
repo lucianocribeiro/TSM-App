@@ -74,3 +74,67 @@ create policy firmas_storage_select_propio_o_admin
       )
     )
   );
+
+-- ---------------------------------------------------------------------------
+-- Path ownership: the first folder of every stored path is the row's owner
+-- ---------------------------------------------------------------------------
+-- Receipts and their history also carry the period folder; every receipt
+-- path is a PDF, every signature path a PNG.
+
+alter table public.recibos
+  add constraint recibos_archivo_path_propietario
+  check (
+    starts_with(archivo_path, empleado_id::text || '/' || periodo_id::text || '/')
+    and archivo_path like '%.pdf'
+  );
+
+alter table public.recibo_historial
+  add constraint recibo_historial_archivo_path_propietario
+  check (
+    starts_with(archivo_path, empleado_id::text || '/' || periodo_id::text || '/')
+    and archivo_path like '%.pdf'
+  );
+
+alter table public.firmas_empleado
+  add constraint firmas_empleado_imagen_path_propietario
+  check (
+    starts_with(imagen_path, empleado_id::text || '/')
+    and imagen_path like '%.png'
+  );
+
+-- recibo_overrides has no owner or period columns: a CHECK cannot read the
+-- receipt, so a BEFORE INSERT trigger does (UPDATE is already refused by
+-- recibo_overrides_solo_agregar). A missing receipt is left to the foreign
+-- key (23503).
+create function public.recibo_overrides_ruta_propietario()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_empleado_id uuid;
+  v_periodo_id uuid;
+begin
+  select r.empleado_id, r.periodo_id
+    into v_empleado_id, v_periodo_id
+    from public.recibos as r
+    where r.id = new.recibo_id;
+
+  if found and not (
+    starts_with(new.archivo_path, v_empleado_id::text || '/' || v_periodo_id::text || '/')
+    and new.archivo_path like '%.pdf'
+  ) then
+    raise exception 'override path does not match its receipt'
+      using errcode = '23514', hint = 'ruta_recibo_ajena';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.recibo_overrides_ruta_propietario() from public, anon, authenticated;
+
+create trigger recibo_overrides_ruta_propietario
+  before insert on public.recibo_overrides
+  for each row
+  execute function public.recibo_overrides_ruta_propietario();

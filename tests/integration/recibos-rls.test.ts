@@ -101,7 +101,7 @@ describe("receipts schema (F2-02)", () => {
           recibo_id: r,
           periodo_id: p.id,
           empleado_id: empleado.id,
-          archivo_path: "anterior.pdf",
+          archivo_path: `${empleado.id}/${p.id}/anterior.pdf`,
           archivo_bytes: 10,
           estado_al_reemplazo: "pendiente",
           cargado_por: admin.id,
@@ -112,7 +112,7 @@ describe("receipts schema (F2-02)", () => {
         .single();
       const override = await service
         .from("recibo_overrides")
-        .insert({ recibo_id: r, motivo: "dni_no_encontrado", archivo_path: "anterior.pdf", admin_id: admin.id })
+        .insert({ recibo_id: r, motivo: "dni_no_encontrado", archivo_path: `${empleado.id}/${p.id}/anterior.pdf`, admin_id: admin.id })
         .select("id")
         .single();
       const log = await service.from("recibo_periodo_historial").insert({ periodo_id: p.id, accion: "publicado", actor_id: admin.id }).select("id").single();
@@ -174,7 +174,7 @@ describe("receipts schema (F2-02)", () => {
       await recibo(p, empleado);
       const { error } = await service
         .from("recibos")
-        .insert({ periodo_id: p, empleado_id: empleado.id, archivo_path: "otro.pdf", archivo_bytes: 1, cargado_por: admin.id });
+        .insert({ periodo_id: p, empleado_id: empleado.id, archivo_path: `${empleado.id}/${p}/otro.pdf`, archivo_bytes: 1, cargado_por: admin.id });
       expect(error?.code).toBe("23505");
     });
 
@@ -199,12 +199,12 @@ describe("receipts schema (F2-02)", () => {
       const { data: activa } = await service.from("firmas_empleado").select("version").eq("empleado_id", otro.id).eq("activa", true).single();
       const { error } = await service
         .from("firmas_empleado")
-        .insert({ empleado_id: otro.id, version: (activa?.version ?? 0) + 1, imagen_path: "x.png", activa: true });
+        .insert({ empleado_id: otro.id, version: (activa?.version ?? 0) + 1, imagen_path: `${otro.id}/x.png`, activa: true });
       expect(error?.code).toBe("23505");
       // The same version twice.
       const repetida = await service
         .from("firmas_empleado")
-        .insert({ empleado_id: otro.id, version: activa?.version ?? 1, imagen_path: "x.png", activa: false });
+        .insert({ empleado_id: otro.id, version: activa?.version ?? 1, imagen_path: `${otro.id}/x.png`, activa: false });
       expect(repetida.error?.code).toBe("23505");
     });
 
