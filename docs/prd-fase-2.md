@@ -1,4 +1,4 @@
-# PRD Fase 2 v0.4 — Recibos de sueldo y firma electrónica
+# PRD Fase 2 v0.5 — Recibos de sueldo y firma electrónica
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Sources | TSM-DEV-F2-BRIEF v1.0, TSM-HANDOFF-F1-DEV v1.0, TSM-HANDOFF-F1-PM v1.0, Luciano's answers 06/11/2026 (Q1–Q14, P1, P2) |
 | Date | 06/11/2026 |
 
-Change log: v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
+Change log: v0.5 — storage defined (TSM-F2-03): two private buckets, `recibos` (PDF, 10 MB) and `firmas` (PNG, 1 MB), owner-first path layouts enforced by the database. v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
 
 ---
 
@@ -83,7 +83,11 @@ Written only through a SECURITY DEFINER function with `search_path = ''`, execut
 
 - New tables (names final in TSM-F2-02): periods (with state history), receipts (per employee per period, current file path, state), receipt history (replaced files and their signature records), signature records, registered signatures (versioned), upload overrides.
 - RLS on every new table, with an isolation test for each (employee A cannot read employee B; employees cannot read draft periods).
-- Private bucket(s) for receipts and signatures. Storage policies scoped by employee. 5-minute signed URLs.
+- Private buckets (TSM-F2-03):
+  - `recibos`: receipt PDFs, PDF only, max 10 MB. Path `{empleado_id}/{periodo_id}/{uuid}.pdf`; the stamped PDF of F2-05 gets a new uuid in the same folder.
+  - `firmas`: registered signature images, PNG only, max 1 MB. Path `{empleado_id}/{version}-{uuid}.png`.
+  - The first folder is always the owner's profile id. The database checks every stored path against its row's owner (and period, for receipts, history and overrides).
+  - Storage policies: SELECT only, active accounts only. An Admin reads every object; an Empleado reads an object in their own folder only when a row they can see references it (so never a draft period's file, a replaced file or an unreferenced object). No write policy: uploads use server-created signed upload URLs, removals run server-side. 5-minute signed URLs for downloads.
 - All Server Action inputs `.strict()` at every level, refused before any I/O. Boundary test per new action.
 - Admin-only code and copy (Carga, Estado, overrides, history) in Admin-only modules covered by the ESLint rule and bundle check.
 - PDF text extraction and stamping run server-side only. Libraries reviewed in F2-07.
