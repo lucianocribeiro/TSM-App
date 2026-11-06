@@ -185,3 +185,30 @@ async function crearPermanente(service: TypedClient, titular: string): Promise<R
     logPeriodo: logPeriodo.data!.id,
   };
 }
+
+// For the accounts a test leaves behind because they hold receipt rows
+// (deleteTestUsers cannot remove them): removes their Fase 1 data that
+// other tests count across the whole database (pending requests and
+// documents, the bell, and their files), so a kept account weighs on no
+// other test. Accounts already gone are skipped. Call before deleteTestUsers.
+export async function despejarRetenidos(service: TypedClient, ids: string[]) {
+  const { DOCUMENTOS_BUCKET } = await import("@/lib/documentos/tipos");
+  const bucket = service.storage.from(DOCUMENTOS_BUCKET);
+  async function objetos(carpeta: string): Promise<string[]> {
+    const { data } = await bucket.list(carpeta, { limit: 1000 });
+    const rutas: string[] = [];
+    for (const entrada of data ?? []) {
+      const ruta = `${carpeta}/${entrada.name}`;
+      rutas.push(...(entrada.id === null ? await objetos(ruta) : [ruta]));
+    }
+    return rutas;
+  }
+  for (const id of ids) {
+    const { data: legajo } = await service.from("legajos").select("id").eq("profile_id", id).maybeSingle();
+    if (!legajo) continue;
+    await service.from("solicitudes_cambio").delete().eq("legajo_id", legajo.id);
+    await service.from("legajo_documentos").delete().eq("legajo_id", legajo.id);
+    const rutas = await objetos(id);
+    if (rutas.length > 0) await bucket.remove(rutas);
+  }
+}

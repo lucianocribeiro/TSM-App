@@ -16,6 +16,7 @@ import {
 import { createTestUser, deleteTestUsers, serviceClient, type TestUser, type TypedClient } from "./helpers";
 import { laboralCompleto } from "./laborales";
 import { ACTORES_ESTADO, ejecutarCelda, OPS, TABLAS, type Llamante, type Titular } from "./matriz-acceso";
+import { despejarRetenidos } from "./recibos";
 
 // F1-11A, GAP-01: account state at the database (Constitution §4 and §10,
 // v0.6).
@@ -49,7 +50,12 @@ describe("account state at the database (GAP-01)", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await deleteTestUsers(service, [victima.id, desactivado.id, forzado.id, adminDesactivado.id, admin.id]);
+    const ids = [victima.id, desactivado.id, forzado.id, adminDesactivado.id, admin.id];
+    // The titulares hold receipt rows from the access matrix and stay (F2-02):
+    // their Fase 1 data goes first, so nothing of theirs is counted elsewhere
+    // and the Admin who reviewed it can still be removed.
+    await despejarRetenidos(service, ids);
+    await deleteTestUsers(service, ids);
   });
 
   describe("the fixtures reproduce the real window", () => {

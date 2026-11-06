@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
 import { crearDesactivado } from "./actores";
 import { anonClient, createTestUser, deleteTestUsers, serviceClient, type TestUser } from "./helpers";
-import { borrarReciboYPeriodo, firmarRecibo, nuevaFirma, nuevoPeriodo, nuevoRecibo, ponerEstadoPeriodo } from "./recibos";
+import { borrarReciboYPeriodo, despejarRetenidos, firmarRecibo, nuevaFirma, nuevoPeriodo, nuevoRecibo, ponerEstadoPeriodo } from "./recibos";
 
 // F2-02, receipts schema (PRD Fase 2 v0.4, Constitution §11). The access
 // matrix (matriz-acceso.ts) covers every table for every actor and
@@ -54,6 +54,7 @@ describe("receipts schema (F2-02)", () => {
   afterAll(async () => {
     session.client = null;
     for (const { recibo: id, periodo: p } of limpieza) await borrarReciboYPeriodo(service, id, p);
+    await despejarRetenidos(service, usuarios);
     await deleteTestUsers(service, usuarios);
   });
 
