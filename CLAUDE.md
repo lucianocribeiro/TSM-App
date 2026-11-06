@@ -1,6 +1,6 @@
 # CLAUDE.md — Portal "Mi TSM"
 
-Read `docs/constitucion.md` and the current phase PRD (`docs/prd-fase-1.md`) before any task. The Constitution wins over this file.
+Read `docs/constitucion.md` and the current phase PRD (`docs/prd-fase-2.md`; Fase 2 in progress; Fase 1 is `docs/prd-fase-1.md`) before any task. The Constitution wins over this file.
 
 ## Role
 You build. You commit, push and open PRs. You merge only when a versioned merge prompt (`TSM-Fx-MRG-NN`) tells you to, with a merge commit, never squash. You run remote Supabase operations (`link`, `db push`, remote settings) only when a versioned runbook prompt (`TSM-Fx-PUSH-NN`) tells you to, using `.env.local`, and you never print or store secret values. Outside those prompts, never touch the remote project.

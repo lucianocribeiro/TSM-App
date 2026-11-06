@@ -1,6 +1,6 @@
 # Constitución — Portal "Mi TSM"
-Version: 0.9 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
-Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6). v0.6 — Security contract for account state (§4, §10): an inactive account is refused by the database, except reading its own profile; a pending forced password change is enforced by the app, not the database, by design. v0.7 — Configuración (Admin only) added to the Fase 1 menu (§6): the Admin-maintained lists used by the legajo, with their change history. v0.8 — Datos laborales (group E) are Admin only, at the database level (§3, §4): the Empleado no longer reads any group E value, their own included. v0.9 — Excel export in the security contract (§4): Admin only, built on the server from re-read data, always logged in the database before the file is returned, and never stored.
+Version: 0.10 (draft) | Owner: Luciano Ribeiro (Agencia Kairos)
+Change log: v0.5 — Aprobaciones (Admin only) added to the Fase 1 menu (§6). v0.6 — Security contract for account state (§4, §10): an inactive account is refused by the database, except reading its own profile; a pending forced password change is enforced by the app, not the database, by design. v0.7 — Configuración (Admin only) added to the Fase 1 menu (§6): the Admin-maintained lists used by the legajo, with their change history. v0.8 — Datos laborales (group E) are Admin only, at the database level (§3, §4): the Empleado no longer reads any group E value, their own included. v0.9 — Excel export in the security contract (§4): Admin only, built on the server from re-read data, always logged in the database before the file is returned, and never stored. v0.10 — Recibos de sueldo y firma (§11, Fase 2): employees see only their own receipts, signatures and evidence and nothing of a draft period; receipt writes only through SECURITY DEFINER functions; signature evidence append-only for every role; the signed PDF replaces the unsigned one; files only through 5-minute signed URLs; accounts with receipts cannot be purged; Admin-only receipt data in Admin-only modules.
 
 This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes require Luciano's approval and a version bump.
 
@@ -78,3 +78,12 @@ This document wins over `CLAUDE.md`, skills and prompts in any conflict. Changes
 - History keeps naming who uploaded, changed, approved or rejected each item, including users whose account is Inactiva.
 - Purge (permanent removal of the account, its legajo, documents and approval history) is an Admin action intended for test data. It requires typing the account's email to confirm.
 - No user can deactivate or purge their own account.
+
+## 11. Recibos de sueldo y firma
+- An employee only ever sees their own receipts, signatures and signature evidence, and nothing of a `borrador` period. Enforced by RLS and storage policies.
+- All writes to receipt tables go through SECURITY DEFINER functions with `search_path = ''`; no direct write policy for `authenticated`.
+- Signature evidence (identity, date/time, signature version) is append-only and immutable, including for the service role.
+- The signed PDF replaces the unsigned file; the replace step deletes the unsigned file only after the signed one is stored and its record committed.
+- Receipt files are served only through 5-minute signed URLs, never through a Server Action response.
+- Accounts with receipts cannot be purged (`ON DELETE RESTRICT`) until a retention rule exists (Fase 3).
+- Admin-only receipt data (history, overrides, upload screens) lives in Admin-only modules under the ESLint rule and bundle check.
