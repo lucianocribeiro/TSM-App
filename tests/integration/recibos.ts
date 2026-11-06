@@ -87,7 +87,7 @@ export async function nuevaFirma(service: TypedClient, empleadoId: string) {
   const version = (previas?.[0]?.version ?? 0) + 1;
   const { data, error } = await service
     .from("firmas_empleado")
-    .insert({ empleado_id: empleadoId, version, imagen_path: `${empleadoId}/firma-${version}.png`, activa: true })
+    .insert({ empleado_id: empleadoId, version, imagen_path: rutaFirma(empleadoId, version), activa: true })
     .select("id")
     .single();
   if (error || !data) throw new Error(`signature setup failed: ${error?.message}`);
@@ -189,7 +189,8 @@ async function crearPermanente(service: TypedClient, titular: string): Promise<R
 // For the accounts a test leaves behind because they hold receipt rows
 // (deleteTestUsers cannot remove them): removes their Fase 1 data that
 // other tests count across the whole database (pending requests and
-// documents, the bell, and their files), so a kept account weighs on no
+// documents, the bell, and their files, receipt and signature objects
+// included), so a kept account weighs on no
 // other test. Accounts already gone are skipped. Call before deleteTestUsers.
 export async function despejarRetenidos(service: TypedClient, ids: string[]) {
   const { DOCUMENTOS_BUCKET } = await import("@/lib/documentos/tipos");
@@ -210,5 +211,82 @@ export async function despejarRetenidos(service: TypedClient, ids: string[]) {
     await service.from("legajo_documentos").delete().eq("legajo_id", legajo.id);
     const rutas = await objetos(id);
     if (rutas.length > 0) await bucket.remove(rutas);
+  }
+  // Their receipt and signature objects too (F2-03).
+  await borrarObjetosRecibos(service, ids);
+}
+
+// Storage (F2-03). Paths follow the owner-first layouts of
+// src/lib/recibos/paths.ts (written out here: that module is server-only).
+export const RECIBOS_BUCKET = "recibos";
+export const FIRMAS_BUCKET = "firmas";
+
+export function rutaRecibo(empleadoId: string, periodoId: string): string {
+  return `${empleadoId}/${periodoId}/${randomUUID()}.pdf`;
+}
+
+export function rutaFirma(empleadoId: string, version: number): string {
+  return `${empleadoId}/${version}-${randomUUID()}.png`;
+}
+
+// A tiny valid-looking PNG (signature and IHDR start), for the firmas bucket.
+export function fakePng(label: string): Buffer {
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from(`FAKE TEST PNG - ${label}`)]);
+}
+
+export async function subir(service: TypedClient, bucket: string, path: string, cuerpo: Buffer, contentType: string) {
+  const { error } = await service.storage.from(bucket).upload(path, cuerpo, { contentType, upsert: true });
+  if (error) throw new Error(`service upload failed: ${error.message}`);
+}
+
+// A receipt whose row points at a stored object.
+export async function nuevoReciboConArchivo(service: TypedClient, periodoId: string, empleadoId: string, cargadoPor: string) {
+  const id = await nuevoRecibo(service, periodoId, empleadoId, cargadoPor);
+  const { data, error } = await service.from("recibos").select("archivo_path").eq("id", id).single();
+  if (error || !data) throw new Error(`receipt read failed: ${error?.message}`);
+  const { fakePdf } = await import("./actores");
+  await subir(service, RECIBOS_BUCKET, data.archivo_path, fakePdf("recibo"), "application/pdf");
+  return { id, path: data.archivo_path };
+}
+
+// The employee's next signature version with its image stored.
+export async function nuevaFirmaConImagen(service: TypedClient, empleadoId: string) {
+  const id = await nuevaFirma(service, empleadoId);
+  const { data, error } = await service.from("firmas_empleado").select("imagen_path").eq("id", id).single();
+  if (error || !data) throw new Error(`signature read failed: ${error?.message}`);
+  await subir(service, FIRMAS_BUCKET, data.imagen_path, fakePng("firma"), "image/png");
+  return { id, path: data.imagen_path };
+}
+
+// One registered signature per titular for the access matrix (signatures
+// cannot be removed), its image uploaded again by every cell.
+const firmasMatriz = new Map<string, Promise<{ id: string; path: string }>>();
+
+export function firmaMatriz(service: TypedClient, titular: string) {
+  let hecha = firmasMatriz.get(titular);
+  if (!hecha) {
+    hecha = nuevaFirmaConImagen(service, titular);
+    firmasMatriz.set(titular, hecha);
+  }
+  return hecha;
+}
+
+// Removes every object in the given owners' folders of both buckets.
+export async function borrarObjetosRecibos(service: TypedClient, ids: string[]) {
+  for (const bucket of [RECIBOS_BUCKET, FIRMAS_BUCKET]) {
+    const store = service.storage.from(bucket);
+    const objetos = async (carpeta: string): Promise<string[]> => {
+      const { data } = await store.list(carpeta, { limit: 1000 });
+      const rutas: string[] = [];
+      for (const entrada of data ?? []) {
+        const ruta = `${carpeta}/${entrada.name}`;
+        rutas.push(...(entrada.id === null ? await objetos(ruta) : [ruta]));
+      }
+      return rutas;
+    };
+    for (const id of ids) {
+      const rutas = await objetos(id);
+      if (rutas.length > 0) await store.remove(rutas);
+    }
   }
 }

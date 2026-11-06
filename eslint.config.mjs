@@ -34,6 +34,15 @@ const grupoE = [
   { group: ["./laborales", "./laborales-escritura"], message: grupoEMessage },
 ];
 
+// F2-03: the receipts orphan sweep is Admin only (Constitution §11). Mi
+// Legajo, the app shell, the shared components and the shared modules never
+// import it; the future Mis Recibos route reaches receipts only through its
+// own Server Actions.
+const recibosAdminMessage = "The receipts sweep is Admin only: employee routes and shared modules must not import it (F2-03).";
+const recibosAdmin = [
+  { group: ["@/lib/recibos/limpieza", "**/recibos/limpieza"], message: recibosAdminMessage },
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -64,7 +73,10 @@ const eslintConfig = defineConfig([
       "src/app/(app)/mi-legajo/DatosLaboralesPropios.tsx",
     ],
     rules: {
-      "no-restricted-imports": ["error", { ...serviceRole, patterns: [...serviceRole.patterns, ...grupoE] }],
+      "no-restricted-imports": [
+        "error",
+        { ...serviceRole, patterns: [...serviceRole.patterns, ...grupoE, ...recibosAdmin] },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.

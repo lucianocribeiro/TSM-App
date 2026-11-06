@@ -4,10 +4,23 @@ import type { Database } from "@/lib/supabase/database.types";
 import { fakePdf, rutaDocumento } from "./actores";
 import type { TypedClient } from "./helpers";
 import { escribirLaboral, laboralCompleto } from "./laborales";
-import { borrarReciboYPeriodo, nuevoPeriodo, nuevoRecibo, reciboPermanente } from "./recibos";
+import {
+  borrarReciboYPeriodo,
+  fakePng,
+  FIRMAS_BUCKET,
+  firmaMatriz,
+  nuevoPeriodo,
+  nuevoRecibo,
+  nuevoReciboConArchivo,
+  RECIBOS_BUCKET,
+  reciboPermanente,
+  rutaFirma,
+  rutaRecibo,
+  subir,
+} from "./recibos";
 
-// The access matrix (F1-11A, GAP-01 and GAP-02): every table and the
-// legajo-docs bucket, every actor, every operation (SELECT, INSERT, UPDATE,
+// The access matrix (F1-11A, GAP-01 and GAP-02): every table and every
+// bucket (legajo-docs; recibos and firmas, F2-03), every actor, every operation (SELECT, INSERT, UPDATE,
 // DELETE), with the exact expected outcome. Table-driven: a new table is one
 // entry in TABLAS (the type requires an entry for every table in the
 // generated types) with its expectation for every actor in ACTORES.
@@ -96,6 +109,9 @@ export const BUCKET_DOCUMENTOS = `storage.objects (${DOCUMENTOS_BUCKET})`;
 // CR-3: the Admin-only type, row and object, on top of the generic entries.
 export const DOCUMENTOS_ALTA_AFIP = "legajo_documentos (alta_afip)";
 export const BUCKET_ALTA_AFIP = `storage.objects (${DOCUMENTOS_BUCKET}, alta_afip)`;
+// F2-03: the receipts and signatures buckets.
+export const BUCKET_RECIBOS = `storage.objects (${RECIBOS_BUCKET})`;
+export const BUCKET_FIRMAS = `storage.objects (${FIRMAS_BUCKET})`;
 
 // The titular's current Alta de AFIP, as an Admin leaves it (approved at
 // once): object and row. The service role keeps the values it writes.
@@ -161,7 +177,7 @@ async function borrarSolicitudes(service: TypedClient, titular: Titular) {
 }
 
 export const TABLAS: Record<
-  Tabla | typeof BUCKET_DOCUMENTOS | typeof DOCUMENTOS_ALTA_AFIP | typeof BUCKET_ALTA_AFIP,
+  Tabla | typeof BUCKET_DOCUMENTOS | typeof DOCUMENTOS_ALTA_AFIP | typeof BUCKET_ALTA_AFIP | typeof BUCKET_RECIBOS | typeof BUCKET_FIRMAS,
   EspecTabla
 > = {
   // No INSERT or DELETE for any API role; UPDATE (role) is Admin only.
@@ -881,6 +897,104 @@ export const TABLAS: Record<
       "empleado-propio": e(P, N, N, V),
       "empleado-ajeno": e(V, N, N, V),
       admin: e(P, P, P, P),
+      ...inactivo(e(V, N, N, V)),
+      "cambio-forzado-propio": e(P, N, N, V),
+    },
+  },
+
+  // F2-03. Both buckets: read only, and only through the referencing row.
+  // The target is the object of the titular's receipt in a published period
+  // (recibos) or of their registered signature (firmas). SELECT is a
+  // download; INSERT an upload to a new path in the titular's folder; UPDATE
+  // an overwrite; DELETE a removal (refused removals answer no objects). No
+  // API role writes either bucket, the Admin included; anon reads nothing.
+  [BUCKET_RECIBOS]: {
+    preparar: async (service, titular) => {
+      const periodo = await nuevoPeriodo(service, titular.id, "publicado");
+      const recibo = await nuevoReciboConArchivo(service, periodo.id, titular.id, titular.id);
+      return { periodo: periodo.id, recibo: recibo.id, path: recibo.path, nuevo: rutaRecibo(titular.id, periodo.id) };
+    },
+    estado: async (service, _titular, o) => {
+      const bucket = service.storage.from(RECIBOS_BUCKET);
+      const [actual, nuevo] = await Promise.all([bucket.download(o.path), bucket.download(o.nuevo)]);
+      return {
+        actual: actual.data ? await actual.data.text() : null,
+        nuevo: nuevo.data ? await nuevo.data.text() : null,
+      };
+    },
+    ops: {
+      select: async (c, _l, _t, o) => ((await c.storage.from(RECIBOS_BUCKET).download(o.path)).data ? P : V),
+      insert: async (c, _l, _t, o) => {
+        const { error } = await c.storage
+          .from(RECIBOS_BUCKET)
+          .upload(o.nuevo, fakePdf("matriz intento"), { contentType: "application/pdf" });
+        return error ? N : P;
+      },
+      update: async (c, _l, _t, o) => {
+        const { error } = await c.storage
+          .from(RECIBOS_BUCKET)
+          .update(o.path, fakePdf("matriz cambiado"), { contentType: "application/pdf" });
+        return error ? N : P;
+      },
+      delete: async (c, _l, _t, o) => {
+        const { data, error } = await c.storage.from(RECIBOS_BUCKET).remove([o.path]);
+        if (error) return N;
+        return (data?.length ?? 0) > 0 ? P : V;
+      },
+    },
+    limpiar: async (service, _titular, o) => {
+      await service.storage.from(RECIBOS_BUCKET).remove([o.path, o.nuevo]);
+      await borrarReciboYPeriodo(service, o.recibo, o.periodo);
+    },
+    esperado: {
+      anon: e(V, N, N, V),
+      "empleado-propio": e(P, N, N, V),
+      "empleado-ajeno": e(V, N, N, V),
+      admin: e(P, N, N, V),
+      ...inactivo(e(V, N, N, V)),
+      "cambio-forzado-propio": e(P, N, N, V),
+    },
+  },
+
+  [BUCKET_FIRMAS]: {
+    preparar: async (service, titular) => {
+      const firma = await firmaMatriz(service, titular.id);
+      // Stored again for each cell: the previous cell's cleanup removed it.
+      await subir(service, FIRMAS_BUCKET, firma.path, fakePng("matriz original"), "image/png");
+      return { path: firma.path, nuevo: rutaFirma(titular.id, 999) };
+    },
+    estado: async (service, _titular, o) => {
+      const bucket = service.storage.from(FIRMAS_BUCKET);
+      const [actual, nuevo] = await Promise.all([bucket.download(o.path), bucket.download(o.nuevo)]);
+      return {
+        actual: actual.data ? await actual.data.text() : null,
+        nuevo: nuevo.data ? await nuevo.data.text() : null,
+      };
+    },
+    ops: {
+      select: async (c, _l, _t, o) => ((await c.storage.from(FIRMAS_BUCKET).download(o.path)).data ? P : V),
+      insert: async (c, _l, _t, o) => {
+        const { error } = await c.storage.from(FIRMAS_BUCKET).upload(o.nuevo, fakePng("matriz intento"), { contentType: "image/png" });
+        return error ? N : P;
+      },
+      update: async (c, _l, _t, o) => {
+        const { error } = await c.storage.from(FIRMAS_BUCKET).update(o.path, fakePng("matriz cambiado"), { contentType: "image/png" });
+        return error ? N : P;
+      },
+      delete: async (c, _l, _t, o) => {
+        const { data, error } = await c.storage.from(FIRMAS_BUCKET).remove([o.path]);
+        if (error) return N;
+        return (data?.length ?? 0) > 0 ? P : V;
+      },
+    },
+    limpiar: async (service, _titular, o) => {
+      await service.storage.from(FIRMAS_BUCKET).remove([o.path, o.nuevo]);
+    },
+    esperado: {
+      anon: e(V, N, N, V),
+      "empleado-propio": e(P, N, N, V),
+      "empleado-ajeno": e(V, N, N, V),
+      admin: e(P, N, N, V),
       ...inactivo(e(V, N, N, V)),
       "cambio-forzado-propio": e(P, N, N, V),
     },
