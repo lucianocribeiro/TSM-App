@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { legajoIdDe } from "./actores";
 import { anonClient, createTestUser, deleteTestUsers, serviceClient, type TestUser } from "./helpers";
 import { ACTORES_ROL, ejecutarCelda, OPS, TABLAS, type Llamante, type Titular } from "./matriz-acceso";
+import { despejarRetenidos } from "./recibos";
 
 // F1-11A, GAP-02: the denied-operation matrix for the role actors (anon, an
 // Empleado on their own and on another employee's data, an Admin), over
@@ -27,7 +28,11 @@ describe("access matrix: role actors (GAP-02)", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await deleteTestUsers(service, [empleado.id, victima.id, admin.id]);
+    const ids = [empleado.id, victima.id, admin.id];
+    // The titulares hold receipt rows (append-only) and stay (F2-02): their
+    // Fase 1 data goes first.
+    await despejarRetenidos(service, ids);
+    await deleteTestUsers(service, ids);
   });
 
   function actor(nombre: (typeof ACTORES_ROL)[number]): { llamante: Llamante; titular: Titular } {

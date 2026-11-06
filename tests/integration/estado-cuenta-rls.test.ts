@@ -16,6 +16,7 @@ import {
 import { createTestUser, deleteTestUsers, serviceClient, type TestUser, type TypedClient } from "./helpers";
 import { laboralCompleto } from "./laborales";
 import { ACTORES_ESTADO, ejecutarCelda, OPS, TABLAS, type Llamante, type Titular } from "./matriz-acceso";
+import { despejarRetenidos } from "./recibos";
 
 // F1-11A, GAP-01: account state at the database (Constitution §4 and §10,
 // v0.6).
@@ -49,7 +50,12 @@ describe("account state at the database (GAP-01)", () => {
   }, 120_000);
 
   afterAll(async () => {
-    await deleteTestUsers(service, [victima.id, desactivado.id, forzado.id, adminDesactivado.id, admin.id]);
+    const ids = [victima.id, desactivado.id, forzado.id, adminDesactivado.id, admin.id];
+    // The titulares hold receipt rows from the access matrix and stay (F2-02):
+    // their Fase 1 data goes first, so nothing of theirs is counted elsewhere
+    // and the Admin who reviewed it can still be removed.
+    await despejarRetenidos(service, ids);
+    await deleteTestUsers(service, ids);
   });
 
   describe("the fixtures reproduce the real window", () => {
@@ -197,8 +203,9 @@ describe("account state at the database (GAP-01)", () => {
     type Llamada = (c: TypedClient, x: Contexto) => PromiseLike<{ data: unknown; error: { code?: string } | null }>;
     // 42501: refused. falso / nulo: the helper answers "no" (it runs inside
     // policies, so it cannot raise). pura: a validator of its arguments only,
-    // used by check constraints; it reads and writes no data.
-    const RPCS: Record<Rpc, { esperado: "42501" | "falso" | "nulo" | "pura"; llamar: Llamada }> = {
+    // used by check constraints; it reads and writes no data. cero: a
+    // SECURITY INVOKER count, where RLS lets no row through (F2-02).
+    const RPCS: Record<Rpc, { esperado: "42501" | "falso" | "nulo" | "pura" | "cero"; llamar: Llamada }> = {
       aprobar_documento: { esperado: "42501", llamar: (c, x) => c.rpc("aprobar_documento", { p_documento_id: x.victima.docPendienteId }) },
       aprobar_solicitud: { esperado: "42501", llamar: (c, x) => c.rpc("aprobar_solicitud", { p_solicitud_id: x.victima.solicitudId }) },
       campos_solicitud_permitidos: { esperado: "pura", llamar: (c) => c.rpc("campos_solicitud_permitidos") },
@@ -247,6 +254,8 @@ describe("account state at the database (GAP-01)", () => {
         esperado: "42501",
         llamar: (c) => c.rpc("mover_catalogo_item", { p_item_id: randomUUID(), p_version: 1, p_direccion: "arriba" }),
       },
+      // F2-02: the Mis Recibos counter; recibos-rls.test.ts gives the caller a pending receipt.
+      mis_recibos_pendientes_count: { esperado: "cero", llamar: (c) => c.rpc("mis_recibos_pendientes_count") },
       pendientes_admin: { esperado: "42501", llamar: (c) => c.rpc("pendientes_admin") },
       purgar_cuenta: {
         esperado: "42501",
@@ -327,6 +336,10 @@ describe("account state at the database (GAP-01)", () => {
                 break;
               case "pura":
                 expect(error).toBeNull();
+                break;
+              case "cero":
+                expect(error).toBeNull();
+                expect(data).toBe(0);
                 break;
             }
             expect(await instantanea(service, ids)).toEqual(antes);

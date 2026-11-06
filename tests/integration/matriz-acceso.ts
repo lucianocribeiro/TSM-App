@@ -4,6 +4,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { fakePdf, rutaDocumento } from "./actores";
 import type { TypedClient } from "./helpers";
 import { escribirLaboral, laboralCompleto } from "./laborales";
+import { borrarReciboYPeriodo, nuevoPeriodo, nuevoRecibo, reciboPermanente } from "./recibos";
 
 // The access matrix (F1-11A, GAP-01 and GAP-02): every table and the
 // legajo-docs bucket, every actor, every operation (SELECT, INSERT, UPDATE,
@@ -563,6 +564,206 @@ export const TABLAS: Record<
       admin: e(P, N, N, N),
       ...inactivo(e(V, N, N, N)),
       "cambio-forzado-propio": e(V, N, N, N),
+    },
+  },
+
+  // F2-02, receipts. Read only for every API role (writes come with the
+  // SECURITY DEFINER functions of F2-04 and F2-05): no INSERT, UPDATE or
+  // DELETE grant, so every write is refused (42501).
+  // Periods are global. The target is a draft: an Empleado sees nothing of
+  // it (recibos-rls.test.ts covers the published and closed states).
+  recibo_periodos: {
+    preparar: async (service, titular) => ({ id: (await nuevoPeriodo(service, titular.id, "borrador")).id }),
+    estado: (service, _titular, o) => filas(service.from("recibo_periodos").select("*").eq("id", o.id)),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("recibo_periodos").select("id").eq("id", o.id)),
+      insert: (c, l, t) => r(c.from("recibo_periodos").insert({ anio: 2100, mes: 12, created_by: l.id ?? t.id }).select("id")),
+      update: (c, _l, _t, o) => r(c.from("recibo_periodos").update({ mes: 1 }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("recibo_periodos").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: (service, _titular, o) => borrarReciboYPeriodo(service, null, o.id),
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(V, N, N, N),
+    },
+  },
+
+  // The titular's receipt in a published period. The owner reads it.
+  recibos: {
+    preparar: async (service, titular) => {
+      const periodo = await nuevoPeriodo(service, titular.id, "publicado");
+      return { periodo: periodo.id, id: await nuevoRecibo(service, periodo.id, titular.id, titular.id) };
+    },
+    estado: (service, _titular, o) => filas(service.from("recibos").select("*").eq("periodo_id", o.periodo).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("recibos").select("id").eq("id", o.id)),
+      insert: (c, l, t, o) =>
+        r(
+          c
+            .from("recibos")
+            .insert({ periodo_id: o.periodo, empleado_id: l.id ?? t.id, archivo_path: "intento.pdf", archivo_bytes: 1, cargado_por: l.id ?? t.id })
+            .select("id"),
+        ),
+      update: (c, _l, _t, o) => r(c.from("recibos").update({ archivo_bytes: 2 }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("recibos").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async (service, _titular, o) => {
+      await service.from("recibos").delete().eq("periodo_id", o.periodo);
+      await borrarReciboYPeriodo(service, null, o.periodo);
+    },
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(P, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(P, N, N, N),
+    },
+  },
+
+  // Append-only and Admin only: the period log, the replaced receipts and
+  // the DNI-check overrides. The target is the titular's permanent set
+  // (./recibos.ts), made once: these rows cannot be removed.
+  recibo_periodo_historial: {
+    preparar: async (service, titular) => {
+      const permanente = await reciboPermanente(service, titular.id);
+      return { id: permanente.logPeriodo, periodo: permanente.periodo };
+    },
+    estado: (service, _titular, o) =>
+      filas(service.from("recibo_periodo_historial").select("*").eq("periodo_id", o.periodo).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("recibo_periodo_historial").select("id").eq("id", o.id)),
+      insert: (c, l, t, o) =>
+        r(c.from("recibo_periodo_historial").insert({ periodo_id: o.periodo, accion: "cerrado", actor_id: l.id ?? t.id }).select("id")),
+      update: (c, _l, _t, o) => r(c.from("recibo_periodo_historial").update({ accion: "reabierto" }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("recibo_periodo_historial").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async () => undefined,
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(V, N, N, N),
+    },
+  },
+
+  recibo_historial: {
+    preparar: async (service, titular) => {
+      const permanente = await reciboPermanente(service, titular.id);
+      return { id: permanente.historial, recibo: permanente.recibo, periodo: permanente.periodo };
+    },
+    estado: (service, _titular, o) => filas(service.from("recibo_historial").select("*").eq("recibo_id", o.recibo).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("recibo_historial").select("id").eq("id", o.id)),
+      insert: (c, l, t, o) =>
+        r(
+          c
+            .from("recibo_historial")
+            .insert({
+              recibo_id: o.recibo,
+              periodo_id: o.periodo,
+              empleado_id: t.id,
+              archivo_path: "intento.pdf",
+              archivo_bytes: 1,
+              estado_al_reemplazo: "pendiente",
+              cargado_por: l.id ?? t.id,
+              cargado_at: new Date().toISOString(),
+              reemplazado_por: l.id ?? t.id,
+            })
+            .select("id"),
+        ),
+      update: (c, _l, _t, o) => r(c.from("recibo_historial").update({ archivo_bytes: 2 }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("recibo_historial").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async () => undefined,
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(V, N, N, N),
+    },
+  },
+
+  recibo_overrides: {
+    preparar: async (service, titular) => {
+      const permanente = await reciboPermanente(service, titular.id);
+      return { id: permanente.override, recibo: permanente.recibo };
+    },
+    estado: (service, _titular, o) => filas(service.from("recibo_overrides").select("*").eq("recibo_id", o.recibo).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("recibo_overrides").select("id").eq("id", o.id)),
+      insert: (c, l, t, o) =>
+        r(
+          c
+            .from("recibo_overrides")
+            .insert({ recibo_id: o.recibo, motivo: "sin_dni", archivo_path: "intento.pdf", admin_id: l.id ?? t.id })
+            .select("id"),
+        ),
+      update: (c, _l, _t, o) => r(c.from("recibo_overrides").update({ motivo: "dni_no_encontrado" }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("recibo_overrides").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async () => undefined,
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(V, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(V, N, N, N),
+    },
+  },
+
+  // The owner reads their own signatures and evidence.
+  firmas_empleado: {
+    preparar: async (service, titular) => ({ id: (await reciboPermanente(service, titular.id)).firma }),
+    estado: (service, titular) => filas(service.from("firmas_empleado").select("*").eq("empleado_id", titular.id).order("version")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("firmas_empleado").select("id").eq("id", o.id)),
+      insert: (c, _l, t) =>
+        r(c.from("firmas_empleado").insert({ empleado_id: t.id, version: 99, imagen_path: "intento.png", activa: false }).select("id")),
+      update: (c, _l, _t, o) => r(c.from("firmas_empleado").update({ activa: false }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("firmas_empleado").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async () => undefined,
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(P, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(P, N, N, N),
+    },
+  },
+
+  recibo_firmas: {
+    preparar: async (service, titular) => {
+      const permanente = await reciboPermanente(service, titular.id);
+      return { id: permanente.evidencia, recibo: permanente.recibo, firma: permanente.firma };
+    },
+    estado: (service, titular) => filas(service.from("recibo_firmas").select("*").eq("empleado_id", titular.id).order("id")),
+    ops: {
+      select: (c, _l, _t, o) => r(c.from("recibo_firmas").select("id").eq("id", o.id)),
+      insert: (c, _l, t, o) =>
+        r(c.from("recibo_firmas").insert({ recibo_id: o.recibo, empleado_id: t.id, firma_id: o.firma }).select("id")),
+      update: (c, _l, _t, o) => r(c.from("recibo_firmas").update({ firmado_at: new Date().toISOString() }).eq("id", o.id).select("id")),
+      delete: (c, _l, _t, o) => r(c.from("recibo_firmas").delete().eq("id", o.id).select("id")),
+    },
+    limpiar: async () => undefined,
+    esperado: {
+      anon: e(N, N, N, N),
+      "empleado-propio": e(P, N, N, N),
+      "empleado-ajeno": e(V, N, N, N),
+      admin: e(P, N, N, N),
+      ...inactivo(e(V, N, N, N)),
+      "cambio-forzado-propio": e(P, N, N, N),
     },
   },
 
