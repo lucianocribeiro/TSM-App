@@ -217,6 +217,41 @@ export type Database = {
           },
         ]
       }
+      firmas_empleado: {
+        Row: {
+          activa: boolean
+          created_at: string
+          empleado_id: string
+          id: string
+          imagen_path: string
+          version: number
+        }
+        Insert: {
+          activa: boolean
+          created_at?: string
+          empleado_id: string
+          id?: string
+          imagen_path: string
+          version: number
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          empleado_id?: string
+          id?: string
+          imagen_path?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firmas_empleado_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       legajo_documentos: {
         Row: {
           created_at: string
@@ -589,6 +624,356 @@ export type Database = {
         }
         Relationships: []
       }
+      recibo_firmas: {
+        Row: {
+          empleado_id: string
+          firma_id: string
+          firmado_at: string
+          id: string
+          recibo_id: string
+        }
+        Insert: {
+          empleado_id: string
+          firma_id: string
+          firmado_at?: string
+          id?: string
+          recibo_id: string
+        }
+        Update: {
+          empleado_id?: string
+          firma_id?: string
+          firmado_at?: string
+          id?: string
+          recibo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibo_firmas_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_firmas_firma_fkey"
+            columns: ["firma_id", "empleado_id"]
+            isOneToOne: false
+            referencedRelation: "firmas_empleado"
+            referencedColumns: ["id", "empleado_id"]
+          },
+          {
+            foreignKeyName: "recibo_firmas_recibo_fkey"
+            columns: ["recibo_id", "empleado_id"]
+            isOneToOne: false
+            referencedRelation: "recibos"
+            referencedColumns: ["id", "empleado_id"]
+          },
+        ]
+      }
+      recibo_historial: {
+        Row: {
+          archivo_bytes: number
+          archivo_path: string
+          cargado_at: string
+          cargado_por: string
+          empleado_id: string
+          estado_al_reemplazo: Database["public"]["Enums"]["recibo_estado"]
+          firma_id: string | null
+          firmado_at: string | null
+          id: string
+          periodo_id: string
+          recibo_id: string
+          reemplazado_at: string
+          reemplazado_por: string
+        }
+        Insert: {
+          archivo_bytes: number
+          archivo_path: string
+          cargado_at: string
+          cargado_por: string
+          empleado_id: string
+          estado_al_reemplazo: Database["public"]["Enums"]["recibo_estado"]
+          firma_id?: string | null
+          firmado_at?: string | null
+          id?: string
+          periodo_id: string
+          recibo_id: string
+          reemplazado_at?: string
+          reemplazado_por: string
+        }
+        Update: {
+          archivo_bytes?: number
+          archivo_path?: string
+          cargado_at?: string
+          cargado_por?: string
+          empleado_id?: string
+          estado_al_reemplazo?: Database["public"]["Enums"]["recibo_estado"]
+          firma_id?: string | null
+          firmado_at?: string | null
+          id?: string
+          periodo_id?: string
+          recibo_id?: string
+          reemplazado_at?: string
+          reemplazado_por?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibo_historial_cargado_por_fkey"
+            columns: ["cargado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_historial_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_historial_firma_id_fkey"
+            columns: ["firma_id"]
+            isOneToOne: false
+            referencedRelation: "firmas_empleado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_historial_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "recibo_periodos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_historial_recibo_id_fkey"
+            columns: ["recibo_id"]
+            isOneToOne: false
+            referencedRelation: "recibos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_historial_reemplazado_por_fkey"
+            columns: ["reemplazado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recibo_overrides: {
+        Row: {
+          admin_id: string
+          archivo_path: string
+          created_at: string
+          id: string
+          motivo: Database["public"]["Enums"]["recibo_override_motivo"]
+          recibo_id: string
+        }
+        Insert: {
+          admin_id: string
+          archivo_path: string
+          created_at?: string
+          id?: string
+          motivo: Database["public"]["Enums"]["recibo_override_motivo"]
+          recibo_id: string
+        }
+        Update: {
+          admin_id?: string
+          archivo_path?: string
+          created_at?: string
+          id?: string
+          motivo?: Database["public"]["Enums"]["recibo_override_motivo"]
+          recibo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibo_overrides_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_overrides_recibo_id_fkey"
+            columns: ["recibo_id"]
+            isOneToOne: false
+            referencedRelation: "recibos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recibo_periodo_historial: {
+        Row: {
+          accion: Database["public"]["Enums"]["recibo_periodo_accion"]
+          actor_id: string
+          created_at: string
+          id: string
+          periodo_id: string
+        }
+        Insert: {
+          accion: Database["public"]["Enums"]["recibo_periodo_accion"]
+          actor_id: string
+          created_at?: string
+          id?: string
+          periodo_id: string
+        }
+        Update: {
+          accion?: Database["public"]["Enums"]["recibo_periodo_accion"]
+          actor_id?: string
+          created_at?: string
+          id?: string
+          periodo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibo_periodo_historial_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_periodo_historial_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "recibo_periodos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recibo_periodos: {
+        Row: {
+          anio: number
+          cerrado_at: string | null
+          cerrado_por: string | null
+          created_at: string
+          created_by: string
+          estado: Database["public"]["Enums"]["recibo_periodo_estado"]
+          id: string
+          mes: number
+          publicado_at: string | null
+          publicado_por: string | null
+        }
+        Insert: {
+          anio: number
+          cerrado_at?: string | null
+          cerrado_por?: string | null
+          created_at?: string
+          created_by: string
+          estado?: Database["public"]["Enums"]["recibo_periodo_estado"]
+          id?: string
+          mes: number
+          publicado_at?: string | null
+          publicado_por?: string | null
+        }
+        Update: {
+          anio?: number
+          cerrado_at?: string | null
+          cerrado_por?: string | null
+          created_at?: string
+          created_by?: string
+          estado?: Database["public"]["Enums"]["recibo_periodo_estado"]
+          id?: string
+          mes?: number
+          publicado_at?: string | null
+          publicado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibo_periodos_cerrado_por_fkey"
+            columns: ["cerrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_periodos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibo_periodos_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recibos: {
+        Row: {
+          archivo_bytes: number
+          archivo_path: string
+          cargado_at: string
+          cargado_por: string
+          empleado_id: string
+          estado: Database["public"]["Enums"]["recibo_estado"]
+          firma_id: string | null
+          firmado_at: string | null
+          id: string
+          periodo_id: string
+          updated_at: string
+        }
+        Insert: {
+          archivo_bytes: number
+          archivo_path: string
+          cargado_at?: string
+          cargado_por: string
+          empleado_id: string
+          estado?: Database["public"]["Enums"]["recibo_estado"]
+          firma_id?: string | null
+          firmado_at?: string | null
+          id?: string
+          periodo_id: string
+          updated_at?: string
+        }
+        Update: {
+          archivo_bytes?: number
+          archivo_path?: string
+          cargado_at?: string
+          cargado_por?: string
+          empleado_id?: string
+          estado?: Database["public"]["Enums"]["recibo_estado"]
+          firma_id?: string | null
+          firmado_at?: string | null
+          id?: string
+          periodo_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibos_cargado_por_fkey"
+            columns: ["cargado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_firma_fkey"
+            columns: ["firma_id", "empleado_id"]
+            isOneToOne: false
+            referencedRelation: "firmas_empleado"
+            referencedColumns: ["id", "empleado_id"]
+          },
+          {
+            foreignKeyName: "recibos_periodo_id_fkey"
+            columns: ["periodo_id"]
+            isOneToOne: false
+            referencedRelation: "recibo_periodos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       solicitudes_cambio: {
         Row: {
           created_at: string
@@ -741,6 +1126,7 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: undefined
       }
+      mis_recibos_pendientes_count: { Args: never; Returns: number }
       mover_catalogo_item: {
         Args: { p_direccion: string; p_item_id: string; p_version: number }
         Returns: undefined
@@ -833,6 +1219,10 @@ export type Database = {
         | "viudo"
         | "union_convivencial"
       estado_laboral: "activo" | "en_prueba"
+      recibo_estado: "pendiente" | "firmado"
+      recibo_override_motivo: "dni_no_encontrado" | "no_verificable" | "sin_dni"
+      recibo_periodo_accion: "creado" | "publicado" | "cerrado" | "reabierto"
+      recibo_periodo_estado: "borrador" | "publicado" | "cerrado"
       solicitud_estado: "pendiente" | "aprobada" | "rechazada" | "cancelada"
     }
     CompositeTypes: {
@@ -1002,6 +1392,14 @@ export const Constants = {
         "union_convivencial",
       ],
       estado_laboral: ["activo", "en_prueba"],
+      recibo_estado: ["pendiente", "firmado"],
+      recibo_override_motivo: [
+        "dni_no_encontrado",
+        "no_verificable",
+        "sin_dni",
+      ],
+      recibo_periodo_accion: ["creado", "publicado", "cerrado", "reabierto"],
+      recibo_periodo_estado: ["borrador", "publicado", "cerrado"],
       solicitud_estado: ["pendiente", "aprobada", "rechazada", "cancelada"],
     },
   },
