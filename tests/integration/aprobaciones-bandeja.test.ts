@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { copy } from "@/lib/copy/es-AR";
 import { buildDocumentoPath } from "@/lib/documentos/paths";
 import { DOCUMENTOS_BUCKET, type DocumentoTipo } from "@/lib/documentos/tipos";
+import { camposDelGrupo } from "@/lib/legajo/grupos";
 import { anonClient, createTestUser, deleteTestUsers, serviceClient, type TestUser, type TypedClient } from "./helpers";
 import { laboralCompleto } from "./laborales";
 
@@ -29,6 +30,8 @@ const ACTIVA = { estadoCuenta: "activa", debeCambiarPassword: false };
 const noAutorizado = { ok: false, error: copy.cuentas.errors.noAutorizado };
 const OBJECT_STATE = "55000";
 
+const soloCampos = (valores: Record<string, unknown>, campos: readonly string[]) =>
+  Object.fromEntries(Object.entries(valores).filter(([campo]) => campos.includes(campo)));
 const GRUPOS_A_D = {
   nombres: "Prueba",
   apellido: "Bandeja",
@@ -522,7 +525,8 @@ describe("F1-09B: lock, replacement, history and the approvals inbox", () => {
       const result = await legajos.actualizarGrupoLegajo({
         profileId: empleado.id,
         grupo: "D",
-        valores: { ...GRUPOS_A_D, alergias: "Otra" },
+        // Group D's own fields only: any other key refuses the input before the lock is read (AUD-SEC-01-01).
+        valores: { ...soloCampos(GRUPOS_A_D, camposDelGrupo("D")), alergias: "Otra" },
       });
       expect(result).toEqual({ ok: false, error: copy.legajos.errors.solicitudPendiente });
     });

@@ -19,21 +19,24 @@ const campana = (page: Page) => page.getByTestId("campana").filter({ visible: tr
 
 type Apartados = { solicitudes: string[]; documentos: string[] };
 
-async function apartarPendientes(revisor: string): Promise<Apartados> {
+// Records each set of ids in apartados before changing it, so that a failure
+// halfway still restores what was set aside (AUD11B-01).
+async function apartarPendientes(revisor: string, apartados: Apartados) {
   const service = localServiceClient();
   const solicitudes = ((await service.from("solicitudes_cambio").select("id").eq("estado", "pendiente")).data ?? []).map((s) => s.id);
   const documentos = ((await service.from("legajo_documentos").select("id").eq("estado", "pendiente")).data ?? []).map((d) => d.id);
   if (solicitudes.length) {
+    apartados.solicitudes = solicitudes;
     expect((await service.from("solicitudes_cambio").update({ estado: "cancelada" }).in("id", solicitudes)).error).toBeNull();
   }
   if (documentos.length) {
+    apartados.documentos = documentos;
     const apartado = await service
       .from("legajo_documentos")
       .update({ estado: "rechazado", motivo_rechazo: "Apartado por la prueba de la campana", revisado_por: revisor, revisado_en: new Date().toISOString() })
       .in("id", documentos);
     expect(apartado.error).toBeNull();
   }
-  return { solicitudes, documentos };
 }
 
 async function restaurar({ solicitudes, documentos }: Apartados) {
@@ -47,10 +50,14 @@ async function restaurar({ solicitudes, documentos }: Apartados) {
   }
 }
 
+// The setup runs inside try, so the items set aside are restored even when
+// the setup or an assertion fails; the accounts the test creates are removed
+// by afterAll above, which runs on failure too (AUD11B-01).
 test("the bell: no badge at zero, the exact count, and 9+ above nine", async ({ page }) => {
-  const admin = await adminNuevo("campana-admin", cuentas.add);
-  const apartados = await apartarPendientes(admin.id);
+  const apartados: Apartados = { solicitudes: [], documentos: [] };
   try {
+    const admin = await adminNuevo("campana-admin", cuentas.add);
+    await apartarPendientes(admin.id, apartados);
     const service = localServiceClient();
     for (const tabla of ["solicitudes_cambio", "legajo_documentos"] as const) {
       const { count } = await service.from(tabla).select("id", { count: "exact", head: true }).eq("estado", "pendiente");

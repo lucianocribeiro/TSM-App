@@ -4,25 +4,31 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { CAMPO_HIJOS, type CampoSolicitudColumna } from "@/lib/aprobaciones/campos";
 import { solicitudErrorMessage } from "@/lib/aprobaciones/solicitudes";
-import { listarItems } from "@/lib/configuracion/datos";
 import { copy } from "@/lib/copy/es-AR";
-import { copyLaborales } from "@/lib/copy/laborales";
 import type { Database } from "@/lib/supabase/database.types";
-import { camposDelGrupo, ESQUEMA_GRUPO, isGrupoEditable, type GrupoEditable } from "./grupos";
-import { fieldErrors } from "./validation";
-import { validarDatosLaborales } from "./laborales";
+import { camposDelGrupo, isGrupoEditable, type GrupoEditable } from "./grupos";
+import {
+  datosEmergenciaEntradaSchema,
+  datosFamiliaresEntradaSchema,
+  datosPersonalesEntradaSchema,
+  domicilioContactoEntradaSchema,
+  fieldErrors,
+} from "./validation";
 
-// Direct writes to a legajo (Admin: their own from /mi-legajo, anyone's from
-// /legajos). Values are validated with the shared schemas of PRD 5.7 before
-// anything is written; RLS (legajos_update_admin, legajo_hijos_*_admin) lets
-// only an active Admin write. The calling action checks the role first.
+// Groups A to D of a legajo, shared by /mi-legajo and /legajos: validating a
+// group as action input, and the direct writes (Admin: their own from
+// /mi-legajo, anyone's from /legajos). Values are validated with the shared
+// schemas of PRD 5.7 before anything is written; RLS (legajos_update_admin,
+// legajo_hijos_*_admin) lets only an active Admin write. The calling action
+// checks the role first. Group E (Admin only) is not here: it lives in
+// ./laborales-escritura.ts, which this module never imports (AUDCR3-01).
 
 type Client = SupabaseClient<Database>;
 type LegajoUpdate = Database["public"]["Tables"]["legajos"]["Update"];
 
 const aprobacionErrors = copy.aprobaciones.errors;
-const UNIQUE_VIOLATION = "23505";
-const CHECK_VIOLATION = "23514";
+export const UNIQUE_VIOLATION = "23505";
+export const CHECK_VIOLATION = "23514";
 const INVALID_PARAMETER = "22023";
 const OBJECT_STATE = "55000";
 // HINT of the lock that refuses groups A to D while a request is pending.
@@ -35,19 +41,31 @@ export function dbErrorMessage(error: { code?: string; message?: string; hint?: 
   return aprobacionErrors.guardarFallo;
 }
 
-const grupoInput = z.object({ grupo: z.string().refine(isGrupoEditable), valores: z.unknown() });
+// Action input: exactly { grupo, valores }, and the values exactly the
+// group's own fields (children included), checked before any read or write
+// (AUD-SEC-01-01).
+const grupoInput = z.strictObject({ grupo: z.string().refine(isGrupoEditable), valores: z.unknown() });
+const ESQUEMA_GRUPO_ENTRADA = {
+  A: datosPersonalesEntradaSchema,
+  B: domicilioContactoEntradaSchema,
+  C: datosFamiliaresEntradaSchema,
+  D: datosEmergenciaEntradaSchema,
+} as const;
 
 export type GrupoValidado =
   | { ok: true; grupo: GrupoEditable; valores: Record<string, unknown> }
   | { ok: false; result: ActionResult };
 
 // Validates one group's values with its shared schema. Field errors come back
-// keyed by field for the form.
+// keyed by field for the form. An unknown key, at any level, is a wrong shape:
+// the generic error, as for any other malformed input.
 export function validarGrupo(input: unknown): GrupoValidado {
+  const malformado: GrupoValidado = { ok: false, result: { ok: false, error: aprobacionErrors.guardarFallo } };
   const shape = grupoInput.safeParse(input);
-  if (!shape.success) return { ok: false, result: { ok: false, error: aprobacionErrors.guardarFallo } };
+  if (!shape.success) return malformado;
   const grupo = shape.data.grupo as GrupoEditable;
-  const parsed = ESQUEMA_GRUPO[grupo].safeParse(shape.data.valores);
+  const parsed = ESQUEMA_GRUPO_ENTRADA[grupo].safeParse(shape.data.valores);
+  if (!parsed.success && parsed.error.issues.some((issue) => issue.code === "unrecognized_keys")) return malformado;
   if (!parsed.success) {
     return {
       ok: false,
@@ -91,51 +109,6 @@ export async function aplicarGrupo(
       if (inserted.error) return { ok: false, error: dbErrorMessage(inserted.error) };
     }
   }
-  return { ok: true };
-}
-
-// HINTs of legajos_laborales_validar (CR-2).
-const LABORALES_INCOMPLETOS_HINT = "laborales_incompletos";
-const ITEM_INACTIVO_HINT = "item_inactivo";
-// CR-5: the "No" convenio with Tarea or Categoría.
-const SIN_CONVENIO_HINT = "sin_convenio";
-
-// Validates and writes group E (PRD 5.5) to legajos_laborales, against the
-// Configuración lists as they are now (validarDatosLaborales). Antigüedad is
-// calculated, never stored. A número de legajo already used by another
-// employee is its own error. The database applies the same rules
-// (legajos_laborales_validar), so a list changed meanwhile is still refused.
-export async function aplicarDatosLaborales(client: Client, profileId: string, valores: unknown): Promise<ActionResult> {
-  const [legajo, items] = await Promise.all([
-    client.from("legajos").select("id, legajos_laborales(*)").eq("profile_id", profileId).maybeSingle(),
-    listarItems(client),
-  ]);
-  if (legajo.error || !legajo.data?.legajos_laborales || !items) return { ok: false, error: aprobacionErrors.guardarFallo };
-
-  const validado = validarDatosLaborales(valores, items, legajo.data.legajos_laborales);
-  if (!validado.ok) return { ok: false, error: copy.miLegajo.errors.revisarCampos, fieldErrors: validado.fieldErrors };
-
-  const { data, error } = await client
-    .from("legajos_laborales")
-    .update(validado.datos)
-    .eq("legajo_id", legajo.data.id)
-    .select("legajo_id")
-    .maybeSingle();
-  if (error?.code === UNIQUE_VIOLATION) {
-    const mensaje = copyLaborales.errors.numeroLegajoDuplicado;
-    return { ok: false, error: mensaje, fieldErrors: { numero_legajo: mensaje } };
-  }
-  if (error?.code === CHECK_VIOLATION && error.hint === ITEM_INACTIVO_HINT) {
-    return { ok: false, error: copy.legajo.validation.itemInactivo };
-  }
-  if (error?.code === CHECK_VIOLATION && error.hint === SIN_CONVENIO_HINT) {
-    const mensaje = copyLaborales.errors.sinConvenio;
-    return { ok: false, error: copy.miLegajo.errors.revisarCampos, fieldErrors: { tarea_id: mensaje, categoria_id: mensaje } };
-  }
-  if (error?.code === CHECK_VIOLATION && error.hint === LABORALES_INCOMPLETOS_HINT) {
-    return { ok: false, error: copy.miLegajo.errors.revisarCampos };
-  }
-  if (error || !data) return { ok: false, error: error ? dbErrorMessage(error) : aprobacionErrors.guardarFallo };
   return { ok: true };
 }
 

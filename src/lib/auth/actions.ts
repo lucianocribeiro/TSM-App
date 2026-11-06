@@ -8,6 +8,7 @@ import { rutaRetornoSegura, VOLVER_PARAM } from "@/lib/auth/retorno";
 import { autorizarAccion, sesionParaCerrar } from "@/lib/auth/require-role";
 import { borrarActividad, sellarActividad } from "@/lib/sesion/marca-servidor";
 import { sesionIdDeToken } from "@/lib/sesion/marca";
+import { soloCamposPermitidos } from "@/lib/auth/form-data";
 import { parseLoginInput } from "@/lib/auth/login-input";
 import { parseCambioPassword } from "@/lib/auth/password";
 import { verifyCurrentPassword } from "@/lib/auth/verify-password";
@@ -28,10 +29,17 @@ const CUENTA_INACTIVA: ActionResult = {
   error: copy.auth.errors.cuentaInactiva,
 };
 
+// The fields of each form (src/app/login/LoginForm.tsx,
+// src/app/(app)/cambiar-password/CambiarPasswordForm.tsx). Any other key
+// refuses the form before any read or write (AUD-SEC-01-01).
+const CAMPOS_LOGIN = ["email", "password", VOLVER_PARAM] as const;
+const CAMPOS_CAMBIO_PASSWORD = ["actual", "password", "confirmacion"] as const;
+
 export async function login(
   _previous: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
+  if (!soloCamposPermitidos(formData, CAMPOS_LOGIN)) return LOGIN_FAILED;
   const input = parseLoginInput(formData);
   if (!input) {
     return LOGIN_FAILED;
@@ -127,7 +135,10 @@ export async function logout(): Promise<ActionResult> {
 // sesionTerminada: there is no usable session any more (the client goes to
 // the login page). A pending password change is refused too, but the session
 // stays: the proxy has already renewed the marker for this request.
-export async function mantenerSesion(): Promise<ActionResult & { sesionTerminada?: boolean }> {
+// It takes no input: any argument is refused (AUD-SEC-01-01), without ending
+// the session.
+export async function mantenerSesion(...args: unknown[]): Promise<ActionResult & { sesionTerminada?: boolean }> {
+  if (args.length > 0) return { ok: false, error: copy.auth.errors.sesionInactividad, sesionTerminada: false };
   const acceso = await autorizarAccion();
   if (!acceso.ok) {
     return {
@@ -172,6 +183,7 @@ export async function cambiarPassword(
     // The one action a pending forced change allows (explicit exemption).
     const acceso = await autorizarAccion({ permitirCambioPendiente: true });
     if (!acceso.ok) return { ok: false, error: copy.cuentas.errors.noAutorizado };
+    if (!soloCamposPermitidos(formData, CAMPOS_CAMBIO_PASSWORD)) return generic;
     const supabase = await createClient();
     const {
       data: { user },

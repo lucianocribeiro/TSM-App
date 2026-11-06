@@ -61,9 +61,19 @@ describe.each(cases)("%s", (_name, action, operation, input) => {
     expect(operation).not.toHaveBeenCalled();
   });
 
+  // AUD-SEC-01-01: an unknown key used to be dropped; now it refuses the input.
+  it("refuses an unknown key, even undefined, before calling the module", async () => {
+    operation.mockResolvedValue({ ok: true });
+    for (const extra of [{ extra: "ignorado" }, { extra: undefined }, { role: "admin" }]) {
+      await expect(action({ ...input, ...extra }), JSON.stringify(Object.keys(extra))).resolves.toEqual({ ok: false, error: errors.accionFallo });
+    }
+    expect(operation).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
   it("passes the parsed input to the module and revalidates on success", async () => {
     operation.mockResolvedValue({ ok: true });
-    const result = await action({ ...input, extra: "ignorado" });
+    const result = await action(input);
     expect(result.ok).toBe(true);
     expect(operation).toHaveBeenCalledWith(input);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/usuarios", "layout");

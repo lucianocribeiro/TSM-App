@@ -46,12 +46,26 @@ export function avisarFalloLimpieza(origen: string, motivo: string) {
   console.error(`[${origen}] legajo-docs cleanup failed: ${motivo}`);
 }
 
-const subidaInput = z.object({
+// The fields of each step's input. Each step accepts exactly these keys
+// (AUD-SEC-01-01); /legajos adds the target employee's profileId to each
+// and checks the whole input with it before calling here.
+export const SUBIDA_CAMPOS = {
   tipo: z.string(),
   fileName: z.string(),
   mimeType: z.string(),
   sizeBytes: z.number(),
-});
+};
+export const REGISTRO_CAMPOS = {
+  tipo: z.string(),
+  path: z.string(),
+  fileName: z.string(),
+  modo: z.enum(MODOS_REEMPLAZO).optional(),
+};
+export const DESCARTE_CAMPOS = { path: z.string() };
+
+export const subidaInput = z.strictObject(SUBIDA_CAMPOS);
+export const registroInput = z.strictObject(REGISTRO_CAMPOS);
+export const descarteInput = z.strictObject(DESCARTE_CAMPOS);
 
 // A type outside the caller's writable ones.
 function tipoNoPermitido(tipo: string, tipos: readonly DocumentoTipo[]): boolean {
@@ -120,9 +134,7 @@ export async function registrarObjeto(
   { client, ownerId, uploaderId, esAdmin, origen, tipos = DOCUMENTO_TIPO_CODES }: Registro,
   input: unknown,
 ): Promise<ActionResult<{ estado: DocumentoEstado }>> {
-  const parsed = z
-    .object({ tipo: z.string(), path: z.string(), fileName: z.string(), modo: z.enum(MODOS_REEMPLAZO).optional() })
-    .safeParse(input);
+  const parsed = registroInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: errors.subirFallo };
 
   const ruta = parseDocumentoPath(parsed.data.path);
@@ -254,7 +266,7 @@ export async function descartarObjeto(
   origen: string,
   tipos: readonly DocumentoTipo[] = DOCUMENTO_TIPO_CODES,
 ): Promise<ActionResult> {
-  const parsed = z.object({ path: z.string() }).safeParse(input);
+  const parsed = descarteInput.safeParse(input);
   const ruta = parsed.success ? parseDocumentoPath(parsed.data.path) : null;
   if (!parsed.success || !ruta || ruta.profileId !== ownerId) return { ok: false, error: errors.subirFallo };
   if (tipoNoPermitido(ruta.tipo, tipos)) return { ok: false, error: errors.soloAdmin };
