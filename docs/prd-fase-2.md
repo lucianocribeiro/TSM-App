@@ -1,4 +1,4 @@
-# PRD Fase 2 v0.5 — Recibos de sueldo y firma electrónica
+# PRD Fase 2 v0.6 — Recibos de sueldo y firma electrónica
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Sources | TSM-DEV-F2-BRIEF v1.0, TSM-HANDOFF-F1-DEV v1.0, TSM-HANDOFF-F1-PM v1.0, Luciano's answers 06/11/2026 (Q1–Q14, P1, P2) |
 | Date | 06/11/2026 |
 
-Change log: v0.5 — storage defined (TSM-F2-03): two private buckets, `recibos` (PDF, 10 MB) and `firmas` (PNG, 1 MB), owner-first path layouts enforced by the database. v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
+Change log: v0.6 — libraries chosen (TSM-F2-07): `unpdf` for the DNI text check and `@cantoo/pdf-lib` for the signature stamp, server-only; signature drawing and drag-and-drop use no library. v0.5 — storage defined (TSM-F2-03): two private buckets, `recibos` (PDF, 10 MB) and `firmas` (PNG, 1 MB), owner-first path layouts enforced by the database. v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
 
 ---
 
@@ -91,6 +91,17 @@ Written only through a SECURITY DEFINER function with `search_path = ''`, execut
 - All Server Action inputs `.strict()` at every level, refused before any I/O. Boundary test per new action.
 - Admin-only code and copy (Carga, Estado, overrides, history) in Admin-only modules covered by the ESLint rule and bundle check.
 - PDF text extraction and stamping run server-side only. Libraries reviewed in F2-07.
+
+### Librerías (TSM-F2-07)
+
+| Need | Library | Version | License |
+|---|---|---|---|
+| PDF text extraction for the DNI check (RF-08) | `unpdf` | 2.1.0 | MIT |
+| Stamping the signature on the last page (RF-17) | `@cantoo/pdf-lib` | 2.11.1 | MIT |
+
+- Both are imported only by the server-only wrappers `src/lib/recibos/pdf-texto.ts` and `src/lib/recibos/pdf-firma.ts` (and their tests); an ESLint rule refuses the import anywhere else.
+- DNI check limits: 20 pages and 5 seconds per file; beyond either, the DNI is "no verificable".
+- Signature drawing (RF-15) uses a `<canvas>` with Pointer Events and `canvas.toBlob("image/png")`; the upload slots (RF-05) use native drag-and-drop with an `<input type="file">` fallback. No library for either.
 
 ## 7. Pieces and sequence
 
