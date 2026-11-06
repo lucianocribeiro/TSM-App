@@ -131,7 +131,15 @@ describe("/mi-legajo Server Actions", () => {
       as(empleado);
       const result = await actions.enviarSolicitud({
         grupo: "A",
-        valores: { ...LEGAJO, cuil: "20-90000001-6", dni: "94A", fecha_nacimiento: "2999-01-01" },
+        // Group A's own fields only: any other key refuses the input as a whole (AUD-SEC-01-01).
+        valores: {
+          nombres: LEGAJO.nombres,
+          apellido: LEGAJO.apellido,
+          nacionalidad: LEGAJO.nacionalidad,
+          cuil: "20-90000001-6",
+          dni: "94A",
+          fecha_nacimiento: "2999-01-01",
+        },
       });
       expect(result.ok).toBe(false);
       if (result.ok) return;

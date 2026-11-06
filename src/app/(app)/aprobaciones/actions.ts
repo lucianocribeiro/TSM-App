@@ -28,8 +28,12 @@ const errors = copy.aprobaciones.errors;
 const noAutorizado = { ok: false as const, error: copy.cuentas.errors.noAutorizado };
 const yaDecidido = { ok: false as const, error: errors.yaDecidido, yaDecidido: true };
 
-const solicitudInput = z.object({ solicitudId: z.uuid() });
-const documentoInput = z.object({ documentoId: z.uuid() });
+// Action inputs: no key besides the ones named (AUD-SEC-01-01). The reason
+// is checked by validarMotivo, after the shape.
+const solicitudInput = z.strictObject({ solicitudId: z.uuid() });
+const rechazoSolicitudInput = z.strictObject({ solicitudId: z.uuid(), motivo: z.unknown() });
+const documentoInput = z.strictObject({ documentoId: z.uuid() });
+const rechazoDocumentoInput = z.strictObject({ documentoId: z.uuid(), motivo: z.unknown() });
 
 // Everything under the app layout: the inbox, the bell count the layout
 // renders, and the employee's legajo in /legajos and /mi-legajo.
@@ -71,9 +75,9 @@ export async function aprobarSolicitud(input: unknown): Promise<DecisionResult> 
 export async function rechazarSolicitud(input: unknown): Promise<DecisionResult> {
   const admin = await sessionWithRole("admin");
   if (!admin) return noAutorizado;
-  const parsed = solicitudInput.safeParse(input);
+  const parsed = rechazoSolicitudInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: errors.guardarFallo };
-  const motivo = validarMotivo((input as { motivo?: unknown }).motivo);
+  const motivo = validarMotivo(parsed.data.motivo);
   if (!motivo.ok) return { ok: false, error: motivo.error };
 
   const solicitud = await cargarSolicitud(parsed.data.solicitudId);
@@ -92,8 +96,8 @@ export async function rechazarSolicitud(input: unknown): Promise<DecisionResult>
 // ---------------------------------------------------------------------------
 // Documents
 // ---------------------------------------------------------------------------
-async function documentoPendiente(input: unknown, adminId: string) {
-  const parsed = documentoInput.safeParse(input);
+async function documentoPendiente(input: unknown, adminId: string, schema: typeof documentoInput | typeof rechazoDocumentoInput) {
+  const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: errors.guardarFallo };
   const documento = await cargarDocumento(parsed.data.documentoId);
   if (documento === "no-encontrado") return yaDecidido;
@@ -106,7 +110,7 @@ async function documentoPendiente(input: unknown, adminId: string) {
 export async function aprobarDocumento(input: unknown): Promise<DecisionResult> {
   const admin = await sessionWithRole("admin");
   if (!admin) return noAutorizado;
-  const found = await documentoPendiente(input, admin.id);
+  const found = await documentoPendiente(input, admin.id, documentoInput);
   if (!found.ok) return found;
 
   const supabase = await createClient();
@@ -120,7 +124,7 @@ export async function rechazarDocumento(input: unknown): Promise<DecisionResult>
   const admin = await sessionWithRole("admin");
   if (!admin) return noAutorizado;
   const motivo = validarMotivo((input as { motivo?: unknown } | null)?.motivo);
-  const found = await documentoPendiente(input, admin.id);
+  const found = await documentoPendiente(input, admin.id, rechazoDocumentoInput);
   if (!found.ok) return found;
   if (!motivo.ok) return { ok: false, error: motivo.error };
 
@@ -156,7 +160,9 @@ export async function descargarDocumentoBandeja(input: unknown): Promise<ActionR
 // ---------------------------------------------------------------------------
 // The count for the Admin's bell, asked again on navigation. Anyone else gets
 // no number.
-export async function contarPendientesCampana(): Promise<ActionResult<{ total: number }>> {
+// It takes no input: any argument is refused (AUD-SEC-01-01).
+export async function contarPendientesCampana(...args: unknown[]): Promise<ActionResult<{ total: number }>> {
+  if (args.length > 0) return { ok: false, error: errors.guardarFallo };
   const admin = await sessionWithRole("admin");
   if (!admin) return noAutorizado;
   const total = await contarPendientes();

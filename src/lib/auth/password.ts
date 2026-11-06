@@ -26,7 +26,7 @@ const actualSchema = z
 // change the user has just signed in with their temporary password.
 export function cambioPasswordSchema({ requiereActual }: { requiereActual: boolean }) {
   return z
-    .object({
+    .strictObject({
       actual: requiereActual ? actualSchema : z.unknown().transform(() => null),
       password: passwordSchema,
       confirmacion: z.string({ error: messages.noCoinciden }),

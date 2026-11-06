@@ -6,8 +6,14 @@ import { CAMPO_HIJOS, type CampoSolicitudColumna } from "@/lib/aprobaciones/camp
 import { solicitudErrorMessage } from "@/lib/aprobaciones/solicitudes";
 import { copy } from "@/lib/copy/es-AR";
 import type { Database } from "@/lib/supabase/database.types";
-import { camposDelGrupo, ESQUEMA_GRUPO, isGrupoEditable, type GrupoEditable } from "./grupos";
-import { fieldErrors } from "./validation";
+import { camposDelGrupo, isGrupoEditable, type GrupoEditable } from "./grupos";
+import {
+  datosEmergenciaEntradaSchema,
+  datosFamiliaresEntradaSchema,
+  datosPersonalesEntradaSchema,
+  domicilioContactoEntradaSchema,
+  fieldErrors,
+} from "./validation";
 
 // Groups A to D of a legajo, shared by /mi-legajo and /legajos: validating a
 // group as action input, and the direct writes (Admin: their own from
@@ -35,19 +41,31 @@ export function dbErrorMessage(error: { code?: string; message?: string; hint?: 
   return aprobacionErrors.guardarFallo;
 }
 
-const grupoInput = z.object({ grupo: z.string().refine(isGrupoEditable), valores: z.unknown() });
+// Action input: exactly { grupo, valores }, and the values exactly the
+// group's own fields (children included), checked before any read or write
+// (AUD-SEC-01-01).
+const grupoInput = z.strictObject({ grupo: z.string().refine(isGrupoEditable), valores: z.unknown() });
+const ESQUEMA_GRUPO_ENTRADA = {
+  A: datosPersonalesEntradaSchema,
+  B: domicilioContactoEntradaSchema,
+  C: datosFamiliaresEntradaSchema,
+  D: datosEmergenciaEntradaSchema,
+} as const;
 
 export type GrupoValidado =
   | { ok: true; grupo: GrupoEditable; valores: Record<string, unknown> }
   | { ok: false; result: ActionResult };
 
 // Validates one group's values with its shared schema. Field errors come back
-// keyed by field for the form.
+// keyed by field for the form. An unknown key, at any level, is a wrong shape:
+// the generic error, as for any other malformed input.
 export function validarGrupo(input: unknown): GrupoValidado {
+  const malformado: GrupoValidado = { ok: false, result: { ok: false, error: aprobacionErrors.guardarFallo } };
   const shape = grupoInput.safeParse(input);
-  if (!shape.success) return { ok: false, result: { ok: false, error: aprobacionErrors.guardarFallo } };
+  if (!shape.success) return malformado;
   const grupo = shape.data.grupo as GrupoEditable;
-  const parsed = ESQUEMA_GRUPO[grupo].safeParse(shape.data.valores);
+  const parsed = ESQUEMA_GRUPO_ENTRADA[grupo].safeParse(shape.data.valores);
+  if (!parsed.success && parsed.error.issues.some((issue) => issue.code === "unrecognized_keys")) return malformado;
   if (!parsed.success) {
     return {
       ok: false,

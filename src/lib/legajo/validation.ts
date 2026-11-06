@@ -168,6 +168,17 @@ export const domicilioContactoSchema = z
 export const datosFamiliaresSchema = z.object(datosFamiliaresShape).superRefine(checkHijos);
 export const datosEmergenciaSchema = z.object(datosEmergenciaShape);
 
+// The same groups as Server Action input (AUD-SEC-01-01): no key besides the
+// group's own fields, at either level (the children too). The schemas above
+// stay as they are for the forms' own check and for values read back on the
+// server (src/lib/aprobaciones/revalidacion.ts).
+export const datosPersonalesEntradaSchema = z.strictObject(datosPersonalesShape);
+export const domicilioContactoEntradaSchema = z.strictObject(domicilioContactoShape).superRefine(checkPartidoOtro);
+export const datosFamiliaresEntradaSchema = z
+  .strictObject({ ...datosFamiliaresShape, hijos: z.array(hijoSchema.strict(), { error: messages.required }) })
+  .superRefine(checkHijos);
+export const datosEmergenciaEntradaSchema = z.strictObject(datosEmergenciaShape);
+
 // Groups A to D together: what an Empleado can edit on their own legajo.
 export const legajoPersonalSchema = z
   .object({

@@ -6,7 +6,14 @@ import type { ActionResult } from "@/lib/action-result";
 import { buildSolicitudItemsDe, type LegajoActual } from "@/lib/aprobaciones/solicitudes";
 import { sessionWithRole, usuarioActivo } from "@/lib/auth/require-role";
 import { copy } from "@/lib/copy/es-AR";
-import { descartarObjeto, prepararRuta, registrarObjeto } from "@/lib/documentos/registro";
+import {
+  descartarObjeto,
+  descarteInput,
+  prepararRuta,
+  registrarObjeto,
+  registroInput,
+  subidaInput,
+} from "@/lib/documentos/registro";
 import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
 import { DOCUMENTO_TIPOS_PROPIOS, DOCUMENTOS_BUCKET, esTipoSoloAdmin } from "@/lib/documentos/tipos";
 import { camposDelGrupo } from "@/lib/legajo/grupos";
@@ -23,6 +30,9 @@ const MI_LEGAJO_PATH = "/mi-legajo";
 const t = copy.miLegajo;
 const aprobacionErrors = copy.aprobaciones.errors;
 const noAutorizado: ActionResult = { ok: false, error: copy.cuentas.errors.noAutorizado };
+// Action inputs: no key besides the ones named (AUD-SEC-01-01).
+const solicitudInput = z.strictObject({ solicitudId: z.uuid() });
+const documentoInput = z.strictObject({ documentoId: z.uuid() });
 
 // ---------------------------------------------------------------------------
 // Change requests (Empleado)
@@ -58,7 +68,7 @@ export async function enviarSolicitud(input: unknown): Promise<ActionResult> {
 export async function cancelarSolicitud(input: unknown): Promise<ActionResult> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  const parsed = z.object({ solicitudId: z.uuid() }).safeParse(input);
+  const parsed = solicitudInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: aprobacionErrors.guardarFallo };
 
   const supabase = await createClient();
@@ -102,10 +112,14 @@ export async function actualizarLegajoPropio(input: unknown): Promise<ActionResu
 // (Alta de AFIP) are refused here for every role, an Admin included: they are
 // managed from Legajos (CR-3).
 const ORIGEN = "mi-legajo";
+// The shape is checked before the session client is even built; the shared
+// steps check it again.
+const subirFallo: ActionResult<never> = { ok: false, error: t.documentos.errors.subirFallo };
 
 export async function prepararSubidaDocumento(input: unknown): Promise<ActionResult<{ path: string }>> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
+  if (!subidaInput.safeParse(input).success) return subirFallo;
   return prepararRuta(await createClient(), user.id, input, { origen: ORIGEN, tipos: DOCUMENTO_TIPOS_PROPIOS });
 }
 
@@ -114,6 +128,7 @@ export async function registrarDocumento(
 ): Promise<ActionResult<{ estado: Database["public"]["Enums"]["documento_estado"] }>> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
+  if (!registroInput.safeParse(input).success) return subirFallo;
   const result = await registrarObjeto(
     {
       client: await createClient(),
@@ -133,19 +148,20 @@ export async function registrarDocumento(
 export async function descartarSubida(input: unknown): Promise<ActionResult> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
+  if (!descarteInput.safeParse(input).success) return subirFallo;
   return descartarObjeto(await createClient(), user.id, input, ORIGEN, DOCUMENTO_TIPOS_PROPIOS);
 }
 
 // A document of the caller's own legajo, found by id. An Admin's RLS reaches
 // every legajo, so the ownership is checked here too.
-async function documentoPropio(documentoId: unknown, userId: string) {
-  const parsed = z.uuid().safeParse(documentoId);
+async function documentoPropio(input: unknown, userId: string) {
+  const parsed = documentoInput.safeParse(input);
   if (!parsed.success) return null;
   const supabase = await createClient();
   const { data } = await supabase
     .from("legajo_documentos")
     .select("id, tipo, estado, storage_path, file_name, legajos!inner(profile_id)")
-    .eq("id", parsed.data)
+    .eq("id", parsed.data.documentoId)
     .eq("legajos.profile_id", userId)
     .maybeSingle();
   return data ? { supabase, documento: data } : null;
@@ -154,7 +170,7 @@ async function documentoPropio(documentoId: unknown, userId: string) {
 export async function eliminarDocumentoPendiente(input: unknown): Promise<ActionResult> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  const found = await documentoPropio((input as { documentoId?: unknown } | null)?.documentoId, user.id);
+  const found = await documentoPropio(input, user.id);
   if (found && esTipoSoloAdmin(found.documento.tipo)) return { ok: false, error: t.documentos.errors.soloAdmin };
   if (!found || found.documento.estado !== "pendiente") return { ok: false, error: t.documentos.errors.eliminarFallo };
 
@@ -172,7 +188,7 @@ export async function eliminarDocumentoPendiente(input: unknown): Promise<Action
 export async function obtenerUrlDocumento(input: unknown): Promise<ActionResult<{ url: string }>> {
   const user = await usuarioActivo();
   if (!user) return noAutorizado;
-  const found = await documentoPropio((input as { documentoId?: unknown } | null)?.documentoId, user.id);
+  const found = await documentoPropio(input, user.id);
   if (!found) return { ok: false, error: copy.documentos.errors.downloadFailed };
   // Served as an attachment with the original file name.
   return createDocumentoSignedUrl(found.documento.storage_path, { download: found.documento.file_name });
