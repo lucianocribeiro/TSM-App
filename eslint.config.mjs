@@ -43,17 +43,42 @@ const recibosAdmin = [
   { group: ["@/lib/recibos/limpieza", "**/recibos/limpieza"], message: recibosAdminMessage },
 ];
 
+// F2-07: the PDF libraries run on the server only, behind the two receipt
+// wrappers (src/lib/recibos/pdf-texto.ts and pdf-firma.ts, "server-only").
+// No other file imports them; the wrappers' own tests do, to build fixtures.
+const pdfLibsMessage = "PDF libraries are only allowed in src/lib/recibos/pdf-*.ts (F2-07).";
+const pdfLibs = [
+  { group: ["unpdf", "unpdf/*", "@cantoo/pdf-lib", "@cantoo/pdf-lib/*"], message: pdfLibsMessage },
+];
+const pdfWrappers = ["src/lib/recibos/pdf-*.ts"];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
     files: ["**/*.{ts,tsx,js,jsx,mjs}"],
-    ignores: ["src/lib/admin/cuentas.ts"],
+    ignores: ["src/lib/admin/cuentas.ts", ...pdfWrappers],
+    rules: {
+      "no-restricted-imports": ["error", { ...serviceRole, patterns: [...serviceRole.patterns, ...pdfLibs] }],
+    },
+  },
+  // The one file allowed the service-role client still may not use the PDF
+  // libraries.
+  {
+    files: ["src/lib/admin/cuentas.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: pdfLibs }],
+    },
+  },
+  // The PDF wrappers keep the service-role restriction.
+  {
+    files: pdfWrappers,
     rules: {
       "no-restricted-imports": ["error", serviceRole],
     },
   },
-  // Replaces the rule's options for these files, so it repeats serviceRole.
+  // Replaces the rule's options for these files, so it repeats serviceRole
+  // and pdfLibs.
   {
     files: [
       "src/app/*.{ts,tsx}",
@@ -75,7 +100,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { ...serviceRole, patterns: [...serviceRole.patterns, ...grupoE, ...recibosAdmin] },
+        { ...serviceRole, patterns: [...serviceRole.patterns, ...grupoE, ...recibosAdmin, ...pdfLibs] },
       ],
     },
   },
