@@ -573,6 +573,7 @@ export type Copy = {
       motivoRequerido: string;
       emailConfirmacionNoCoincide: string;
       historialEnOtrasCuentas: string;
+      tieneRecibos: string;
       accionFallo: string;
     };
   };
@@ -1351,6 +1352,8 @@ export const copy = {
         "El email no coincide con el de la cuenta. Revisalo y volvé a intentar.",
       historialEnOtrasCuentas:
         "Esta cuenta figura en el historial de otras cuentas y no se puede purgar. Desactivala en su lugar.",
+      tieneRecibos:
+        "No se puede purgar la cuenta porque tiene recibos de sueldo cargados. Desactivala en su lugar.",
       accionFallo: "No pudimos completar la acción. Intentá de nuevo.",
     },
   },

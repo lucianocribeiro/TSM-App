@@ -28,9 +28,12 @@ import { createClient } from "@/lib/supabase/server";
 type AppRole = Database["public"]["Enums"]["app_role"];
 type SessionClient = Awaited<ReturnType<typeof createClient>>;
 type ServiceClient = ReturnType<typeof createAdminClient>;
-type DbError = { code?: string; hint?: string | null } | null | undefined;
+type DbError = { code?: string; hint?: string | null; message?: string } | null | undefined;
 
 const errors = copy.cuentas.errors;
+const FK_VIOLATION = "23503";
+// The receipt tables, as the foreign-key error names them.
+const TABLAS_RECIBOS = /on table "(recibos|recibo_[a-z_]+|firmas_empleado)"/;
 
 // Auth bans are durations: 100 years stands for "until reactivated".
 const BAN_UNTIL_REACTIVATED = "876000h";
@@ -77,6 +80,10 @@ export function cuentaErrorMessage(error: DbError): string {
     case "historial_otras_cuentas":
       return errors.historialEnOtrasCuentas;
   }
+  // Receipts (F2-02): every foreign key from the receipt tables to profiles
+  // is ON DELETE RESTRICT, so purging an account with a receipt, signature or
+  // signature evidence row stops at the profile delete (Constitution §11).
+  if (error?.code === FK_VIOLATION && TABLAS_RECIBOS.test(error.message ?? "")) return errors.tieneRecibos;
   switch (error?.code) {
     case "42501":
       return errors.noAutorizado;
