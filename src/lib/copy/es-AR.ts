@@ -185,11 +185,6 @@ export type Copy = {
     vacio: string;
     sinResultados: string;
     total: string;
-    kpis: {
-      label: string;
-      activos: string;
-      ingresosDelMes: string;
-    };
     busqueda: {
       label: string;
     };
@@ -948,11 +943,6 @@ export const copy = {
     vacio: "Todavía no hay empleados con legajo.",
     sinResultados: "No encontramos empleados con esa búsqueda o esos filtros.",
     total: "{n} de {total} empleados",
-    kpis: {
-      label: "Resumen del personal",
-      activos: "Activos",
-      ingresosDelMes: "Ingresos del mes",
-    },
     busqueda: {
       label: "Buscar",
     },

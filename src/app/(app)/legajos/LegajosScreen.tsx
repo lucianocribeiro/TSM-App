@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import { Button, buttonClassName } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Field } from "@/components/ui/Field";
-import { KpiStrip } from "@/components/ui/KpiStrip";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Select } from "@/components/ui/Select";
@@ -24,7 +23,6 @@ import {
   type FiltrosLegajos,
   type LegajoListItem,
 } from "@/lib/legajo/listado";
-import type { KpisLegajos } from "@/lib/legajo/kpis";
 import { ESTADOS_LABORALES } from "@/lib/legajo/options";
 import { ExportarDialog } from "./ExportarDialog";
 
@@ -36,11 +34,9 @@ type LegajosScreenProps = {
   // The Configuración lists, for the filter options.
   items: CatalogoItem[];
   listaFallo: boolean;
-  // Whole workforce, from the server; null when the list could not be read.
-  kpis: KpisLegajos | null;
 };
 
-export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScreenProps) {
+export function LegajosScreen({ legajos, items, listaFallo }: LegajosScreenProps) {
   const router = useRouter();
   const [filtros, setFiltros] = useState<FiltrosLegajos>(FILTROS_INICIALES);
   const [exportando, setExportando] = useState(false);
@@ -79,16 +75,6 @@ export function LegajosScreen({ legajos, items, listaFallo, kpis }: LegajosScree
         }
       />
       <div className="flex flex-col gap-4 px-[34px] pb-10 pt-[26px]">
-        {kpis ? (
-          <KpiStrip
-            label={t.kpis.label}
-            className="mb-2"
-            items={[
-              { key: "activos", label: t.kpis.activos, value: kpis.activos },
-              { key: "ingresos-del-mes", label: t.kpis.ingresosDelMes, value: kpis.ingresosDelMes },
-            ]}
-          />
-        ) : null}
         <div role="search" aria-label={t.filtros.label} className="flex flex-col gap-3">
           <div className="grid items-end gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
             <div className="[grid-column:span_2] max-[560px]:[grid-column:auto]">

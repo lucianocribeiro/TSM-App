@@ -28,7 +28,7 @@ export type LegajoListItem = {
   tareaId: string | null;
   tarea: string | null;
   estadoLaboral: EstadoLaboral | null;
-  // YYYY-MM-DD, for the "Ingresos del mes" card.
+  // YYYY-MM-DD.
   fechaIngreso: string | null;
   estadoCuenta: CuentaEstado;
 };

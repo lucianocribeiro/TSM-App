@@ -1,6 +1,5 @@
 import { requireRole } from "@/lib/auth/require-role";
 import { cargarListadoLegajos } from "@/lib/legajo/admin-legajos";
-import { calcularKpis } from "@/lib/legajo/kpis";
 import { LegajosScreen } from "./LegajosScreen";
 
 // Legajos (PRD US-4, US-8). Admin only: the page guards itself before reading
@@ -8,14 +7,11 @@ import { LegajosScreen } from "./LegajosScreen";
 export default async function LegajosPage() {
   await requireRole("admin");
   const listado = await cargarListadoLegajos();
-  // KPI cards over the whole workforce, computed here (Argentina's month).
-  const kpis = listado ? calcularKpis(listado.legajos) : null;
   return (
     <LegajosScreen
       legajos={listado?.legajos ?? []}
       items={listado?.items ?? []}
       listaFallo={listado === null}
-      kpis={kpis}
     />
   );
 }
