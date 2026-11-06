@@ -10,7 +10,8 @@ import { avisarFalloLimpieza, descartarObjeto, prepararRuta, registrarObjeto } f
 import { createDocumentoSignedUrl } from "@/lib/documentos/signed-url";
 import { exportarLegajos as exportar, type ArchivoExportado } from "@/lib/exportacion/exportar";
 import type { Database } from "@/lib/supabase/database.types";
-import { aplicarDatosLaborales, aplicarGrupo, tieneSolicitudPendiente, validarGrupo } from "@/lib/legajo/escritura";
+import { aplicarGrupo, tieneSolicitudPendiente, validarGrupo } from "@/lib/legajo/escritura";
+import { aplicarDatosLaborales } from "@/lib/legajo/laborales-escritura";
 import { clavesLaboralesSchema } from "@/lib/legajo/laborales";
 import { createClient } from "@/lib/supabase/server";
 
