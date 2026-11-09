@@ -141,7 +141,7 @@ test("an Empleado does not see Configuración and cannot open it", async ({ page
   const empleado = await createE2EUser(`configuracion-empleado-${randomUUID().slice(0, 8)}`);
   cuentas.add(empleado.id);
   await loginAs(page, empleado);
-  await expectNavLinks(page, [copy.nav.miLegajo]);
+  await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.misRecibos]);
   for (const path of ["/configuracion", "/configuracion/historial", "/configuracion?lista=puesto"]) {
     await page.goto(path);
     await expect(page, path).toHaveURL(/\/mi-legajo$/);

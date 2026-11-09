@@ -95,7 +95,7 @@ test.describe("forced password change", () => {
     await fillCambioPassword(page, NEW_PASSWORD);
     await expect(page).toHaveURL(/\/mi-legajo$/);
     await expect(page.getByRole("heading", { level: 1, name: copy.miLegajo.title })).toBeVisible();
-    await expectNavLinks(page, [copy.nav.miLegajo]);
+    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.misRecibos]);
 
     // Still reachable, now as a voluntary change with the usual navigation,
     // which asks for the current password.
@@ -103,7 +103,7 @@ test.describe("forced password change", () => {
     await expect(page).toHaveURL(/\/cambiar-password$/);
     await expect(page.getByText(copy.password.introVoluntaria)).toBeVisible();
     await expect(page.getByLabel(copy.password.actualLabel, { exact: true })).toBeVisible();
-    await expectNavLinks(page, [copy.nav.miLegajo]);
+    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.misRecibos]);
 
     await page.getByRole("button", { name: copy.auth.logout }).click();
     await expect(page).toHaveURL(/\/login$/);
