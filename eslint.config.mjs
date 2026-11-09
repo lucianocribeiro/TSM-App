@@ -46,11 +46,18 @@ const recibosAdmin = [
 // F2-07: the PDF libraries run on the server only, behind the two receipt
 // wrappers (src/lib/recibos/pdf-texto.ts and pdf-firma.ts, "server-only").
 // No other file imports them; the wrappers' own tests do, to build fixtures.
-const pdfLibsMessage = "PDF libraries are only allowed in src/lib/recibos/pdf-*.ts (F2-07).";
+// An explicit list, not a glob (AUD-07-01): a new pdf-*.ts file is not exempt.
+const pdfLibsMessage = "PDF libraries are only allowed in src/lib/recibos/pdf-texto.ts and pdf-firma.ts (F2-07, AUD-07-01).";
 const pdfLibs = [
   { group: ["unpdf", "unpdf/*", "@cantoo/pdf-lib", "@cantoo/pdf-lib/*"], message: pdfLibsMessage },
 ];
-const pdfWrappers = ["src/lib/recibos/pdf-*.ts"];
+const pdfWrappers = [
+  "src/lib/recibos/pdf-texto.ts",
+  "src/lib/recibos/pdf-firma.ts",
+  "src/lib/recibos/pdf-texto.test.ts",
+  "src/lib/recibos/pdf-texto-tiempo.test.ts",
+  "src/lib/recibos/pdf-firma.test.ts",
+];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
