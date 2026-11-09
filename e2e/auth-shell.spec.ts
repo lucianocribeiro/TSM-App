@@ -116,7 +116,7 @@ test.describe("session and menu", () => {
     await expect(nav).toBeHidden();
     await page.getByRole("button", { name: copy.common.openMenu }).click();
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveCount(5);
+    await expect(nav.getByRole("link")).toHaveCount(6);
     await page.screenshot({ path: `${SCREENSHOT_DIR}/shell-admin-mobile-menu.png` });
 
     await setThemeCookie(page, "dark");
