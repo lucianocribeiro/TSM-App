@@ -1,9 +1,9 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { barrerHuerfanosRecibos, type BarridoRecibosResultado } from "./limpieza";
-import { parseReciboPath } from "./paths";
-import { crearUrlSubidaRecibo, type UrlSubida } from "./signed-url";
-import { MAX_RECIBO_BYTES, RECIBOS_BUCKET } from "./tipos";
+import { parseFirmaPath, parseReciboPath } from "./paths";
+import { crearUrlSubidaFirma, crearUrlSubidaRecibo, type UrlSubida } from "./signed-url";
+import { FIRMAS_BUCKET, MAX_FIRMA_BYTES, MAX_RECIBO_BYTES, RECIBO_MIME_TYPE, RECIBOS_BUCKET } from "./tipos";
 
 // The receipts' privileged storage access (F2-04, Constitution §11). Neither
 // receipts bucket has a write policy, so uploads, reads of the stored bytes,
@@ -14,10 +14,12 @@ import { MAX_RECIBO_BYTES, RECIBOS_BUCKET } from "./tipos";
 //
 // Authorization is the caller's job, before calling anything here: an
 // active Admin (the central action guard), and the path checked against the
-// employee and period it is for. F2-05 reuses it for the employee's own
-// signature and signed PDF, after its own checks.
+// employee and period it is for. F2-05 (Mis Recibos): an active Empleado,
+// and the path checked to be their own (signature images and their signed
+// receipts).
 
 export type BytesRecibo = { ok: true; bytes: Uint8Array; mimeType: string } | { ok: false; motivo: "muy-grande" | "lectura" };
+export type BytesFirma = BytesRecibo;
 
 function privilegiado() {
   return createAdminClient();
@@ -62,5 +64,57 @@ export async function barrerHuerfanos(): Promise<BarridoRecibosResultado> {
     return await barrerHuerfanosRecibos(privilegiado());
   } catch {
     return { ok: false, eliminados: 0, fallidos: [] };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// F2-05: signatures and signed receipts
+// ---------------------------------------------------------------------------
+// A signed upload URL for a signature image path (upsert off).
+export async function crearUrlSubidaFirmaPrivilegiada(path: string): Promise<UrlSubida> {
+  if (!parseFirmaPath(path)) return { ok: false };
+  return crearUrlSubidaFirma(privilegiado(), path);
+}
+
+// The stored bytes of a signature image. Its size is read first: an object
+// over the signature limit is never downloaded.
+export async function descargarFirma(path: string): Promise<BytesFirma> {
+  if (!parseFirmaPath(path)) return { ok: false, motivo: "lectura" };
+  try {
+    const store = privilegiado().storage.from(FIRMAS_BUCKET);
+    const info = await store.info(path);
+    if (info.error || !info.data) return { ok: false, motivo: "lectura" };
+    if ((info.data.size ?? Number.POSITIVE_INFINITY) > MAX_FIRMA_BYTES) return { ok: false, motivo: "muy-grande" };
+    const { data, error } = await store.download(path);
+    if (error || !data) return { ok: false, motivo: "lectura" };
+    if (data.size > MAX_FIRMA_BYTES) return { ok: false, motivo: "muy-grande" };
+    return { ok: true, bytes: new Uint8Array(await data.arrayBuffer()), mimeType: data.type };
+  } catch {
+    return { ok: false, motivo: "lectura" };
+  }
+}
+
+// Stores a PDF the server made (the signed receipt) at a new receipt path.
+// Never overwrites: an existing object makes it fail.
+export async function subirRecibo(path: string, bytes: Uint8Array): Promise<boolean> {
+  if (!parseReciboPath(path)) return false;
+  try {
+    const { error } = await privilegiado()
+      .storage.from(RECIBOS_BUCKET)
+      .upload(path, bytes, { contentType: RECIBO_MIME_TYPE, upsert: false });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+// Removes a signature image. True only when Storage removed it.
+export async function eliminarFirma(path: string): Promise<boolean> {
+  if (!parseFirmaPath(path)) return false;
+  try {
+    const { data, error } = await privilegiado().storage.from(FIRMAS_BUCKET).remove([path]);
+    return !error && (data ?? []).length > 0;
+  } catch {
+    return false;
   }
 }
