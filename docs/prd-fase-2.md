@@ -1,4 +1,4 @@
-# PRD Fase 2 v0.6 — Recibos de sueldo y firma electrónica
+# PRD Fase 2 v0.7 — Recibos de sueldo y firma electrónica
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Sources | TSM-DEV-F2-BRIEF v1.0, TSM-HANDOFF-F1-DEV v1.0, TSM-HANDOFF-F1-PM v1.0, Luciano's answers 06/11/2026 (Q1–Q14, P1, P2) |
 | Date | 06/11/2026 |
 
-Change log: v0.6 — libraries chosen (TSM-F2-07): `unpdf` for the DNI text check and `@cantoo/pdf-lib` for the signature stamp, server-only; signature drawing and drag-and-drop use no library. v0.5 — storage defined (TSM-F2-03): two private buckets, `recibos` (PDF, 10 MB) and `firmas` (PNG, 1 MB), owner-first path layouts enforced by the database. v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
+Change log: v0.7 — Carga de recibos built (TSM-F2-04): rows are active Empleado accounts only; replaced files stay in storage; no period deletion; the receipts screen's functions run for at most 30 seconds. v0.6 — libraries chosen (TSM-F2-07): `unpdf` for the DNI text check and `@cantoo/pdf-lib` for the signature stamp, server-only; signature drawing and drag-and-drop use no library. v0.5 — storage defined (TSM-F2-03): two private buckets, `recibos` (PDF, 10 MB) and `firmas` (PNG, 1 MB), owner-first path layouts enforced by the database. v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
 
 ---
 
@@ -36,9 +36,10 @@ Admins upload salary receipts by period. Each employee views, downloads and elec
 - RF-02. **Publicar.** Employees see nothing of a period until the Admin publishes it. Receipts uploaded to an already published period become visible on upload. Visibility drives the employee's pending counter (RF-23) and, later, one email per newly visible receipt (RF-24).
 - RF-03. **Cerrar.** A closed period accepts no uploads or replacements. Employees can still view and sign.
 - RF-04. **Reabrir.** An Admin can re-open a closed period. Who and when is logged and shown in the period history.
+- There is no period deletion. A period created by mistake stays as an empty borrador, which no employee sees.
 
 ### 4.2 Carga de recibos (F2-04)
-- RF-05. One screen "Carga de recibos". The Admin picks the period and sees one drop slot per active employee, all on the same screen, no navigation between employees.
+- RF-05. One screen "Carga de recibos". The Admin picks the period and sees one drop slot per employee, all on the same screen, no navigation between employees. Rows are the accounts with role Empleado and an active account only: Admins never get a row, and a deactivated account gets no row and cannot receive a receipt (reactivate it first).
 - RF-06. Each slot shows the employee's name and state: sin recibo / cargado / firmado.
 - RF-07. Server-side validation: PDF only, max 10 MB (Fase 1 documents pattern).
 - RF-08. **DNI check.** On upload, the server extracts the PDF text and looks for the employee's DNI as stored in their legajo (7 or 8 digits), ignoring dots, spaces and hyphens. Outcomes:
@@ -46,7 +47,7 @@ Admins upload salary receipts by period. Each employee views, downloads and elec
   - Not found: the Admin gets a message explaining that the employee's DNI was not found in the file, and chooses **Aceptar** (upload anyway) or **Rechazar** (discard the file).
   - Text cannot be read (for example a scanned PDF) or the employee has no DNI loaded: the Admin gets a message explaining that the DNI could not be verified and why, and chooses Aceptar or Rechazar.
 - RF-09. **Override evidence.** Every Aceptar after a failed or impossible DNI check is recorded: Admin, date and time, receipt, and reason (no encontrado / no verificable / sin DNI cargado). Shown in the receipt history.
-- RF-10. **Replacement.** If the employee already has a receipt in the period, the Admin gets an alert that the existing receipt will be replaced and confirms or cancels. On confirm, the previous file moves to the receipt history (not visible to the employee) and the new one becomes current.
+- RF-10. **Replacement.** If the employee already has a receipt in the period, the Admin gets an alert that the existing receipt will be replaced and confirms or cancels. On confirm, the previous file moves to the receipt history (not visible to the employee) and the new one becomes current. Replaced files stay in storage: the history references them.
 - RF-11. **Replacing a signed receipt.** Allowed, with the same alert stating that the receipt is already signed and that the employee will have to sign again. The signed file and its signature record stay in the history. The new receipt starts as pendiente.
 - RF-12. Uploads that fail after the file reaches storage leave no orphan file (Fase 1 lazy sweep pattern).
 
@@ -91,6 +92,7 @@ Written only through a SECURITY DEFINER function with `search_path = ''`, execut
 - All Server Action inputs `.strict()` at every level, refused before any I/O. Boundary test per new action.
 - Admin-only code and copy (Carga, Estado, overrides, history) in Admin-only modules covered by the ESLint rule and bundle check.
 - PDF text extraction and stamping run server-side only. Libraries reviewed in F2-07.
+- The receipts screen and its Server Actions run for at most 30 seconds (route segment `maxDuration`), so a PDF that overruns the 5-second DNI text limit cannot hold the function longer.
 
 ### Librerías (TSM-F2-07)
 
@@ -121,6 +123,7 @@ Written only through a SECURITY DEFINER function with `search_path = ''`, execut
 ## 8. Out of scope
 
 - Generating receipts from the liquidación Excel (Fase 4).
+- Deleting a receipt period.
 - Licencias, ausencias, comunicados (Fase 3).
 - Granting employees their login.
 - Production hardening, backups, retention, DB sizing (Fase 3).
