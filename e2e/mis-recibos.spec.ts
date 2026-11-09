@@ -71,8 +71,12 @@ test("Empleado: counter, view in a new tab, draw, sign, download, change the sig
   const r1 = fila(page, primero.etiqueta);
   await expect(r1.getByText(t.estados.pendiente)).toBeVisible();
   await expect(r1.getByRole("button", { name: t.acciones.descargar })).toHaveCount(0);
+  // Headless Chromium has no PDF viewer, so the new tab does not render the
+  // file: the test checks the tab opens and requests the inline signed URL
+  // (no download parameter).
+  const pedido = page.context().waitForEvent("request", (r) => r.url().includes("/object/sign/recibos/"));
   const [pestana] = await Promise.all([page.waitForEvent("popup"), r1.getByRole("button", { name: t.acciones.ver }).click()]);
-  await expect.poll(() => pestana.url()).toContain("/object/sign/recibos/");
+  expect((await pedido).url()).not.toContain("download=");
   await pestana.close();
 
   // First signing: the drawing comes first, then the confirmation.
