@@ -45,6 +45,7 @@ export type CopyMisRecibos = {
     firmaVacia: string;
     firmaContenido: string;
     firmaMedidas: string;
+    firmaSinTransparencia: string;
     firmaFallo: string;
     firmaLimpiezaFallo: string;
     descarteFallo: string;
@@ -108,6 +109,7 @@ export const copyMisRecibos: CopyMisRecibos = {
     firmaVacia: "La firma está vacía. Dibujala de nuevo.",
     firmaContenido: "La imagen de la firma no es válida. Dibujala de nuevo.",
     firmaMedidas: "La imagen de la firma tiene un tamaño fuera de lo esperado. Dibujala de nuevo.",
+    firmaSinTransparencia: "La firma tiene que tener fondo transparente. Volvé a dibujarla.",
     firmaFallo: "No pudimos guardar tu firma. Probá de nuevo.",
     firmaLimpiezaFallo: "No pudimos guardar tu firma, y la imagen subida no se pudo borrar ahora: se va a borrar sola más tarde. Probá de nuevo.",
     descarteFallo: "No pudimos borrar la imagen subida ahora: se va a borrar sola más tarde.",

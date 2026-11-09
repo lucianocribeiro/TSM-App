@@ -52,6 +52,15 @@ export function medidasPng(bytes: Uint8Array): { ancho: number; alto: number } |
   return { ancho: vista.getUint32(16), alto: vista.getUint32(20) };
 }
 
+// The PNG colour type (IHDR byte 9) has an alpha channel: 6 (RGBA) or 4
+// (grey + alpha). The signature must have a transparent background
+// (F2-05-FIX-01).
+export const TIPOS_COLOR_CON_ALFA = [4, 6] as const;
+export function tieneAlfa(bytes: Uint8Array): boolean {
+  if (medidasPng(bytes) === null || bytes.length < 26) return false;
+  return (TIPOS_COLOR_CON_ALFA as readonly number[]).includes(bytes[25]);
+}
+
 export function medidasAceptables(medidas: { ancho: number; alto: number } | null): boolean {
   return (
     medidas !== null &&
@@ -154,6 +163,7 @@ export async function registrarFirma(client: Client, yo: string, input: { path: 
   if (!archivo.ok) return fallarYLimpiarFirma(path, archivo.motivo === "muy-grande" ? e.firmaMuyGrande : e.firmaFallo, "read");
   const valida = validarFirmaImagen({ mimeType: archivo.mimeType, bytes: archivo.bytes });
   if (!valida.ok) return fallarYLimpiarFirma(path, mensajeFirma(valida.motivo), "validation");
+  if (!tieneAlfa(archivo.bytes)) return fallarYLimpiarFirma(path, e.firmaSinTransparencia, "alpha");
   if (!medidasAceptables(medidasPng(archivo.bytes))) return fallarYLimpiarFirma(path, e.firmaMedidas, "dimensions");
 
   const { data, error } = await client.rpc("firma_registrar", { p_imagen_path: path });

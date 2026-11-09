@@ -5,7 +5,8 @@ import { contarTinta, dibujoSuficiente, distancia } from "@/lib/recibos/dibujo";
 import { cx } from "./cx";
 
 export type SignaturePadHandle = {
-  // The drawing as a PNG (paper and ink colors from the --firma-* tokens).
+  // The drawing as a PNG with a transparent background: only the ink strokes
+  // (--firma-tinta) are opaque.
   toBlob: () => Promise<Blob | null>;
   clear: () => void;
 };
@@ -26,7 +27,9 @@ const DPR_MAX = 3;
 
 // A drawing surface on <canvas> with Pointer Events: mouse, touch and pen.
 // touch-action: none keeps the page from scrolling while drawing. High-DPI
-// aware; fits its container's width (up to 600px). Resizing clears it.
+// aware; fits its container's width (up to 600px). Resizing clears it. The
+// exported PNG is transparent except for the strokes, so the stamp never
+// hides receipt content (F2-05-FIX-01).
 export function SignaturePad({ label, onChange, ref, className }: SignaturePadProps) {
   const contenedor = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -37,30 +40,25 @@ export function SignaturePad({ label, onChange, ref, className }: SignaturePadPr
     avisar.current = onChange;
   }, [onChange]);
 
-  const colores = useCallback(() => {
-    const estilos = getComputedStyle(document.documentElement);
-    return {
-      fondo: estilos.getPropertyValue("--firma-fondo").trim(),
-      tinta: estilos.getPropertyValue("--firma-tinta").trim(),
-    };
-  }, []);
+  const tinta = useCallback(() => getComputedStyle(document.documentElement).getPropertyValue("--firma-tinta").trim(), []);
 
-  const pintarPapel = useCallback(() => {
+  // Transparent canvas: only the ink strokes are drawn into it. The paper is
+  // the CSS background behind it (--firma-fondo), never part of the PNG.
+  const borrarLienzo = useCallback(() => {
     const c = canvas.current;
     const ctx = c?.getContext("2d");
     if (!c || !ctx) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = colores().fondo;
-    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.clearRect(0, 0, c.width, c.height);
     ctx.setTransform(estado.current.dpr, 0, 0, estado.current.dpr, 0, 0);
-  }, [colores]);
+  }, []);
 
   const limpiar = useCallback(() => {
     estado.current.largo = 0;
     estado.current.dibujando = false;
-    pintarPapel();
+    borrarLienzo();
     avisar.current(false);
-  }, [pintarPapel]);
+  }, [borrarLienzo]);
 
   // Size to the container, in device pixels.
   useEffect(() => {
@@ -105,7 +103,7 @@ export function SignaturePad({ label, onChange, ref, className }: SignaturePadPr
     const p = punto(event);
     estado.current.dibujando = true;
     estado.current.ultimo = p;
-    ctx.strokeStyle = colores().tinta;
+    ctx.strokeStyle = tinta();
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -141,7 +139,7 @@ export function SignaturePad({ label, onChange, ref, className }: SignaturePadPr
         role="img"
         aria-label={label}
         data-testid="signature-pad"
-        className="block cursor-crosshair touch-none rounded-md border border-line"
+        className="block cursor-crosshair touch-none rounded-md border border-line bg-[var(--firma-fondo)]"
         onPointerDown={empezar}
         onPointerMove={mover}
         onPointerUp={terminar}
