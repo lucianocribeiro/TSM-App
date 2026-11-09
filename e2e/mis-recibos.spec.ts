@@ -49,6 +49,19 @@ async function guardarDibujo(page: Page) {
   await expect(guardar).toBeDisabled();
   await dibujar(page);
   await expect(guardar).toBeEnabled();
+  // F2-05-FIX-01: the exported PNG is transparent but for the strokes.
+  const alfa = await page.getByTestId("signature-pad").evaluate(async (lienzo: HTMLCanvasElement) => {
+    const blob = await new Promise<Blob | null>((resolve) => lienzo.toBlob(resolve, "image/png"));
+    const imagen = await createImageBitmap(blob!);
+    const copia = new OffscreenCanvas(imagen.width, imagen.height);
+    const ctx = copia.getContext("2d")!;
+    ctx.drawImage(imagen, 0, 0);
+    const datos = ctx.getImageData(0, 0, imagen.width, imagen.height).data;
+    let opaco = false;
+    for (let i = 3; i < datos.length && !opaco; i += 4) opaco = datos[i] === 255;
+    return { esquina: datos[3], opaco };
+  });
+  expect(alfa).toEqual({ esquina: 0, opaco: true });
   await guardar.click();
   await expect(dialogo).toHaveCount(0);
 }

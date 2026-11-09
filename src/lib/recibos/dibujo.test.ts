@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { contarTinta, DIBUJO_MINIMO, dibujoSuficiente, distancia } from "./dibujo";
 
-// RGBA pixels: n of ink (dark, opaque), the rest paper (white).
+// RGBA pixels on a transparent canvas: n of ink (opaque), the rest empty.
 function pixeles(tinta: number, total: number): Uint8ClampedArray {
-  const datos = new Uint8ClampedArray(total * 4).fill(255);
+  const datos = new Uint8ClampedArray(total * 4).fill(0);
   for (let i = 0; i < tinta; i++) datos.set([0, 7, 46, 255], i * 4);
   return datos;
 }
@@ -17,11 +17,13 @@ describe("minimum drawing (decision 13)", () => {
     expect(dibujoSuficiente({ largoTrazo: 0, pixelesTinta: 0 })).toBe(false);
   });
 
-  it("counts only opaque pixels darker than paper", () => {
+  it("counts every pixel with alpha, and no transparent one (F2-05-FIX-01)", () => {
     expect(contarTinta(pixeles(0, 100))).toBe(0);
     expect(contarTinta(pixeles(37, 100))).toBe(37);
-    // Transparent dark pixels and light grey do not count.
-    expect(contarTinta(new Uint8ClampedArray([0, 0, 0, 0, 230, 230, 230, 255]))).toBe(0);
+    // A transparent pixel does not count, whatever its colour; any alpha does
+    // (the strokes are anti-aliased at their edges).
+    expect(contarTinta(new Uint8ClampedArray([0, 0, 0, 0, 255, 255, 255, 0]))).toBe(0);
+    expect(contarTinta(new Uint8ClampedArray([230, 230, 230, 255, 0, 7, 46, 40]))).toBe(2);
   });
 
   it("measures stroke travel between pointer positions", () => {

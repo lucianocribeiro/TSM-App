@@ -1,8 +1,9 @@
 import { crc32, deflateSync } from "node:zlib";
 
-// A valid RGBA PNG of the given size, written by hand (a dark band on white
-// paper, like a drawn signature): integration and e2e fixtures, invented
-// content only.
+// A valid RGBA PNG of the given size, written by hand: a dark band on a
+// transparent background (alpha 0 everywhere else, corners included), like
+// the signature pad's export. Integration and e2e fixtures, invented content
+// only.
 export function pngFirma(ancho = 600, alto = 180): Buffer {
   const trozo = (tipo: string, datos: Buffer) => {
     const largo = Buffer.alloc(4);
@@ -18,8 +19,8 @@ export function pngFirma(ancho = 600, alto = 180): Buffer {
   cabecera.set([8, 6, 0, 0, 0], 8);
   const filas: Buffer[] = [];
   for (let y = 0; y < alto; y++) {
-    const fila = Buffer.alloc(1 + ancho * 4, 255);
-    fila[0] = 0;
+    // Filter byte 0, then fully transparent pixels.
+    const fila = Buffer.alloc(1 + ancho * 4, 0);
     if (Math.abs(y - alto / 2) < 4) for (let x = ancho * 0.1; x < ancho * 0.9; x++) fila.set([0, 7, 46, 255], 1 + Math.floor(x) * 4);
     filas.push(fila);
   }

@@ -48,12 +48,15 @@ const FIRMA_PATH = `${YO}/1-77777777-7777-4777-8777-777777777777.png`;
 const AHORA = new Date("2026-11-09T18:30:00.000Z");
 
 // A PNG header with the given size (signature, IHDR length and type, width, height).
-function pngDe(ancho: number, alto: number): Uint8Array {
+// colorType: 6 RGBA (the pad's export), 4 grey + alpha, 2 RGB, 0 grey.
+function pngDe(ancho: number, alto: number, colorType = 6): Uint8Array {
   const bytes = new Uint8Array(33);
   bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
   const vista = new DataView(bytes.buffer);
   vista.setUint32(16, ancho);
   vista.setUint32(20, alto);
+  bytes[24] = 8;
+  bytes[25] = colorType;
   return bytes;
 }
 
@@ -185,6 +188,19 @@ describe("registrarFirma", () => {
     const { client } = cliente(sinUso);
     expect(await registrarFirma(client, YO, { path: FIRMA_PATH.replace(YO, OTRO) })).toEqual({ ok: false, error: e.firmaFallo });
     expect(mocks.eliminarFirma).not.toHaveBeenCalled();
+  });
+
+  it("refuses a PNG without alpha (opaque background) and removes it; accepts RGBA and grey + alpha (F2-05-FIX-01)", async () => {
+    const { client } = cliente(sinUso, { data: 1, error: null });
+    for (const tipo of [0, 2, 3]) {
+      mocks.descargarFirma.mockResolvedValue({ ok: true, bytes: pngDe(600, 180, tipo), mimeType: "image/png" });
+      expect(await registrarFirma(client, YO, { path: FIRMA_PATH }), String(tipo)).toEqual({ ok: false, error: e.firmaSinTransparencia });
+    }
+    expect(mocks.eliminarFirma).toHaveBeenCalledTimes(3);
+    for (const tipo of [4, 6]) {
+      mocks.descargarFirma.mockResolvedValue({ ok: true, bytes: pngDe(600, 180, tipo), mimeType: "image/png" });
+      expect(await registrarFirma(client, YO, { path: FIRMA_PATH }), String(tipo)).toEqual({ ok: true, data: { version: 1 } });
+    }
   });
 
   it("removes the object for bad content or size, and reports a failed removal", async () => {
