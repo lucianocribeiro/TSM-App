@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
+import { copyRecibos } from "@/lib/copy/recibos";
 import { inventarioAcciones } from "./acciones-inventario.test-helpers";
 
 // Strict inputs (AUD-SEC-01-01, TSM-F2-SEC-02): every Server Action refuses
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   cuentas: {} as Record<string, Fn>,
   marca: {} as Record<string, Fn>,
   verifyCurrentPassword: null as unknown as Fn,
+  privilegiado: {} as Record<string, Fn>,
 }));
 
 // A client double: any chain of calls is recorded and chains on; awaiting a
@@ -66,12 +68,19 @@ vi.mock("@/lib/sesion/marca-servidor", () => ({
   borrarActividad: (...args: unknown[]) => mocks.marca.borrarActividad(...args),
 }));
 vi.mock("@/lib/auth/verify-password", () => ({ verifyCurrentPassword: (...args: unknown[]) => mocks.verifyCurrentPassword(...args) }));
+// The receipts privileged storage client (F2-04).
+const PRIVILEGIADO = ["crearUrlSubidaReciboPrivilegiada", "descargarRecibo", "eliminarRecibo", "barrerHuerfanos"];
+vi.mock("@/lib/recibos/cliente-privilegiado", () => {
+  const nombres = ["crearUrlSubidaReciboPrivilegiada", "descargarRecibo", "eliminarRecibo", "barrerHuerfanos"];
+  return Object.fromEntries(nombres.map((nombre) => [nombre, (...args: unknown[]) => mocks.privilegiado[nombre](...args)]));
+});
 
 const miLegajo = await import("@/app/(app)/mi-legajo/actions");
 const legajos = await import("@/app/(app)/legajos/actions");
 const configuracion = await import("@/app/(app)/configuracion/actions");
 const aprobaciones = await import("@/app/(app)/aprobaciones/actions");
 const usuarios = await import("@/app/(app)/usuarios/actions");
+const recibos = await import("@/app/(app)/recibos/actions");
 const auth = await import("./actions");
 
 let errorLog: ReturnType<typeof vi.spyOn>;
@@ -96,6 +105,9 @@ beforeEach(() => {
   mocks.marca.sellarActividad = vi.fn<(...args: unknown[]) => unknown>(async () => true);
   mocks.marca.borrarActividad = vi.fn<(...args: unknown[]) => unknown>(async () => undefined);
   mocks.verifyCurrentPassword = vi.fn<(...args: unknown[]) => unknown>(async () => false);
+  for (const nombre of PRIVILEGIADO) {
+    mocks.privilegiado[nombre] = vi.fn<(...args: unknown[]) => unknown>(async () => ({ ok: false }));
+  }
   errorLog?.mockRestore();
   errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
@@ -104,7 +116,9 @@ beforeEach(() => {
 function sinIO() {
   expect(mocks.createClient).not.toHaveBeenCalled();
   expect(mocks.io).toEqual([]);
-  for (const spy of [...Object.values(mocks.cuentas), ...Object.values(mocks.marca)]) expect(spy).not.toHaveBeenCalled();
+  for (const spy of [...Object.values(mocks.cuentas), ...Object.values(mocks.marca), ...Object.values(mocks.privilegiado)]) {
+    expect(spy).not.toHaveBeenCalled();
+  }
   expect(mocks.verifyCurrentPassword).not.toHaveBeenCalled();
   expect(mocks.revalidatePath).not.toHaveBeenCalled();
   expect(mocks.redirect).not.toHaveBeenCalled();
@@ -112,7 +126,10 @@ function sinIO() {
 }
 
 function huboIO(): boolean {
-  return mocks.createClient.mock.calls.length > 0 || Object.values(mocks.cuentas).some((spy) => spy.mock.calls.length > 0);
+  return (
+    mocks.createClient.mock.calls.length > 0 ||
+    [...Object.values(mocks.cuentas), ...Object.values(mocks.privilegiado)].some((spy) => spy.mock.calls.length > 0)
+  );
 }
 
 function formulario(campos: Record<string, string>): FormData {
@@ -146,6 +163,7 @@ const raiz = (input: Record<string, unknown>) => [
 
 const subida = { tipo: "dni_frente", fileName: "dni.pdf", mimeType: "application/pdf", sizeBytes: 120 };
 const pathDe = (profileId: string) => `${profileId}/dni_frente/${FILE_ID}.pdf`;
+const reciboPath = `${EMPLEADO}/${ID}/${FILE_ID}.pdf`;
 const filtros = { busqueda: "", estadoLaboral: "", areaId: "", sucursalId: "", tareaId: "", mostrarBajas: false };
 const exportacion = (extraFiltros = {}, extraSeleccion = {}) => ({
   filtros: { ...filtros, ...extraFiltros },
@@ -162,6 +180,10 @@ const e = {
   cuentas: copy.cuentas.errors.accionFallo,
   login: copy.auth.errors.invalidCredentials,
   password: copy.password.errors.guardarFallo,
+  recibosAccion: copyRecibos.errors.accionFallo,
+  recibosSubida: copyRecibos.errors.subidaFallo,
+  recibosRegistro: copyRecibos.errors.registroFallo,
+  recibosVer: copyRecibos.errors.verFallo,
 };
 
 type Caso = {
@@ -295,6 +317,41 @@ const CASOS: Caso[] = [
     e.cuentas,
   ),
 
+  // Recibos (F2-04)
+  caso("app/(app)/recibos/actions.ts#crearPeriodoRecibos", "admin", recibos.crearPeriodoRecibos, { anio: 2026, mes: 11 }, raiz({ anio: 2026, mes: 11 }), e.recibosAccion),
+  caso("app/(app)/recibos/actions.ts#publicarPeriodoRecibos", "admin", recibos.publicarPeriodoRecibos, { periodoId: ID }, raiz({ periodoId: ID }), e.recibosAccion),
+  caso("app/(app)/recibos/actions.ts#cerrarPeriodoRecibos", "admin", recibos.cerrarPeriodoRecibos, { periodoId: ID }, raiz({ periodoId: ID }), e.recibosAccion),
+  caso("app/(app)/recibos/actions.ts#reabrirPeriodoRecibos", "admin", recibos.reabrirPeriodoRecibos, { periodoId: ID }, raiz({ periodoId: ID }), e.recibosAccion),
+  caso(
+    "app/(app)/recibos/actions.ts#prepararSubidaRecibo",
+    "admin",
+    recibos.prepararSubidaRecibo,
+    { periodoId: ID, empleadoId: EMPLEADO, tamano: 1024, tipo: "application/pdf" },
+    raiz({ periodoId: ID, empleadoId: EMPLEADO, tamano: 1024, tipo: "application/pdf" }),
+    e.recibosSubida,
+  ),
+  caso(
+    "app/(app)/recibos/actions.ts#registrarRecibo",
+    "admin",
+    recibos.registrarRecibo,
+    { periodoId: ID, empleadoId: EMPLEADO, path: reciboPath, confirmarDni: "sin_dni", confirmarReemplazo: true },
+    [
+      ...raiz({ periodoId: ID, empleadoId: EMPLEADO, path: reciboPath }),
+      { periodoId: ID, empleadoId: EMPLEADO, path: reciboPath, confirmarDni: "otro" },
+      { periodoId: ID, empleadoId: EMPLEADO, path: reciboPath, overrideMotivo: "sin_dni" },
+    ],
+    e.recibosRegistro,
+  ),
+  caso(
+    "app/(app)/recibos/actions.ts#descartarSubidaRecibo",
+    "admin",
+    recibos.descartarSubidaRecibo,
+    { periodoId: ID, empleadoId: EMPLEADO, path: reciboPath },
+    raiz({ periodoId: ID, empleadoId: EMPLEADO, path: reciboPath }),
+    e.recibosAccion,
+  ),
+  caso("app/(app)/recibos/actions.ts#obtenerUrlReciboAdmin", "admin", recibos.obtenerUrlReciboAdmin, { reciboId: ID }, raiz({ reciboId: ID }), e.recibosVer),
+
   // Sign-in and password (FormData: the form's own fields only)
   caso(
     "lib/auth/actions.ts#login",
@@ -343,7 +400,7 @@ describe("strict inputs", () => {
     const claves = [...CASOS.map((c) => c.clave), ...EXENTAS].sort();
     expect(new Set(claves).size).toBe(claves.length);
     expect(claves).toEqual(inventario);
-    expect(inventario).toHaveLength(39);
+    expect(inventario).toHaveLength(47);
   });
 
   describe.each(CASOS.map((c) => [c.clave, c] as const))("%s", (_clave, c) => {

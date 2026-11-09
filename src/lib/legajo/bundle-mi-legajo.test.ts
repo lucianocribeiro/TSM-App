@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buscarProhibidos, IDS_PROHIBIDOS, MARCA_XLSX, TEXTOS_PROHIBIDOS } from "../../../scripts/bundle-mi-legajo.mjs";
+import { buscarProhibidos, IDS_PROHIBIDOS, MARCA_XLSX, RECIBOS_PROHIBIDOS, TEXTOS_PROHIBIDOS } from "../../../scripts/bundle-mi-legajo.mjs";
 import { copyLaborales } from "@/lib/copy/laborales";
+import { copyRecibos } from "@/lib/copy/recibos";
 import { CAMPOS_LABORALES } from "./laborales";
 
 // The bundle check (scripts/bundle-mi-legajo.mjs, run after the build in CI)
@@ -19,6 +20,10 @@ describe("Mi Legajo bundle check", () => {
       ]),
     );
     expect(IDS_PROHIBIDOS).toEqual(expect.arrayContaining([...CAMPOS_LABORALES, "legajos_laborales"]));
+  });
+
+  it("looks for the Carga de recibos title and two of its dialog titles (F2-04)", () => {
+    expect(RECIBOS_PROHIBIDOS).toEqual([copyRecibos.title, copyRecibos.dialogos.dniNoEncontrado.title, copyRecibos.dialogos.reemplazo.title]);
   });
 
   it("looks for the .xlsx writer by a path only a workbook writer carries (CR-4)", () => {

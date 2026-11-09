@@ -9,13 +9,14 @@ describe("getNavItems", () => {
     ]);
   });
 
-  it("shows Mi Legajo, Legajos, Aprobaciones, Usuarios and Configuración to an admin, numbered in order", () => {
+  it("shows Mi Legajo, Legajos, Aprobaciones, Recibos, Usuarios and Configuración to an admin, numbered in order", () => {
     expect(getNavItems("admin")).toEqual([
       { href: "/mi-legajo", label: copy.nav.miLegajo, number: "01" },
       { href: "/legajos", label: copy.nav.legajos, number: "02" },
       { href: "/aprobaciones", label: copy.nav.aprobaciones, number: "03" },
-      { href: "/usuarios", label: copy.nav.usuarios, number: "04" },
-      { href: "/configuracion", label: copy.nav.configuracion, number: "05" },
+      { href: "/recibos", label: copy.nav.recibos, number: "04" },
+      { href: "/usuarios", label: copy.nav.usuarios, number: "05" },
+      { href: "/configuracion", label: copy.nav.configuracion, number: "06" },
     ]);
   });
 });
