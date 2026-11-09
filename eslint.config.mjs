@@ -33,7 +33,7 @@ const grupoE = [
 // Legajo, the app shell, the shared components and the shared modules never
 // import it; the future Mis Recibos route reaches receipts only through its
 // own Server Actions.
-const recibosAdminMessage = "Receipts Admin modules (sweep, Carga de recibos, privileged client) must not be imported by employee routes or shared modules (F2-03, F2-04).";
+const recibosAdminMessage = "Receipts Admin modules (sweep, Carga de recibos) must not be imported by employee routes or shared modules (F2-03, F2-04).";
 // F2-04 adds the Carga de recibos modules: its copy, its server logic and
 // flow, and the privileged storage client.
 const recibosAdmin = [
