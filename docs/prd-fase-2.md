@@ -1,4 +1,4 @@
-# PRD Fase 2 v0.7 — Recibos de sueldo y firma electrónica
+# PRD Fase 2 v0.8 — Recibos de sueldo y firma electrónica
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Sources | TSM-DEV-F2-BRIEF v1.0, TSM-HANDOFF-F1-DEV v1.0, TSM-HANDOFF-F1-PM v1.0, Luciano's answers 06/11/2026 (Q1–Q14, P1, P2) |
 | Date | 06/11/2026 |
 
-Change log: v0.7 — Carga de recibos built (TSM-F2-04): rows are active Empleado accounts only; replaced files stay in storage; no period deletion; the receipts screen's functions run for at most 30 seconds. v0.6 — libraries chosen (TSM-F2-07): `unpdf` for the DNI text check and `@cantoo/pdf-lib` for the signature stamp, server-only; signature drawing and drag-and-drop use no library. v0.5 — storage defined (TSM-F2-03): two private buckets, `recibos` (PDF, 10 MB) and `firmas` (PNG, 1 MB), owner-first path layouts enforced by the database. v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
+Change log: v0.8 — Mis Recibos built (TSM-F2-05): "Ver" opens the PDF in a new tab (no download offered before signing); signing time is server time checked by the database within 2 minutes; the signing statement; the stamp name comes from the legajo; a minimum drawing for a signature. v0.7 — Carga de recibos built (TSM-F2-04): rows are active Empleado accounts only; replaced files stay in storage; no period deletion; the receipts screen's functions run for at most 30 seconds. v0.6 — libraries chosen (TSM-F2-07): `unpdf` for the DNI text check and `@cantoo/pdf-lib` for the signature stamp, server-only; signature drawing and drag-and-drop use no library. v0.5 — storage defined (TSM-F2-03): two private buckets, `recibos` (PDF, 10 MB) and `firmas` (PNG, 1 MB), owner-first path layouts enforced by the database. v0.4 — approved; employee notification is a pending-receipts counter on the Mis Recibos menu item (no new notifications table); dependency security update added as the first piece. v0.3 — P1 closed (view before signing, download after); P2 closed (signed PDF replaces the unsigned file). No open items. v0.2 — decisions Q1–Q14 applied; two items left open for clarification (**[P1]** view before signing, **[P2]** keep original after signing). v0.1 — initial draft.
 
 ---
 
@@ -54,9 +54,15 @@ Admins upload salary receipts by period. Each employee views, downloads and elec
 ### 4.3 Mis Recibos (F2-05)
 - RF-13. The employee sees their receipts from published periods, newest first, with state pendiente de firma / firmado.
 - RF-14. Before signing, the employee can view the receipt but not download it. Download is enabled once signed. All file access through 5-minute signed URLs, never through a Server Action response (Vercel ~4.5 MB limit).
+  - "Ver" opens the PDF in a new browser tab through a 5-minute signed URL served inline (works on phones; no embedded viewer). Before signing the app offers no download button. A browser can still save a file it displays: the rule is about what the app offers, not a technical lock. After signing, "Descargar" serves `Recibo-MM-AAAA.pdf`.
 - RF-15. **Register signature.** The first time the employee signs, they draw their signature (mouse or touch, usable at 390 px) and confirm it.
+  - An empty signature is refused: "Guardar firma" stays disabled until the drawing has at least 150 px of stroke and 400 px of ink (CSS pixels); "Borrar" clears it. The server also checks the image: PNG, at most 1 MB, between 100 × 40 and 2000 × 1000 px.
 - RF-16. **Redraw.** The employee can redraw their signature at any time. Receipts already signed do not change. Previous signature versions are kept as evidence, not deleted.
 - RF-17. **Firmar recibo.** The button stamps the current registered signature at the bottom of the last page, with date and time (America/Argentina/Buenos_Aires) and the employee's name. Signature is in conformity only (no disconformidad option).
+  - The confirmation shows the statement "Al firmar, confirmás que recibiste este recibo de sueldo." (Luciano may adjust it) and the current signature.
+  - The stamp line: "Firmado electrónicamente por {nombre} el {dd/mm/aaaa} a las {HH:mm} (hora de Argentina)".
+  - The name is the legajo's names and surname (Datos personales); when both are empty, a fixed text ("la persona titular de la cuenta (sin nombre en el legajo)"); never an id or an email.
+  - The signing time is taken once on the server, stamped on the PDF and passed to the database, which accepts it only within the last 2 minutes of its own clock (5 seconds of clock skew allowed ahead). The PDF and the evidence always show the same time.
 - RF-18. A signed receipt cannot be signed again.
 
 ### 4.4 Estado de firmas (F2-06)
