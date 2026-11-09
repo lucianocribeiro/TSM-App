@@ -200,3 +200,21 @@ for (const { ancho, alto } of [
     await screenshotBoth(page, `cuenta-empleado-${ancho}`);
   });
 }
+
+for (const { nombre, ancho, tope } of [
+  { nombre: "wide screens", ancho: 1280, tope: 0 },
+  { nombre: "below 900px", ancho: 390, tope: 56 },
+]) {
+  test(`${nombre}: the page header stays frozen while the page scrolls`, async ({ page }) => {
+    await page.setViewportSize({ width: ancho, height: 500 });
+    await loginAs(page, await usuario("encabezado-fijo"));
+    await expect(titulo(page)).toBeVisible();
+    const encabezado = page.getByTestId("page-header");
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+
+    expect((await encabezado.boundingBox())!.y).toBe(tope);
+    await expect(titulo(page)).toBeInViewport();
+  });
+}
