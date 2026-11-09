@@ -13,6 +13,7 @@ const entries: Array<{ href: string; label: string; roles: AppRole[] }> = [
   { href: "/mi-legajo", label: copy.nav.miLegajo, roles: ["empleado", "admin"] },
   { href: "/legajos", label: copy.nav.legajos, roles: ["admin"] },
   { href: "/aprobaciones", label: copy.nav.aprobaciones, roles: ["admin"] },
+  { href: "/recibos", label: copy.nav.recibos, roles: ["admin"] },
   { href: "/usuarios", label: copy.nav.usuarios, roles: ["admin"] },
   { href: "/configuracion", label: copy.nav.configuracion, roles: ["admin"] },
 ];

@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { inventarioAcciones } from "@/lib/auth/acciones-inventario.test-helpers";
 import { CAMBIAR_PASSWORD_PATH, HOME_PATH, LOGIN_PATH } from "@/lib/auth/gate";
 import { LOGIN_INACTIVIDAD } from "@/lib/auth/guardia";
 import { copy } from "@/lib/copy/es-AR";
+import { copyRecibos } from "@/lib/copy/recibos";
 import {
   crearCambioForzado,
   crearDesactivado,
@@ -14,6 +16,7 @@ import {
   type Semilla,
 } from "./actores";
 import { anonClient, createTestUser, deleteTestUsers, serviceClient, TEST_PASSWORD, uniqueEmail, type TestUser } from "./helpers";
+import { nuevoPeriodo } from "./recibos";
 
 // F1-11A, GAP-04: the action boundary matrix. Every Server Action in the
 // action inventory (src/lib/auth/acciones-inventario.test-helpers.ts) has an
@@ -51,6 +54,7 @@ const legajos = await import("@/app/(app)/legajos/actions");
 const aprobaciones = await import("@/app/(app)/aprobaciones/actions");
 const usuarios = await import("@/app/(app)/usuarios/actions");
 const configuracion = await import("@/app/(app)/configuracion/actions");
+const recibos = await import("@/app/(app)/recibos/actions");
 const auth = await import("@/lib/auth/actions");
 
 const noAutorizado = { ok: false, error: copy.cuentas.errors.noAutorizado };
@@ -60,6 +64,7 @@ const docErrors = copy.miLegajo.documentos.errors;
 const apErrors = copy.aprobaciones.errors;
 const cuentaErrors = copy.cuentas.errors;
 const configErrors = copy.configuracion.errors;
+const recErrors = copyRecibos.errors;
 const TEMPORAL = "Temporal-2026";
 
 const GRUPO_D = {
@@ -148,6 +153,24 @@ const A = "app/(app)/aprobaciones/actions.ts#";
 const L = "app/(app)/legajos/actions.ts#";
 const U = "app/(app)/usuarios/actions.ts#";
 const C = "app/(app)/configuracion/actions.ts#";
+const R = "app/(app)/recibos/actions.ts#";
+
+// F2-04: receipt periods are global (no employee owns one) and an Admin
+// reaches every receipt by design. The fixture period, a draft created in
+// beforeAll, must be exactly as it was after every refused call, with no
+// receipt, no log entry and no other period created by a fixture account.
+const PERIODOS = "receipt periods are global: no employee owns one, and an Admin reaches every period by design";
+let periodoFrontera = "";
+let periodoFronteraAntes: unknown = null;
+let creadoresFrontera: string[] = [];
+async function recibosSinCambios() {
+  const service = serviceClient();
+  expect((await service.from("recibo_periodos").select("*").eq("id", periodoFrontera).single()).data).toEqual(periodoFronteraAntes);
+  expect((await service.from("recibo_periodos").select("id").in("created_by", creadoresFrontera)).data).toEqual([{ id: periodoFrontera }]);
+  expect((await service.from("recibos").select("id").eq("periodo_id", periodoFrontera)).data).toEqual([]);
+  expect((await service.from("recibo_periodo_historial").select("id").eq("periodo_id", periodoFrontera)).data).toEqual([]);
+}
+const rutaFrontera = (empleadoId: string) => `${empleadoId}/${periodoFrontera}/${randomUUID()}.pdf`;
 const S = "lib/auth/actions.ts#";
 
 const CASOS: Record<string, Caso> = {
@@ -358,6 +381,92 @@ const CASOS: Record<string, Caso> = {
     },
   },
 
+  // /recibos (F2-04)
+  [`${R}crearPeriodoRecibos`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => recibos.crearPeriodoRecibos({ anio: 2100, mes: 12 }),
+    invalido: { llamar: () => recibos.crearPeriodoRecibos({ anio: 1999, mes: 13 }), esperado: fallo(recErrors.accionFallo) },
+    noAplica: { ajeno: PERIODOS },
+    despues: recibosSinCambios,
+  },
+  [`${R}publicarPeriodoRecibos`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => recibos.publicarPeriodoRecibos({ periodoId: periodoFrontera }),
+    invalido: { llamar: () => recibos.publicarPeriodoRecibos({ periodoId: "x" }), esperado: fallo(recErrors.accionFallo) },
+    noAplica: { ajeno: PERIODOS },
+    despues: recibosSinCambios,
+  },
+  [`${R}cerrarPeriodoRecibos`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => recibos.cerrarPeriodoRecibos({ periodoId: periodoFrontera }),
+    invalido: { llamar: () => recibos.cerrarPeriodoRecibos({ periodoId: "x" }), esperado: fallo(recErrors.accionFallo) },
+    noAplica: { ajeno: PERIODOS },
+    despues: recibosSinCambios,
+  },
+  [`${R}reabrirPeriodoRecibos`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => recibos.reabrirPeriodoRecibos({ periodoId: periodoFrontera }),
+    invalido: { llamar: () => recibos.reabrirPeriodoRecibos({ periodoId: "x" }), esperado: fallo(recErrors.accionFallo) },
+    noAplica: { ajeno: PERIODOS },
+    despues: recibosSinCambios,
+  },
+  [`${R}prepararSubidaRecibo`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: (x) => recibos.prepararSubidaRecibo({ periodoId: periodoFrontera, empleadoId: x.victima.id, tamano: 1024, tipo: "application/pdf" }),
+    // The Admin's own account gets no receipt (decision 1).
+    ajeno: {
+      llamar: (x) => recibos.prepararSubidaRecibo({ periodoId: periodoFrontera, empleadoId: x.propio.id, tamano: 1024, tipo: "application/pdf" }),
+      esperado: fallo(recErrors.empleadoNoElegible),
+    },
+    invalido: {
+      llamar: (x) => recibos.prepararSubidaRecibo({ periodoId: "x", empleadoId: x.victima.id, tamano: 1024, tipo: "application/pdf" }),
+      esperado: fallo(recErrors.subidaFallo),
+    },
+    despues: recibosSinCambios,
+  },
+  [`${R}registrarRecibo`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: (x) => recibos.registrarRecibo({ periodoId: periodoFrontera, empleadoId: x.victima.id, path: rutaFrontera(x.victima.id) }),
+    // Another employee's path for this employee: refused before any read of the object.
+    ajeno: {
+      llamar: (x) => recibos.registrarRecibo({ periodoId: periodoFrontera, empleadoId: x.victima.id, path: rutaFrontera(x.tercero) }),
+      esperado: fallo(recErrors.registroFallo),
+    },
+    invalido: {
+      llamar: (x) =>
+        recibos.registrarRecibo({ periodoId: periodoFrontera, empleadoId: x.victima.id, path: rutaFrontera(x.victima.id), confirmarDni: "otro" }),
+      esperado: fallo(recErrors.registroFallo),
+    },
+    despues: recibosSinCambios,
+  },
+  [`${R}descartarSubidaRecibo`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: (x) => recibos.descartarSubidaRecibo({ periodoId: periodoFrontera, empleadoId: x.victima.id, path: rutaFrontera(x.victima.id) }),
+    ajeno: {
+      llamar: (x) => recibos.descartarSubidaRecibo({ periodoId: periodoFrontera, empleadoId: x.victima.id, path: rutaFrontera(x.tercero) }),
+      esperado: fallo(recErrors.accionFallo),
+    },
+    invalido: {
+      llamar: (x) => recibos.descartarSubidaRecibo({ periodoId: periodoFrontera, empleadoId: x.victima.id, path: "../x.pdf" }),
+      esperado: fallo(recErrors.accionFallo),
+    },
+    despues: recibosSinCambios,
+  },
+  [`${R}obtenerUrlReciboAdmin`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => recibos.obtenerUrlReciboAdmin({ reciboId: randomUUID() }),
+    invalido: { llamar: () => recibos.obtenerUrlReciboAdmin({ reciboId: "x" }), esperado: fallo(recErrors.verFallo) },
+    noAplica: { ajeno: GLOBAL },
+  },
+
   // /usuarios
   [`${U}crearUsuarioAction`]: {
     clase: "admin",
@@ -518,12 +627,18 @@ describe("action boundary matrix (GAP-04)", () => {
     if (error || !item) throw new Error(`catalog fixture failed: ${error?.message}`);
     itemFrontera = { id: item.id, version: item.version };
     itemFronteraAntes = item;
+    // F2-04: the receipt period the /recibos actions are called on.
+    creadoresFrontera = ids;
+    const periodo = await nuevoPeriodo(service, admin.id, "borrador");
+    periodoFrontera = periodo.id;
+    periodoFronteraAntes = (await service.from("recibo_periodos").select("*").eq("id", periodo.id).single()).data;
   }, 120_000);
 
   afterAll(async () => {
     session.client = null;
     await service.from("catalogo_eventos").delete().like("item_nombre", `${MARCA_CATALOGO}%`);
     await service.from("catalogo_items").delete().like("nombre", `${MARCA_CATALOGO}%`);
+    if (periodoFrontera) await service.from("recibo_periodos").delete().eq("id", periodoFrontera);
     await deleteTestUsers(service, [
       ...otros,
       empleado.id,
@@ -557,11 +672,11 @@ describe("action boundary matrix (GAP-04)", () => {
     return resultado;
   }
 
-  it("covers exactly the inventory's actions (39), each with every applicable column or a reason", () => {
+  it("covers exactly the inventory's actions (47), each with every applicable column or a reason", () => {
     const claves = inventarioAcciones()
       .map((accion) => accion.clave)
       .sort();
-    expect(claves).toHaveLength(39);
+    expect(claves).toHaveLength(47);
     expect(Object.keys(CASOS).sort()).toEqual(claves);
     for (const [clave, caso] of Object.entries(CASOS)) {
       if (caso.clase !== "empleado" && caso.clase !== "admin") continue;

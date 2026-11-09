@@ -2,22 +2,17 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-// The service-role client bypasses RLS. Only the Admin account module may
-// use it, and every function there checks the caller is an Admin first.
+// The service-role client bypasses RLS. Only two modules may obtain it, and
+// every caller checks for an active Admin first: the Admin account module
+// and, for the receipts storage (F2-04, Constitution §11), the receipts
+// privileged client, which exposes named storage operations only.
+const serviceRoleMessage =
+  "The service-role client is only allowed in src/lib/admin/cuentas.ts and src/lib/recibos/cliente-privilegiado.ts.";
 const serviceRole = {
-  paths: [
-    {
-      name: "@/lib/supabase/admin",
-      message: "The service-role client is only allowed in src/lib/admin/cuentas.ts.",
-    },
-  ],
-  patterns: [
-    {
-      group: ["**/supabase/admin", "**/supabase/admin.ts"],
-      message: "The service-role client is only allowed in src/lib/admin/cuentas.ts.",
-    },
-  ],
+  paths: [{ name: "@/lib/supabase/admin", message: serviceRoleMessage }],
+  patterns: [{ group: ["**/supabase/admin", "**/supabase/admin.ts"], message: serviceRoleMessage }],
 };
+const serviceRoleAllowed = ["src/lib/admin/cuentas.ts", "src/lib/recibos/cliente-privilegiado.ts"];
 
 // Group E (Datos laborales) is Admin only (AUDCR2-01): its copy and its
 // modules (the schema and, AUDCR3-01, its writes) must not reach Mi Legajo's
@@ -38,34 +33,56 @@ const grupoE = [
 // Legajo, the app shell, the shared components and the shared modules never
 // import it; the future Mis Recibos route reaches receipts only through its
 // own Server Actions.
-const recibosAdminMessage = "The receipts sweep is Admin only: employee routes and shared modules must not import it (F2-03).";
+const recibosAdminMessage = "Receipts Admin modules (sweep, Carga de recibos, privileged client) must not be imported by employee routes or shared modules (F2-03, F2-04).";
+// F2-04 adds the Carga de recibos modules: its copy, its server logic and
+// flow, and the privileged storage client.
 const recibosAdmin = [
   { group: ["@/lib/recibos/limpieza", "**/recibos/limpieza"], message: recibosAdminMessage },
+  {
+    group: [
+      "@/lib/copy/recibos",
+      "**/copy/recibos",
+      "@/lib/recibos/carga",
+      "@/lib/recibos/carga-*",
+      "**/recibos/carga",
+      "**/recibos/carga-*",
+      "@/lib/recibos/cliente-privilegiado",
+      "**/recibos/cliente-privilegiado",
+    ],
+    message: recibosAdminMessage,
+  },
 ];
 
 // F2-07: the PDF libraries run on the server only, behind the two receipt
 // wrappers (src/lib/recibos/pdf-texto.ts and pdf-firma.ts, "server-only").
 // No other file imports them; the wrappers' own tests do, to build fixtures.
-const pdfLibsMessage = "PDF libraries are only allowed in src/lib/recibos/pdf-*.ts (F2-07).";
+// An explicit list, not a glob (AUD-07-01): a new pdf-*.ts file is not exempt.
+const pdfLibsMessage = "PDF libraries are only allowed in src/lib/recibos/pdf-texto.ts and pdf-firma.ts (F2-07, AUD-07-01).";
 const pdfLibs = [
   { group: ["unpdf", "unpdf/*", "@cantoo/pdf-lib", "@cantoo/pdf-lib/*"], message: pdfLibsMessage },
 ];
-const pdfWrappers = ["src/lib/recibos/pdf-*.ts"];
+const pdfWrappers = [
+  "src/lib/recibos/pdf-texto.ts",
+  "src/lib/recibos/pdf-firma.ts",
+  "src/lib/recibos/pdf-texto.test.ts",
+  "src/lib/recibos/pdf-texto-tiempo.test.ts",
+  "src/lib/recibos/pdf-firma.test.ts",
+];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
     files: ["**/*.{ts,tsx,js,jsx,mjs}"],
-    ignores: ["src/lib/admin/cuentas.ts", ...pdfWrappers],
+    ignores: [...serviceRoleAllowed, ...pdfWrappers],
     rules: {
       "no-restricted-imports": ["error", { ...serviceRole, patterns: [...serviceRole.patterns, ...pdfLibs] }],
     },
   },
-  // The one file allowed the service-role client still may not use the PDF
+  // The files allowed the service-role client still may not use the PDF
   // libraries.
   {
-    files: ["src/lib/admin/cuentas.ts"],
+    files: serviceRoleAllowed,
     rules: {
       "no-restricted-imports": ["error", { patterns: pdfLibs }],
     },

@@ -1151,6 +1151,33 @@ export type Database = {
         Args: { p_motivo: string; p_solicitud_id: string }
         Returns: undefined
       }
+      recibo_periodo_cerrar: {
+        Args: { p_periodo_id: string }
+        Returns: undefined
+      }
+      recibo_periodo_crear: {
+        Args: { p_anio: number; p_mes: number }
+        Returns: string
+      }
+      recibo_periodo_publicar: {
+        Args: { p_periodo_id: string }
+        Returns: undefined
+      }
+      recibo_periodo_reabrir: {
+        Args: { p_periodo_id: string }
+        Returns: undefined
+      }
+      recibo_registrar: {
+        Args: {
+          p_archivo_bytes: number
+          p_archivo_path: string
+          p_empleado_id: string
+          p_override_motivo?: Database["public"]["Enums"]["recibo_override_motivo"]
+          p_periodo_id: string
+          p_reemplazar: boolean
+        }
+        Returns: string
+      }
       reemplazar_documento: {
         Args: {
           p_conservar_historial: boolean

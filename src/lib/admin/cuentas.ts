@@ -11,7 +11,8 @@ import { createClient } from "@/lib/supabase/server";
 
 // Account lifecycle for Admins (Constitution §10, PRD US-5, US-8, US-9).
 //
-// The only module allowed to use the service-role client (enforced by ESLint).
+// One of the two modules allowed to use the service-role client (enforced by
+// ESLint; the other is src/lib/recibos/cliente-privilegiado.ts).
 // It needs it for the Supabase Auth Admin API: creating users, setting
 // passwords, banning, deleting, and removing a purged account's files.
 //

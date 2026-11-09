@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
+import { copyRecibos } from "../src/lib/copy/recibos";
+import { pdfConTexto } from "../tests/pdf-minimo";
 import { formatCopy } from "../src/lib/copy/format";
 import { THEME_COOKIE, type Theme } from "../src/lib/theme/theme";
 import { adminNuevo, altaAfipCargada, empleadoCompleto, registro, solicitudPendiente } from "./datos";
 import { fillLogin, loginAs } from "./helpers";
 import { assertNoSecretOnPage } from "./secrets";
-import { createE2EUser, fillLaboral, itemIdE2E, localServiceClient } from "./service";
+import { createE2EUser, fillLaboral, fillLegajo, itemIdE2E, localServiceClient } from "./service";
 
 // F1-11B, GAP-08 (partial): the main screens in light and dark, at desktop
 // (1280px) and mobile (390px) widths. Screenshots go to VISUAL_DIR, uploaded
@@ -95,6 +97,30 @@ type Pantalla = {
   trasCargar?: (page: Page) => Promise<void>;
   lista: (page: Page) => Locator;
 };
+
+// F2-04: an Admin on a draft receipts period with one named employee row.
+async function abrirRecibos(page: Page, etiqueta: string): Promise<string> {
+  const admin = await adminNuevo(`visual-${etiqueta}`, cuentas.add);
+  const empleado = await createE2EUser(`visual-${etiqueta}-empleado`);
+  cuentas.add(empleado.id);
+  const nombre = `Visual ${randomUUID().slice(0, 6)}`;
+  await fillLegajo(empleado.id, { nombres: nombre, apellido: "Recibos", dni: "27333444" });
+  const service = localServiceClient();
+  let periodoId = "";
+  for (let intento = 0; intento < 50 && !periodoId; intento++) {
+    const { data } = await service
+      .from("recibo_periodos")
+      .insert({ anio: 2030 + Math.floor(Math.random() * 70), mes: 1 + Math.floor(Math.random() * 12), created_by: admin.id })
+      .select("id")
+      .single();
+    periodoId = data?.id ?? "";
+  }
+  expect(periodoId).not.toBe("");
+  await loginAs(page, admin);
+  await page.goto(`/recibos?periodo=${periodoId}`);
+  return `${nombre} Recibos`;
+}
+let filaVisual = "";
 
 const PANTALLAS: Pantalla[] = [
   {
@@ -308,6 +334,37 @@ const PANTALLAS: Pantalla[] = [
       await page.goto("/configuracion?lista=convenio");
     },
     lista: (page) => page.getByText(copy.configuracion.sistema, { exact: true }),
+  },
+  {
+    nombre: "recibos",
+    abrir: async (page) => {
+      filaVisual = await abrirRecibos(page, "recibos");
+    },
+    lista: (page) => page.getByRole("listitem", { name: filaVisual }),
+  },
+  {
+    nombre: "recibos-nuevo-periodo",
+    abrir: async (page) => {
+      await abrirRecibos(page, "recibos-nuevo");
+    },
+    trasCargar: async (page) => {
+      await page.getByRole("button", { name: copyRecibos.periodos.nuevo }).click();
+    },
+    lista: (page) => page.getByRole("dialog", { name: copyRecibos.nuevoPeriodo.title }),
+  },
+  {
+    // The DNI question after an upload whose file has another DNI.
+    nombre: "recibos-dialogo-dni",
+    abrir: async (page) => {
+      filaVisual = await abrirRecibos(page, "recibos-dni");
+    },
+    trasCargar: async (page) => {
+      await page
+        .getByRole("listitem", { name: filaVisual })
+        .locator('input[type="file"]')
+        .setInputFiles({ name: "recibo.pdf", mimeType: "application/pdf", buffer: pdfConTexto(["RECIBO DE PRUEBA", "DNI 11222333"]) });
+    },
+    lista: (page) => page.getByRole("dialog", { name: copyRecibos.dialogos.dniNoEncontrado.title }),
   },
   {
     nombre: "configuracion-historial",

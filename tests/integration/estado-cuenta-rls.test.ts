@@ -270,6 +270,24 @@ describe("account state at the database (GAP-01)", () => {
         esperado: "42501",
         llamar: (c, x) => c.rpc("rechazar_solicitud", { p_solicitud_id: x.victima.solicitudId, p_motivo: "Intento" }),
       },
+      // F2-04: the receipts write functions check for an active Admin first,
+      // so any id gets the refusal.
+      recibo_periodo_cerrar: { esperado: "42501", llamar: (c) => c.rpc("recibo_periodo_cerrar", { p_periodo_id: randomUUID() }) },
+      recibo_periodo_crear: { esperado: "42501", llamar: (c) => c.rpc("recibo_periodo_crear", { p_anio: 2099, p_mes: 1 }) },
+      recibo_periodo_publicar: { esperado: "42501", llamar: (c) => c.rpc("recibo_periodo_publicar", { p_periodo_id: randomUUID() }) },
+      recibo_periodo_reabrir: { esperado: "42501", llamar: (c) => c.rpc("recibo_periodo_reabrir", { p_periodo_id: randomUUID() }) },
+      recibo_registrar: {
+        esperado: "42501",
+        llamar: (c, x) =>
+          c.rpc("recibo_registrar", {
+            p_periodo_id: randomUUID(),
+            p_empleado_id: x.victima.id,
+            p_archivo_path: `${x.victima.id}/${randomUUID()}/${randomUUID()}.pdf`,
+            p_archivo_bytes: 10,
+            p_reemplazar: true,
+            p_override_motivo: "sin_dni",
+          }),
+      },
       reemplazar_documento: {
         esperado: "42501",
         llamar: (c, x) =>
