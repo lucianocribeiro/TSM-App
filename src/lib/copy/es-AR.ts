@@ -41,6 +41,7 @@ export type Copy = {
     usuarios: string;
     aprobaciones: string;
     configuracion: string;
+    recibos: string;
     cambiarPassword: string;
   };
   sesion: {
@@ -799,6 +800,7 @@ export const copy = {
     usuarios: "Usuarios",
     aprobaciones: "Aprobaciones",
     configuracion: "Configuración",
+    recibos: "Recibos",
     cambiarPassword: "Cambiar contraseña",
   },
   sesion: {

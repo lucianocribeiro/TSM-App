@@ -13,6 +13,10 @@
 // CR-4 adds a second check: the .xlsx writer (write-excel-file) is server
 // only. No client chunk of any route may contain its workbook paths, and,
 // as a control, a server chunk must.
+//
+// F2-04 adds a third: the Carga de recibos copy (src/lib/copy/recibos.ts) is
+// Admin only. Mi Legajo's client chunks must not carry it; as a control, the
+// /recibos route's chunks must.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -40,8 +44,13 @@ export const PROHIBIDOS = [...TEXTOS_PROHIBIDOS, ...IDS_PROHIBIDOS];
 // A string only the .xlsx writer carries: the worksheet part's path.
 export const MARCA_XLSX = "xl/worksheets/";
 
+// Carga de recibos texts (src/lib/copy/recibos.ts), kept in step by
+// src/lib/legajo/bundle-mi-legajo.test.ts.
+export const RECIBOS_PROHIBIDOS = ["Carga de recibos", "No encontramos el DNI", "Reemplazar recibo"];
+
 const RUTA = "/(app)/mi-legajo/page";
 const CONTROL = "/(app)/legajos/[id]/page";
+const CONTROL_RECIBOS = "/(app)/recibos/page";
 
 // The text and its \u-escaped form (a minifier may escape non-ASCII).
 function variantes(texto) {
@@ -109,12 +118,27 @@ function main() {
   for (const { chunk } of xlsxCliente) console.log(`  .xlsx writer found in client chunk ${chunk}`);
   if (!xlsxServidor) console.log("  control failed: the .xlsx writer was not found in any server chunk.");
 
-  if (hallazgos.length > 0 || !controlOk || clientes.length === 0 || xlsxCliente.length > 0 || !xlsxServidor) {
+  const recibosMiLegajo = buscarProhibidos(miLegajo, RECIBOS_PROHIBIDOS);
+  const recibosControl = new Set(buscarProhibidos(chunksDeRuta(nextDir, CONTROL_RECIBOS), RECIBOS_PROHIBIDOS).map((h) => h.texto));
+  const recibosControlOk = recibosControl.size === RECIBOS_PROHIBIDOS.length;
+  for (const { chunk, texto } of recibosMiLegajo) console.log(`  found receipts Admin text "${texto}" in ${chunk}`);
+  if (!recibosControlOk) console.log("  control failed: the Carga de recibos texts were not found in the /recibos chunks.");
+
+  if (
+    hallazgos.length > 0 ||
+    !controlOk ||
+    clientes.length === 0 ||
+    xlsxCliente.length > 0 ||
+    !xlsxServidor ||
+    recibosMiLegajo.length > 0 ||
+    !recibosControlOk
+  ) {
     console.log("Bundle check failed.");
     process.exit(1);
   }
   console.log("Bundle check passed: no group E strings in Mi Legajo's client chunks (control found them in Legajo detail).");
   console.log("Bundle check passed: the .xlsx writer is in no client chunk (control found it server side).");
+  console.log("Bundle check passed: no Carga de recibos texts in Mi Legajo's client chunks (control found them in /recibos).");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
