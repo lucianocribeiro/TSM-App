@@ -270,6 +270,22 @@ describe("account state at the database (GAP-01)", () => {
         esperado: "42501",
         llamar: (c, x) => c.rpc("rechazar_solicitud", { p_solicitud_id: x.victima.solicitudId, p_motivo: "Intento" }),
       },
+      // F2-05: the employee's signing functions check for an active Empleado
+      // first, so any argument gets the refusal.
+      firma_registrar: {
+        esperado: "42501",
+        llamar: (c, x) => c.rpc("firma_registrar", { p_imagen_path: `${x.propio.id}/1-${randomUUID()}.png` }),
+      },
+      recibo_firmar: {
+        esperado: "42501",
+        llamar: (c, x) =>
+          c.rpc("recibo_firmar", {
+            p_recibo_id: randomUUID(),
+            p_archivo_path: `${x.propio.id}/${randomUUID()}/${randomUUID()}.pdf`,
+            p_archivo_bytes: 10,
+            p_firmado_at: new Date().toISOString(),
+          }),
+      },
       // F2-04: the receipts write functions check for an active Admin first,
       // so any id gets the refusal.
       recibo_periodo_cerrar: { esperado: "42501", llamar: (c) => c.rpc("recibo_periodo_cerrar", { p_periodo_id: randomUUID() }) },
