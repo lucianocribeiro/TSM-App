@@ -7,6 +7,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { copy } from "@/lib/copy/es-AR";
 import { MENU_COOKIE, parseEstadoMenu } from "@/lib/nav/menu";
 import { getNavItems } from "@/lib/nav/nav";
+import { contarMisPendientes } from "@/lib/recibos/mis-recibos-datos";
+import { createClient } from "@/lib/supabase/server";
 import { parseTheme, THEME_COOKIE } from "@/lib/theme/theme";
 import { AppShell } from "./AppShell";
 
@@ -47,11 +49,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // pendientes_admin() refuses anyone else, so the count never reaches them.
   const conBell = user.role === "admin" && cuenta.estadoCuenta === "activa" && !cuenta.debeCambiarPassword;
   const pendientes = conBell ? ((await contarPendientes()) ?? 0) : null;
+  // The Mis Recibos counter (RF-23): an active Empleado past the forced
+  // password change; the count is the caller's own, under RLS.
+  const conRecibos = user.role === "empleado" && cuenta.estadoCuenta === "activa" && !cuenta.debeCambiarPassword;
+  const misRecibosPendientes = conRecibos ? await contarMisPendientes(await createClient()) : 0;
 
   return (
     <AppShell
       // No navigation until the temporary password is changed.
-      navItems={cuenta.debeCambiarPassword ? [] : getNavItems(user.role)}
+      navItems={cuenta.debeCambiarPassword ? [] : getNavItems(user.role, { misRecibosPendientes })}
       showCambiarPassword={!cuenta.debeCambiarPassword}
       userEmail={user.email}
       roleLabel={copy.auth.roles[user.role]}

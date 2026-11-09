@@ -47,6 +47,12 @@ describe("decidirAcceso: order of checks", () => {
     expect(decidirAcceso(input("/legajos", sesion({ rol: "admin" })))).toEqual({ accion: "seguir", contarActividad: true });
   });
 
+  it("an employee-only route (F2-05): an Admin goes home, an Empleado goes on", () => {
+    expect(decidirAcceso(input("/mis-recibos", sesion({ rol: "admin" })))).toEqual({ accion: "redirigir", a: "/mi-legajo" });
+    expect(decidirAcceso(input("/mis-recibos", sesion()))).toEqual({ accion: "seguir", contarActividad: true });
+    expect(decidirAcceso(input("/mis-recibos", null))).toEqual({ accion: "redirigir", a: "/login?volver=%2Fmis-recibos" });
+  });
+
   it("never redirects a Server Action: only clears a session that must end", () => {
     expect(decidirAcceso(input("/legajos", null, "POST"))).toEqual({ accion: "seguir", contarActividad: false });
     expect(decidirAcceso(input("/legajos", sesion(), "POST"))).toEqual({ accion: "seguir", contarActividad: true });

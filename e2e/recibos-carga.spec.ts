@@ -154,7 +154,7 @@ test("an Empleado is refused on /recibos like on other Admin routes, and has no 
   const empleado = await createE2EUser("recibos-empleado");
   cuentas.add(empleado.id);
   await loginAs(page, empleado);
-  await expect(mainNav(page).getByRole("link", { name: copy.nav.recibos })).toHaveCount(0);
+  await expect(mainNav(page).getByRole("link", { name: copy.nav.recibos, exact: true })).toHaveCount(0);
   await page.goto("/recibos");
   await expect(page).toHaveURL(/\/mi-legajo$/);
   await expect(page.getByRole("heading", { level: 1, name: t.title })).toHaveCount(0);

@@ -1111,6 +1111,7 @@ export type Database = {
         Args: { p_storage_path: string }
         Returns: Database["public"]["Enums"]["documento_estado"]
       }
+      firma_registrar: { Args: { p_imagen_path: string }; Returns: number }
       hay_solicitud_pendiente: {
         Args: { p_legajo_id: string }
         Returns: boolean
@@ -1150,6 +1151,15 @@ export type Database = {
       rechazar_solicitud: {
         Args: { p_motivo: string; p_solicitud_id: string }
         Returns: undefined
+      }
+      recibo_firmar: {
+        Args: {
+          p_archivo_bytes: number
+          p_archivo_path: string
+          p_firmado_at: string
+          p_recibo_id: string
+        }
+        Returns: string
       }
       recibo_periodo_cerrar: {
         Args: { p_periodo_id: string }

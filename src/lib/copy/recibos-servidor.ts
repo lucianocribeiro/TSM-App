@@ -9,8 +9,12 @@ export type CopyRecibosServidor = {
   // receipt (RF-17). {fecha} is dd/mm/aaaa and {hora} HH:mm, both in
   // America/Argentina/Buenos_Aires.
   estampaFirma: string;
+  // The name on the stamp when the employee's legajo has neither surname nor
+  // name (F2-05, decision 12): never an id or an email.
+  nombreSinLegajo: string;
 };
 
 export const copyRecibosServidor: CopyRecibosServidor = {
   estampaFirma: "Firmado electrónicamente por {nombre} el {fecha} a las {hora} (hora de Argentina)",
+  nombreSinLegajo: "la persona titular de la cuenta (sin nombre en el legajo)",
 };

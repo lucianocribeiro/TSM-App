@@ -4,6 +4,7 @@ import { inventarioAcciones } from "@/lib/auth/acciones-inventario.test-helpers"
 import { CAMBIAR_PASSWORD_PATH, HOME_PATH, LOGIN_PATH } from "@/lib/auth/gate";
 import { LOGIN_INACTIVIDAD } from "@/lib/auth/guardia";
 import { copy } from "@/lib/copy/es-AR";
+import { copyMisRecibos } from "@/lib/copy/mis-recibos";
 import { copyRecibos } from "@/lib/copy/recibos";
 import {
   crearCambioForzado,
@@ -16,7 +17,7 @@ import {
   type Semilla,
 } from "./actores";
 import { anonClient, createTestUser, deleteTestUsers, serviceClient, TEST_PASSWORD, uniqueEmail, type TestUser } from "./helpers";
-import { nuevoPeriodo } from "./recibos";
+import { borrarReciboYPeriodo, nuevoPeriodo, nuevoRecibo } from "./recibos";
 
 // F1-11A, GAP-04: the action boundary matrix. Every Server Action in the
 // action inventory (src/lib/auth/acciones-inventario.test-helpers.ts) has an
@@ -55,6 +56,7 @@ const aprobaciones = await import("@/app/(app)/aprobaciones/actions");
 const usuarios = await import("@/app/(app)/usuarios/actions");
 const configuracion = await import("@/app/(app)/configuracion/actions");
 const recibos = await import("@/app/(app)/recibos/actions");
+const misRecibos = await import("@/app/(app)/mis-recibos/actions");
 const auth = await import("@/lib/auth/actions");
 
 const noAutorizado = { ok: false, error: copy.cuentas.errors.noAutorizado };
@@ -65,6 +67,7 @@ const apErrors = copy.aprobaciones.errors;
 const cuentaErrors = copy.cuentas.errors;
 const configErrors = copy.configuracion.errors;
 const recErrors = copyRecibos.errors;
+const misErrors = copyMisRecibos.errors;
 const TEMPORAL = "Temporal-2026";
 
 const GRUPO_D = {
@@ -166,11 +169,27 @@ let creadoresFrontera: string[] = [];
 async function recibosSinCambios() {
   const service = serviceClient();
   expect((await service.from("recibo_periodos").select("*").eq("id", periodoFrontera).single()).data).toEqual(periodoFronteraAntes);
-  expect((await service.from("recibo_periodos").select("id").in("created_by", creadoresFrontera)).data).toEqual([{ id: periodoFrontera }]);
+  // The two fixture periods (F2-04 draft, F2-05 published) and no other.
+  const creados = (await service.from("recibo_periodos").select("id").in("created_by", creadoresFrontera)).data ?? [];
+  expect(creados.map((p) => p.id).sort()).toEqual([periodoFrontera, reciboVictima.periodoId].sort());
   expect((await service.from("recibos").select("id").eq("periodo_id", periodoFrontera)).data).toEqual([]);
   expect((await service.from("recibo_periodo_historial").select("id").eq("periodo_id", periodoFrontera)).data).toEqual([]);
 }
 const rutaFrontera = (empleadoId: string) => `${empleadoId}/${periodoFrontera}/${randomUUID()}.pdf`;
+
+// F2-05: the victim's pending receipt in a published period (created in
+// beforeAll, removed in afterAll), the target of the "another employee's id"
+// column; and no signature may appear for any fixture account.
+const M2 = "app/(app)/mis-recibos/actions.ts#";
+let reciboVictima = { id: "", periodoId: "" };
+let reciboVictimaAntes: unknown = null;
+async function misRecibosSinCambios() {
+  const service = serviceClient();
+  expect((await service.from("recibos").select("*").eq("id", reciboVictima.id).single()).data).toEqual(reciboVictimaAntes);
+  expect((await service.from("recibo_firmas").select("id").eq("recibo_id", reciboVictima.id)).data).toEqual([]);
+  expect((await service.from("firmas_empleado").select("id").in("empleado_id", creadoresFrontera)).data).toEqual([]);
+}
+const firmaFrontera = (empleadoId: string) => `${empleadoId}/1-${randomUUID()}.png`;
 const S = "lib/auth/actions.ts#";
 
 const CASOS: Record<string, Caso> = {
@@ -467,6 +486,62 @@ const CASOS: Record<string, Caso> = {
     noAplica: { ajeno: GLOBAL },
   },
 
+  // /mis-recibos (F2-05)
+  [`${M2}prepararSubidaFirma`]: {
+    clase: "empleado",
+    rechazo: noAutorizado,
+    llamar: () => misRecibos.prepararSubidaFirma({ tamano: 2048, tipo: "image/png" }),
+    rol: { quien: "admin", esperado: noAutorizado },
+    invalido: { llamar: () => misRecibos.prepararSubidaFirma({ tamano: 2048, tipo: "image/png", empleadoId: randomUUID() }), esperado: fallo(misErrors.firmaFallo) },
+    noAplica: { ajeno: SIN_ID },
+    despues: misRecibosSinCambios,
+  },
+  [`${M2}registrarFirma`]: {
+    clase: "empleado",
+    rechazo: noAutorizado,
+    llamar: (x) => misRecibos.registrarFirma({ path: firmaFrontera(x.propio.id) }),
+    rol: { quien: "admin", esperado: noAutorizado },
+    ajeno: { llamar: (x) => misRecibos.registrarFirma({ path: firmaFrontera(x.victima.id) }), esperado: fallo(misErrors.firmaFallo) },
+    invalido: { llamar: () => misRecibos.registrarFirma({ path: "../x.png" }), esperado: fallo(misErrors.firmaFallo) },
+    despues: misRecibosSinCambios,
+  },
+  [`${M2}descartarSubidaFirma`]: {
+    clase: "empleado",
+    rechazo: noAutorizado,
+    llamar: (x) => misRecibos.descartarSubidaFirma({ path: firmaFrontera(x.propio.id) }),
+    rol: { quien: "admin", esperado: noAutorizado },
+    ajeno: { llamar: (x) => misRecibos.descartarSubidaFirma({ path: firmaFrontera(x.victima.id) }), esperado: fallo(misErrors.accionFallo) },
+    invalido: { llamar: () => misRecibos.descartarSubidaFirma({ path: 5 }), esperado: fallo(misErrors.accionFallo) },
+    despues: misRecibosSinCambios,
+  },
+  [`${M2}obtenerUrlRecibo`]: {
+    clase: "empleado",
+    rechazo: noAutorizado,
+    llamar: () => misRecibos.obtenerUrlRecibo({ reciboId: reciboVictima.id, modo: "ver" }),
+    rol: { quien: "admin", esperado: noAutorizado },
+    ajeno: { llamar: () => misRecibos.obtenerUrlRecibo({ reciboId: reciboVictima.id, modo: "ver" }), esperado: fallo(misErrors.noEncontrado) },
+    invalido: { llamar: () => misRecibos.obtenerUrlRecibo({ reciboId: reciboVictima.id, modo: "imprimir" }), esperado: fallo(misErrors.verFallo) },
+    despues: misRecibosSinCambios,
+  },
+  [`${M2}obtenerUrlMiFirma`]: {
+    clase: "empleado",
+    rechazo: noAutorizado,
+    llamar: () => misRecibos.obtenerUrlMiFirma({}),
+    rol: { quien: "admin", esperado: noAutorizado },
+    invalido: { llamar: () => misRecibos.obtenerUrlMiFirma({ version: 0 }), esperado: fallo(misErrors.accionFallo) },
+    noAplica: { ajeno: SIN_ID },
+    despues: misRecibosSinCambios,
+  },
+  [`${M2}firmarRecibo`]: {
+    clase: "empleado",
+    rechazo: noAutorizado,
+    llamar: () => misRecibos.firmarRecibo({ reciboId: reciboVictima.id }),
+    rol: { quien: "admin", esperado: noAutorizado },
+    ajeno: { llamar: () => misRecibos.firmarRecibo({ reciboId: reciboVictima.id }), esperado: fallo(misErrors.noEncontrado) },
+    invalido: { llamar: () => misRecibos.firmarRecibo({ reciboId: "x" }), esperado: fallo(misErrors.firmarFallo) },
+    despues: misRecibosSinCambios,
+  },
+
   // /usuarios
   [`${U}crearUsuarioAction`]: {
     clase: "admin",
@@ -632,6 +707,11 @@ describe("action boundary matrix (GAP-04)", () => {
     const periodo = await nuevoPeriodo(service, admin.id, "borrador");
     periodoFrontera = periodo.id;
     periodoFronteraAntes = (await service.from("recibo_periodos").select("*").eq("id", periodo.id).single()).data;
+    // F2-05: the victim's pending receipt in a published period.
+    const publicado = await nuevoPeriodo(service, admin.id, "publicado");
+    const reciboId = await nuevoRecibo(service, publicado.id, victima.id, admin.id);
+    reciboVictima = { id: reciboId, periodoId: publicado.id };
+    reciboVictimaAntes = (await service.from("recibos").select("*").eq("id", reciboId).single()).data;
   }, 120_000);
 
   afterAll(async () => {
@@ -639,6 +719,7 @@ describe("action boundary matrix (GAP-04)", () => {
     await service.from("catalogo_eventos").delete().like("item_nombre", `${MARCA_CATALOGO}%`);
     await service.from("catalogo_items").delete().like("nombre", `${MARCA_CATALOGO}%`);
     if (periodoFrontera) await service.from("recibo_periodos").delete().eq("id", periodoFrontera);
+    if (reciboVictima.id) await borrarReciboYPeriodo(service, reciboVictima.id, reciboVictima.periodoId);
     await deleteTestUsers(service, [
       ...otros,
       empleado.id,
@@ -672,11 +753,11 @@ describe("action boundary matrix (GAP-04)", () => {
     return resultado;
   }
 
-  it("covers exactly the inventory's actions (47), each with every applicable column or a reason", () => {
+  it("covers exactly the inventory's actions (53), each with every applicable column or a reason", () => {
     const claves = inventarioAcciones()
       .map((accion) => accion.clave)
       .sort();
-    expect(claves).toHaveLength(47);
+    expect(claves).toHaveLength(53);
     expect(Object.keys(CASOS).sort()).toEqual(claves);
     for (const [clave, caso] of Object.entries(CASOS)) {
       if (caso.clase !== "empleado" && caso.clase !== "admin") continue;

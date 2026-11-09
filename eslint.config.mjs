@@ -33,7 +33,7 @@ const grupoE = [
 // Legajo, the app shell, the shared components and the shared modules never
 // import it; the future Mis Recibos route reaches receipts only through its
 // own Server Actions.
-const recibosAdminMessage = "Receipts Admin modules (sweep, Carga de recibos, privileged client) must not be imported by employee routes or shared modules (F2-03, F2-04).";
+const recibosAdminMessage = "Receipts Admin modules (sweep, Carga de recibos) must not be imported by employee routes or shared modules (F2-03, F2-04).";
 // F2-04 adds the Carga de recibos modules: its copy, its server logic and
 // flow, and the privileged storage client.
 const recibosAdmin = [
@@ -46,12 +46,23 @@ const recibosAdmin = [
       "@/lib/recibos/carga-*",
       "**/recibos/carga",
       "**/recibos/carga-*",
-      "@/lib/recibos/cliente-privilegiado",
-      "**/recibos/cliente-privilegiado",
     ],
     message: recibosAdminMessage,
   },
 ];
+
+// F2-04, F2-05: the receipts privileged storage client is shared by the
+// Admin's Carga de recibos and the employee's Mis Recibos server logic, and
+// only those two modules may import it; each authorizes its caller first.
+const privilegiadoMessage =
+  "The receipts privileged client may only be imported by src/lib/recibos/carga.ts and src/lib/recibos/firma.ts (F2-04, F2-05).";
+const privilegiado = [
+  {
+    group: ["@/lib/recibos/cliente-privilegiado", "**/recibos/cliente-privilegiado", "./cliente-privilegiado"],
+    message: privilegiadoMessage,
+  },
+];
+const privilegiadoAllowed = ["src/lib/recibos/carga.ts", "src/lib/recibos/firma.ts"];
 
 // F2-07: the PDF libraries run on the server only, behind the two receipt
 // wrappers (src/lib/recibos/pdf-texto.ts and pdf-firma.ts, "server-only").
@@ -74,7 +85,14 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["**/*.{ts,tsx,js,jsx,mjs}"],
-    ignores: [...serviceRoleAllowed, ...pdfWrappers],
+    ignores: [...serviceRoleAllowed, ...pdfWrappers, ...privilegiadoAllowed],
+    rules: {
+      "no-restricted-imports": ["error", { ...serviceRole, patterns: [...serviceRole.patterns, ...pdfLibs, ...privilegiado] }],
+    },
+  },
+  // The two receipts modules allowed the privileged client keep the rest.
+  {
+    files: privilegiadoAllowed,
     rules: {
       "no-restricted-imports": ["error", { ...serviceRole, patterns: [...serviceRole.patterns, ...pdfLibs] }],
     },
@@ -84,23 +102,28 @@ const eslintConfig = defineConfig([
   {
     files: serviceRoleAllowed,
     rules: {
-      "no-restricted-imports": ["error", { patterns: pdfLibs }],
+      "no-restricted-imports": ["error", { patterns: [...pdfLibs, ...privilegiado] }],
     },
   },
   // The PDF wrappers keep the service-role restriction.
   {
     files: pdfWrappers,
     rules: {
-      "no-restricted-imports": ["error", serviceRole],
+      "no-restricted-imports": ["error", { ...serviceRole, patterns: [...serviceRole.patterns, ...privilegiado] }],
     },
   },
-  // Replaces the rule's options for these files, so it repeats serviceRole
-  // and pdfLibs.
+  // Replaces the rule's options for these files, so it repeats serviceRole,
+  // pdfLibs and privilegiado.
   {
     files: [
       "src/app/*.{ts,tsx}",
       "src/app/(app)/*.{ts,tsx}",
       "src/app/(app)/mi-legajo/**/*.{ts,tsx}",
+      // F2-05: the employee's receipts route and its modules.
+      "src/app/(app)/mis-recibos/**/*.{ts,tsx}",
+      "src/lib/copy/mis-recibos.ts",
+      "src/lib/recibos/mis-recibos-datos.ts",
+      "src/lib/recibos/dibujo.ts",
       "src/components/**/*.{ts,tsx}",
       "src/lib/copy/es-AR.ts",
       "src/lib/documentos/**/*.{ts,tsx}",
@@ -114,6 +137,17 @@ const eslintConfig = defineConfig([
       // still runs). The general rule above still applies to it.
       "src/app/(app)/mi-legajo/DatosLaboralesPropios.tsx",
     ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { ...serviceRole, patterns: [...serviceRole.patterns, ...grupoE, ...recibosAdmin, ...pdfLibs, ...privilegiado] },
+      ],
+    },
+  },
+  // F2-05: the employee's signing logic may use the privileged client, but
+  // nothing Admin only.
+  {
+    files: ["src/lib/recibos/firma.ts"],
     rules: {
       "no-restricted-imports": [
         "error",

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { copy } from "../src/lib/copy/es-AR";
+import { copyMisRecibos } from "../src/lib/copy/mis-recibos";
 import { copyRecibos } from "../src/lib/copy/recibos";
 import { pdfConTexto } from "../tests/pdf-minimo";
 import { formatCopy } from "../src/lib/copy/format";
@@ -8,6 +9,7 @@ import { THEME_COOKIE, type Theme } from "../src/lib/theme/theme";
 import { adminNuevo, altaAfipCargada, empleadoCompleto, registro, solicitudPendiente } from "./datos";
 import { fillLogin, loginAs } from "./helpers";
 import { assertNoSecretOnPage } from "./secrets";
+import { firmaRegistrada, reciboPublicado } from "./recibos-datos";
 import { createE2EUser, fillLaboral, fillLegajo, itemIdE2E, localServiceClient } from "./service";
 
 // F1-11B, GAP-08 (partial): the main screens in light and dark, at desktop
@@ -121,6 +123,20 @@ async function abrirRecibos(page: Page, etiqueta: string): Promise<string> {
   return `${nombre} Recibos`;
 }
 let filaVisual = "";
+
+// F2-05: an Empleado on Mis Recibos with one pending receipt, and a
+// registered signature when asked.
+async function abrirMisRecibos(page: Page, etiqueta: string, { conRecibo = true, conFirma = false } = {}) {
+  const admin = await adminNuevo(`visual-${etiqueta}-admin`, cuentas.add);
+  const empleado = await createE2EUser(`visual-${etiqueta}`);
+  cuentas.add(empleado.id);
+  await fillLegajo(empleado.id, { nombres: "Visual", apellido: "Mis Recibos" });
+  if (conRecibo) await reciboPublicado(empleado.id, admin.id);
+  if (conFirma) await firmaRegistrada(empleado.id);
+  await loginAs(page, empleado);
+  await page.goto("/mis-recibos");
+}
+const misRecibos = copyMisRecibos;
 
 const PANTALLAS: Pantalla[] = [
   {
@@ -365,6 +381,32 @@ const PANTALLAS: Pantalla[] = [
         .setInputFiles({ name: "recibo.pdf", mimeType: "application/pdf", buffer: pdfConTexto(["RECIBO DE PRUEBA", "DNI 11222333"]) });
     },
     lista: (page) => page.getByRole("dialog", { name: copyRecibos.dialogos.dniNoEncontrado.title }),
+  },
+  {
+    nombre: "mis-recibos",
+    abrir: async (page) => abrirMisRecibos(page, "mis-recibos", { conFirma: true }),
+    lista: (page) => page.getByTestId("mi-firma-imagen"),
+  },
+  {
+    nombre: "mis-recibos-vacio",
+    abrir: async (page) => abrirMisRecibos(page, "mis-recibos-vacio", { conRecibo: false }),
+    lista: (page) => page.getByTestId("mis-recibos-vacio"),
+  },
+  {
+    nombre: "mis-recibos-dibujo",
+    abrir: async (page) => abrirMisRecibos(page, "mis-recibos-dibujo"),
+    trasCargar: async (page) => {
+      await page.getByRole("button", { name: misRecibos.miFirma.registrar }).click();
+    },
+    lista: (page) => page.getByRole("dialog", { name: misRecibos.dibujo.title }),
+  },
+  {
+    nombre: "mis-recibos-confirmar",
+    abrir: async (page) => abrirMisRecibos(page, "mis-recibos-confirmar", { conFirma: true }),
+    trasCargar: async (page) => {
+      await page.getByRole("button", { name: misRecibos.acciones.firmar }).click();
+    },
+    lista: (page) => page.getByTestId("declaracion-firma"),
   },
   {
     nombre: "configuracion-historial",

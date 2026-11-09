@@ -70,13 +70,13 @@ test.describe("session and menu", () => {
     await expect(page).toHaveURL(/\/login\?volver=%2Fmi-legajo$/);
   });
 
-  test("empleado lands on /mi-legajo and sees only Mi Legajo", async ({ page }) => {
+  test("empleado lands on /mi-legajo and sees Mi Legajo and Mis Recibos", async ({ page }) => {
     await loginAs(page, EMPLEADO_A);
     await expect(
       page.getByRole("heading", { level: 1, name: copy.miLegajo.title }),
     ).toBeVisible();
 
-    await expectNavLinks(page, [copy.nav.miLegajo]);
+    await expectNavLinks(page, [copy.nav.miLegajo, copy.nav.misRecibos]);
     const links = mainNav(page).getByRole("link");
     await expect(links.first()).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(copy.auth.roles.empleado, { exact: true })).toBeVisible();

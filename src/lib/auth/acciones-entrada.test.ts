@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { copy } from "@/lib/copy/es-AR";
+import { copyMisRecibos } from "@/lib/copy/mis-recibos";
 import { copyRecibos } from "@/lib/copy/recibos";
 import { inventarioAcciones } from "./acciones-inventario.test-helpers";
 
@@ -69,9 +70,27 @@ vi.mock("@/lib/sesion/marca-servidor", () => ({
 }));
 vi.mock("@/lib/auth/verify-password", () => ({ verifyCurrentPassword: (...args: unknown[]) => mocks.verifyCurrentPassword(...args) }));
 // The receipts privileged storage client (F2-04).
-const PRIVILEGIADO = ["crearUrlSubidaReciboPrivilegiada", "descargarRecibo", "eliminarRecibo", "barrerHuerfanos"];
+const PRIVILEGIADO = [
+  "crearUrlSubidaReciboPrivilegiada",
+  "descargarRecibo",
+  "eliminarRecibo",
+  "barrerHuerfanos",
+  "crearUrlSubidaFirmaPrivilegiada",
+  "descargarFirma",
+  "subirRecibo",
+  "eliminarFirma",
+];
 vi.mock("@/lib/recibos/cliente-privilegiado", () => {
-  const nombres = ["crearUrlSubidaReciboPrivilegiada", "descargarRecibo", "eliminarRecibo", "barrerHuerfanos"];
+  const nombres = [
+    "crearUrlSubidaReciboPrivilegiada",
+    "descargarRecibo",
+    "eliminarRecibo",
+    "barrerHuerfanos",
+    "crearUrlSubidaFirmaPrivilegiada",
+    "descargarFirma",
+    "subirRecibo",
+    "eliminarFirma",
+  ];
   return Object.fromEntries(nombres.map((nombre) => [nombre, (...args: unknown[]) => mocks.privilegiado[nombre](...args)]));
 });
 
@@ -81,6 +100,7 @@ const configuracion = await import("@/app/(app)/configuracion/actions");
 const aprobaciones = await import("@/app/(app)/aprobaciones/actions");
 const usuarios = await import("@/app/(app)/usuarios/actions");
 const recibos = await import("@/app/(app)/recibos/actions");
+const misRecibos = await import("@/app/(app)/mis-recibos/actions");
 const auth = await import("./actions");
 
 let errorLog: ReturnType<typeof vi.spyOn>;
@@ -164,6 +184,7 @@ const raiz = (input: Record<string, unknown>) => [
 const subida = { tipo: "dni_frente", fileName: "dni.pdf", mimeType: "application/pdf", sizeBytes: 120 };
 const pathDe = (profileId: string) => `${profileId}/dni_frente/${FILE_ID}.pdf`;
 const reciboPath = `${EMPLEADO}/${ID}/${FILE_ID}.pdf`;
+const firmaPath = `${EMPLEADO}/1-${FILE_ID}.png`;
 const filtros = { busqueda: "", estadoLaboral: "", areaId: "", sucursalId: "", tareaId: "", mostrarBajas: false };
 const exportacion = (extraFiltros = {}, extraSeleccion = {}) => ({
   filtros: { ...filtros, ...extraFiltros },
@@ -184,6 +205,10 @@ const e = {
   recibosSubida: copyRecibos.errors.subidaFallo,
   recibosRegistro: copyRecibos.errors.registroFallo,
   recibosVer: copyRecibos.errors.verFallo,
+  misFirma: copyMisRecibos.errors.firmaFallo,
+  misAccion: copyMisRecibos.errors.accionFallo,
+  misVer: copyMisRecibos.errors.verFallo,
+  misFirmar: copyMisRecibos.errors.firmarFallo,
 };
 
 type Caso = {
@@ -352,6 +377,21 @@ const CASOS: Caso[] = [
   ),
   caso("app/(app)/recibos/actions.ts#obtenerUrlReciboAdmin", "admin", recibos.obtenerUrlReciboAdmin, { reciboId: ID }, raiz({ reciboId: ID }), e.recibosVer),
 
+  // Mis Recibos (F2-05)
+  caso("app/(app)/mis-recibos/actions.ts#prepararSubidaFirma", "empleado", misRecibos.prepararSubidaFirma, { tamano: 2048, tipo: "image/png" }, raiz({ tamano: 2048, tipo: "image/png" }), e.misFirma),
+  caso("app/(app)/mis-recibos/actions.ts#registrarFirma", "empleado", misRecibos.registrarFirma, { path: firmaPath }, raiz({ path: firmaPath }), e.misFirma),
+  caso("app/(app)/mis-recibos/actions.ts#descartarSubidaFirma", "empleado", misRecibos.descartarSubidaFirma, { path: firmaPath }, raiz({ path: firmaPath }), e.misAccion),
+  caso(
+    "app/(app)/mis-recibos/actions.ts#obtenerUrlRecibo",
+    "empleado",
+    misRecibos.obtenerUrlRecibo,
+    { reciboId: ID, modo: "ver" },
+    [...raiz({ reciboId: ID, modo: "ver" }), { reciboId: ID, modo: "imprimir" }],
+    e.misVer,
+  ),
+  caso("app/(app)/mis-recibos/actions.ts#obtenerUrlMiFirma", "empleado", misRecibos.obtenerUrlMiFirma, {}, [{ extra: 1 }, { empleadoId: ID }, { version: 0 }], e.misAccion),
+  caso("app/(app)/mis-recibos/actions.ts#firmarRecibo", "empleado", misRecibos.firmarRecibo, { reciboId: ID }, [...raiz({ reciboId: ID }), { reciboId: ID, firmadoAt: "2026-01-01T00:00:00Z" }], e.misFirmar),
+
   // Sign-in and password (FormData: the form's own fields only)
   caso(
     "lib/auth/actions.ts#login",
@@ -400,7 +440,7 @@ describe("strict inputs", () => {
     const claves = [...CASOS.map((c) => c.clave), ...EXENTAS].sort();
     expect(new Set(claves).size).toBe(claves.length);
     expect(claves).toEqual(inventario);
-    expect(inventario).toHaveLength(47);
+    expect(inventario).toHaveLength(53);
   });
 
   describe.each(CASOS.map((c) => [c.clave, c] as const))("%s", (_clave, c) => {

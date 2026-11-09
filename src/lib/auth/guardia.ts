@@ -111,7 +111,7 @@ export function decidirAcceso(input: GuardiaInput): GuardiaDecision {
       return { accion: "redirigir", a: CAMBIAR_PASSWORD_PATH };
     }
     // 4. Role, and default deny.
-    if (clase === null || (clase === "admin" && sesion.rol !== "admin")) {
+    if (clase === null || (clase === "admin" && sesion.rol !== "admin") || (clase === "empleado" && sesion.rol !== "empleado")) {
       return { accion: "redirigir", a: HOME_PATH };
     }
   }

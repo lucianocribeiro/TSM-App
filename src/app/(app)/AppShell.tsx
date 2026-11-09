@@ -161,6 +161,7 @@ export function AppShell({
                     <Link
                       href={item.href}
                       aria-current={active ? "page" : undefined}
+                      aria-label={item.ariaLabel}
                       onClick={() => setMenuOpen(false)}
                       className={cx(
                         "flex items-baseline gap-3 border-l-2 px-[22px] py-[11px] text-[14.5px] no-underline transition-colors hover:bg-accent-soft",
@@ -176,6 +177,15 @@ export function AppShell({
                         {item.number}
                       </span>
                       <span>{item.label}</span>
+                      {item.badge ? (
+                        <span
+                          aria-hidden="true"
+                          data-testid="nav-badge"
+                          className="ml-auto self-center rounded-md border border-accent px-[7px] py-px text-[11px] tabular-nums text-accent-deep"
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
                     </Link>
                   </li>
                 );

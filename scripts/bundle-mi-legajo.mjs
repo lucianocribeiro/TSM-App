@@ -17,6 +17,11 @@
 // F2-04 adds a third: the Carga de recibos copy (src/lib/copy/recibos.ts) is
 // Admin only. Mi Legajo's client chunks must not carry it; as a control, the
 // /recibos route's chunks must.
+//
+// F2-05 adds two more: the employee's Mis Recibos client chunks must not
+// carry the Admin receipts copy either; and the PDF libraries (unpdf,
+// @cantoo/pdf-lib) are server only: no client chunk of any route may contain
+// their marker strings, and, as a control, a server chunk must.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -48,9 +53,14 @@ export const MARCA_XLSX = "xl/worksheets/";
 // src/lib/legajo/bundle-mi-legajo.test.ts.
 export const RECIBOS_PROHIBIDOS = ["Carga de recibos", "No encontramos el DNI", "Reemplazar recibo"];
 
+// Strings only the PDF libraries carry: pdf-lib's encrypted-input error and
+// pdf.js's structure error.
+export const MARCAS_PDF = ["Input document to `PDFDocument.load` is encrypted", "Invalid PDF structure"];
+
 const RUTA = "/(app)/mi-legajo/page";
 const CONTROL = "/(app)/legajos/[id]/page";
 const CONTROL_RECIBOS = "/(app)/recibos/page";
+const MIS_RECIBOS = "/(app)/mis-recibos/page";
 
 // The text and its \u-escaped form (a minifier may escape non-ASCII).
 function variantes(texto) {
@@ -124,6 +134,14 @@ function main() {
   for (const { chunk, texto } of recibosMiLegajo) console.log(`  found receipts Admin text "${texto}" in ${chunk}`);
   if (!recibosControlOk) console.log("  control failed: the Carga de recibos texts were not found in the /recibos chunks.");
 
+  const misRecibos = chunksDeRuta(nextDir, MIS_RECIBOS);
+  const recibosEnMisRecibos = buscarProhibidos(misRecibos, RECIBOS_PROHIBIDOS);
+  for (const { chunk, texto } of recibosEnMisRecibos) console.log(`  found receipts Admin text "${texto}" in Mis Recibos chunk ${chunk}`);
+  const pdfCliente = buscarProhibidos(clientes, MARCAS_PDF);
+  const pdfServidor = new Set(buscarProhibidos(archivosJs(path.join(nextDir, "server")), MARCAS_PDF).map((h) => h.texto)).size === MARCAS_PDF.length;
+  for (const { chunk, texto } of pdfCliente) console.log(`  PDF library marker "${texto}" found in client chunk ${chunk}`);
+  if (!pdfServidor) console.log("  control failed: the PDF library markers were not found in the server chunks.");
+
   if (
     hallazgos.length > 0 ||
     !controlOk ||
@@ -131,7 +149,11 @@ function main() {
     xlsxCliente.length > 0 ||
     !xlsxServidor ||
     recibosMiLegajo.length > 0 ||
-    !recibosControlOk
+    !recibosControlOk ||
+    misRecibos.length === 0 ||
+    recibosEnMisRecibos.length > 0 ||
+    pdfCliente.length > 0 ||
+    !pdfServidor
   ) {
     console.log("Bundle check failed.");
     process.exit(1);
@@ -139,6 +161,8 @@ function main() {
   console.log("Bundle check passed: no group E strings in Mi Legajo's client chunks (control found them in Legajo detail).");
   console.log("Bundle check passed: the .xlsx writer is in no client chunk (control found it server side).");
   console.log("Bundle check passed: no Carga de recibos texts in Mi Legajo's client chunks (control found them in /recibos).");
+  console.log("Bundle check passed: no Carga de recibos texts in Mis Recibos' client chunks.");
+  console.log("Bundle check passed: the PDF libraries are in no client chunk (control found them server side).");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

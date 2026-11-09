@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   user: null as SessionUser | null,
   pathname: "/mi-legajo" as string | null,
   contarPendientes: vi.fn(async (): Promise<number | null> => 3),
+  contarMisPendientes: vi.fn(async (): Promise<number> => 2),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -23,6 +24,8 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("./AppShell", () => ({ AppShell: () => null }));
 vi.mock("@/lib/aprobaciones/bandeja-datos", () => ({ contarPendientes: () => state.contarPendientes() }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
+vi.mock("@/lib/recibos/mis-recibos-datos", () => ({ contarMisPendientes: () => state.contarMisPendientes() }));
 
 const { default: AppLayout } = await import("./layout");
 
@@ -100,5 +103,39 @@ describe("approvals bell", () => {
     state.pathname = "/cambiar-password";
     expect(await pendientesDe()).toBeNull();
     expect(state.contarPendientes).not.toHaveBeenCalled();
+  });
+});
+
+// F2-05: the Mis Recibos counter on the menu (RF-23).
+describe("Mis Recibos counter", () => {
+  const activa = { estadoCuenta: "activa" as const, debeCambiarPassword: false };
+  type Item = { href: string; badge?: string; ariaLabel?: string };
+  const itemDe = async () =>
+    ((await render()) as { props: { navItems: Item[] } }).props.navItems.find((item) => item.href === "/mis-recibos");
+
+  beforeEach(() => {
+    state.contarMisPendientes.mockClear();
+    state.contarMisPendientes.mockImplementation(async () => 2);
+  });
+
+  it("gives an active Empleado their count, with the accessible name", async () => {
+    state.user = user(activa);
+    expect(await itemDe()).toMatchObject({ badge: "2", ariaLabel: expect.stringContaining("2") });
+  });
+
+  it("shows no badge at zero", async () => {
+    state.user = user(activa);
+    state.contarMisPendientes.mockImplementation(async () => 0);
+    const item = await itemDe();
+    expect(item?.badge).toBeUndefined();
+  });
+
+  it("never reads it for an Admin or during the forced password change", async () => {
+    state.user = user(activa, "admin");
+    expect(await itemDe()).toBeUndefined();
+    state.user = user({ estadoCuenta: "activa", debeCambiarPassword: true });
+    state.pathname = "/cambiar-password";
+    await render();
+    expect(state.contarMisPendientes).not.toHaveBeenCalled();
   });
 });

@@ -101,6 +101,19 @@ describe("estamparFirma", () => {
     expect(pdf).toEqual(copia);
   });
 
+  it("keeps the signature's transparency: the RGBA image is embedded with an SMask (F2-05-FIX-01)", async () => {
+    const documento = await PDFDocument.load(await estampar(await recibo()));
+    const xobjects = documento.getPages().at(-1)!.node.Resources()!.lookup(PDFName.of("XObject"), PDFDict);
+    const imagenes = xobjects
+      .keys()
+      .map((clave) => xobjects.lookup(clave))
+      .filter((objeto): objeto is PDFRawStream => objeto instanceof PDFRawStream && objeto.dict.get(PDFName.of("Subtype")) === PDFName.of("Image"));
+    expect(imagenes).toHaveLength(1);
+    const mascara = imagenes[0].dict.lookup(PDFName.of("SMask"));
+    expect(mascara).toBeInstanceOf(PDFRawStream);
+    expect((mascara as PDFRawStream).dict.get(PDFName.of("Subtype"))).toBe(PDFName.of("Image"));
+  });
+
   it("adds the image and the text to the last page only", async () => {
     const pdf = await recibo();
     const salida = await estampar(pdf);
