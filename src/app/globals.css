@@ -102,6 +102,8 @@
  * layer) can override them, e.g. nav links that use text-rail-ink.
  */
 @layer base {
+  /* A focused field stays clear of the frozen page header (PageHeader). */
+  html { scroll-padding-top: 18rem; }
   body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
   h1,h2,h3,h4 { font-family: var(--font-heading); }
   a { color: var(--accent-deep); }
