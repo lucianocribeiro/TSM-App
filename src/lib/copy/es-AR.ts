@@ -42,6 +42,10 @@ export type Copy = {
     aprobaciones: string;
     configuracion: string;
     recibos: string;
+    misRecibos: string;
+    // {label}: the item's name, {n}: the count.
+    misRecibosPendiente: string;
+    misRecibosPendientes: string;
     cambiarPassword: string;
   };
   sesion: {
@@ -801,6 +805,9 @@ export const copy = {
     aprobaciones: "Aprobaciones",
     configuracion: "Configuración",
     recibos: "Recibos",
+    misRecibos: "Mis Recibos",
+    misRecibosPendiente: "{label}, 1 pendiente de firma",
+    misRecibosPendientes: "{label}, {n} pendientes de firma",
     cambiarPassword: "Cambiar contraseña",
   },
   sesion: {

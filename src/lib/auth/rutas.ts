@@ -4,7 +4,9 @@
 // or an entry without a page. Static assets (/_next, favicon, images) never
 // reach the proxy (see the matcher in src/proxy.ts).
 
-export type ClaseRuta = "publica" | "autenticada" | "admin";
+// empleado: active Empleado only (F2-05, Mis Recibos): an Admin is sent home,
+// as an Empleado is on an Admin route.
+export type ClaseRuta = "publica" | "autenticada" | "empleado" | "admin";
 
 export type EntradaRuta = {
   // The route as the app defines it; [param] matches one path segment.
@@ -20,6 +22,8 @@ export const RUTAS = [
   { patron: "/", clase: "autenticada" },
   { patron: "/mi-legajo", clase: "autenticada" },
   { patron: "/cambiar-password", clase: "autenticada" },
+  // Empleado only.
+  { patron: "/mis-recibos", clase: "empleado" },
   // Admin only.
   { patron: "/legajos", clase: "admin" },
   { patron: "/legajos/exportaciones", clase: "admin" },
