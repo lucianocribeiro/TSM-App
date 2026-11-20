@@ -170,22 +170,27 @@ export function armarFilas(
 export async function cargarEstadoPeriodo(periodoId: string): Promise<EstadoPeriodo | null> {
   if (!(await sessionWithRole("admin"))) return null;
   const client = await createClient();
+  // Only Empleado accounts take part in receipts (PRD Fase 2 RF-05,
+  // decision 1): the owner's role is filtered in the query itself, so a
+  // receipt owned by any other role never becomes a row.
   const [perfiles, recibos] = await Promise.all([
     client.from("profiles").select("id").eq("role", "empleado").eq("estado_cuenta", "activa"),
-    client.from("recibos").select("id, empleado_id, estado, firmado_at, cargado_at").eq("periodo_id", periodoId),
+    client
+      .from("recibos")
+      .select("id, empleado_id, estado, firmado_at, cargado_at, profiles!recibos_empleado_id_fkey!inner(role, estado_cuenta)")
+      .eq("periodo_id", periodoId)
+      .eq("profiles.role", "empleado"),
   ]);
   if (perfiles.error || recibos.error) return null;
   const activos = (perfiles.data ?? []).map((perfil) => perfil.id);
   const activosSet = new Set(activos);
   const filasRecibo = recibos.data ?? [];
 
-  // Accounts with a receipt here that are not active Empleados now.
+  // Empleados with a receipt here that are not active now (tagged).
   const otros = [...new Set(filasRecibo.map((r) => r.empleado_id).filter((id) => !activosSet.has(id)))];
   const inactivas = new Set<string>();
-  if (otros.length > 0) {
-    const estados = await client.from("profiles").select("id, estado_cuenta").in("id", otros);
-    if (estados.error) return null;
-    for (const perfil of estados.data ?? []) if (perfil.estado_cuenta !== "activa") inactivas.add(perfil.id);
+  for (const recibo of filasRecibo) {
+    if (!activosSet.has(recibo.empleado_id) && recibo.profiles?.estado_cuenta !== "activa") inactivas.add(recibo.empleado_id);
   }
 
   const personas = await personasDe(client, [...activos, ...otros]);
@@ -346,7 +351,9 @@ export async function cargarDetalleRecibo(reciboId: string): Promise<DetalleReci
 // ---------------------------------------------------------------------------
 
 // Distinct employees with at least one pending receipt in a published or
-// closed period, any period, deactivated accounts included. Paged.
+// closed period, any period, deactivated accounts included. Paged by id.
+// Only Empleado owners count (PRD Fase 2 RF-05, decision 1), filtered in
+// the query.
 export async function contarEmpleadosConRecibosSinFirmar(): Promise<number | null> {
   if (!(await sessionWithRole("admin"))) return null;
   const client = await createClient();
@@ -354,9 +361,10 @@ export async function contarEmpleadosConRecibosSinFirmar(): Promise<number | nul
   for (let desde = 0; ; desde += PAGINA) {
     const { data, error } = await client
       .from("recibos")
-      .select("id, empleado_id, recibo_periodos!inner(estado)")
+      .select("id, empleado_id, recibo_periodos!inner(estado), profiles!recibos_empleado_id_fkey!inner(role)")
       .eq("estado", "pendiente")
       .in("recibo_periodos.estado", [...PERIODOS_VISIBLES])
+      .eq("profiles.role", "empleado")
       .order("id", { ascending: true })
       .range(desde, desde + PAGINA - 1);
     if (error) return null;
