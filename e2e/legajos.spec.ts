@@ -163,11 +163,14 @@ test("the Admin filters, searches and shows deactivated employees in the list", 
   await expect(page.getByLabel(t.filtros.mostrarBajas, { exact: true })).not.toBeChecked();
 });
 
-test("the list has no KPI cards", async ({ page }) => {
+// PRD Fase 2 RF-22 (F2-06): "Recibos sin firmar" is the only KPI card; the
+// Fase 1 cards stay gone.
+test("the list has one KPI card, Recibos sin firmar, and none of the old ones", async ({ page }) => {
   await loginAs(page, await admin());
   await page.goto("/legajos");
   await expect(page.getByRole("heading", { level: 1, name: t.title })).toBeVisible();
-  await expect(page.locator("[data-kpi]")).toHaveCount(0);
+  await expect(page.locator('[data-kpi="recibos-sin-firmar"]')).toBeVisible();
+  await expect(page.locator("[data-kpi]")).toHaveCount(1);
   for (const ausente of ["Activos", "Ingresos del mes"]) {
     await expect(page.getByText(ausente, { exact: true })).toHaveCount(0);
   }
