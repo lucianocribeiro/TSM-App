@@ -98,7 +98,8 @@ Tailwind v4 `@theme inline` maps them to utilities: colors `bg`, `surface`, `ink
 | `LabelValueGrid` | Label/value grid (auto-fit, min 150px), with an optional note line per item | `items: { key, label, value, note? }[]` |
 | `Banner` | Page-level notice (role=status); `attention` uses accent border and tint | `tone?: "info" \| "attention"`, `actions?` |
 | `Checkbox` | Native checkbox with its label; checked color from `--accent` | `label`, native input props |
-| `KpiStrip` | KPI cards (label + number) in one bordered strip, cells separated by `--line-soft` | `label` (accessible name), `items: { key, label, value }[]` |
+| `KpiStrip` | KPI cards (label + number) in one bordered strip, cells separated by `--line-soft`; a cell may end with a link line under the value | `label` (accessible name), `items: { key, label, value, link?: { href, label } }[]` |
+| `SegmentedNav` | Links between the views of one section, with the segmented filter look; the current one `--accent-deep` with `aria-current="page"` | `label` (accessible name), `items: { key, href, label }[]`, `actual` |
 | `TextArea` | Label + multi-line input, styled like `Field`, with optional hint and error | `label`, `hint?`, `error?`, textarea props |
 | `BellLink` | Bell icon link with an optional count badge (`--accent` border, `--accent-deep` text on `--rail`); neutral without a badge | `href`, `label` (accessible name), `badge: string \| null` |
 | `MenuButton` | Hamburger button that shows or hides a menu; same square, border and ink as `BellLink` | `label` (accessible name), `expanded`, `controls` (menu id), `onClick` |

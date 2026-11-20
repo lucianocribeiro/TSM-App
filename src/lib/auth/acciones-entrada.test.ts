@@ -61,7 +61,7 @@ vi.mock("next/navigation", () => ({ redirect: (...args: unknown[]) => mocks.redi
 vi.mock("@/lib/auth/session", () => ({ getSessionUser: () => mocks.getSessionUser() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: () => mocks.createClient() }));
 vi.mock("@/lib/admin/cuentas", () => {
-  const nombres = ["crearUsuario", "resetPasswordTemporal", "desactivarCuenta", "reactivarCuenta", "purgarCuenta"];
+  const nombres = ["crearUsuario", "resetPasswordTemporal", "desactivarCuenta", "reactivarCuenta", "purgarCuenta", "listarCuentas"];
   return Object.fromEntries(nombres.map((nombre) => [nombre, (...args: unknown[]) => mocks.cuentas[nombre](...args)]));
 });
 vi.mock("@/lib/sesion/marca-servidor", () => ({
@@ -100,6 +100,7 @@ const configuracion = await import("@/app/(app)/configuracion/actions");
 const aprobaciones = await import("@/app/(app)/aprobaciones/actions");
 const usuarios = await import("@/app/(app)/usuarios/actions");
 const recibos = await import("@/app/(app)/recibos/actions");
+const estadoFirmas = await import("@/app/(app)/recibos/estado/actions");
 const misRecibos = await import("@/app/(app)/mis-recibos/actions");
 const auth = await import("./actions");
 
@@ -119,7 +120,7 @@ beforeEach(() => {
   mocks.redirect = vi.fn<(...args: unknown[]) => unknown>(() => {
     throw new Error("redirect");
   });
-  for (const nombre of ["crearUsuario", "resetPasswordTemporal", "desactivarCuenta", "reactivarCuenta", "purgarCuenta"]) {
+  for (const nombre of ["crearUsuario", "resetPasswordTemporal", "desactivarCuenta", "reactivarCuenta", "purgarCuenta", "listarCuentas"]) {
     mocks.cuentas[nombre] = vi.fn<(...args: unknown[]) => unknown>(async () => ({ ok: false, error: "x" }));
   }
   mocks.marca.sellarActividad = vi.fn<(...args: unknown[]) => unknown>(async () => true);
@@ -205,6 +206,8 @@ const e = {
   recibosSubida: copyRecibos.errors.subidaFallo,
   recibosRegistro: copyRecibos.errors.registroFallo,
   recibosVer: copyRecibos.errors.verFallo,
+  estadoVer: copyRecibos.estado.errors.verFallo,
+  estadoFirma: copyRecibos.estado.errors.firmaFallo,
   misFirma: copyMisRecibos.errors.firmaFallo,
   misAccion: copyMisRecibos.errors.accionFallo,
   misVer: copyMisRecibos.errors.verFallo,
@@ -377,6 +380,30 @@ const CASOS: Caso[] = [
   ),
   caso("app/(app)/recibos/actions.ts#obtenerUrlReciboAdmin", "admin", recibos.obtenerUrlReciboAdmin, { reciboId: ID }, raiz({ reciboId: ID }), e.recibosVer),
 
+  // Estado de firmas (F2-06)
+  caso(
+    "app/(app)/recibos/estado/actions.ts#obtenerUrlArchivoReciboAdmin",
+    "admin",
+    estadoFirmas.obtenerUrlArchivoReciboAdmin,
+    { origen: "historial", id: ID, modo: "descargar" },
+    [
+      ...raiz({ origen: "historial", id: ID, modo: "descargar" }),
+      { origen: "historial", id: ID, modo: "descargar", path: reciboPath },
+      { origen: "historial", id: ID, modo: "descargar", nombre: "x.pdf" },
+      { origen: "otro", id: ID, modo: "ver" },
+      { origen: "actual", id: ID, modo: "imprimir" },
+    ],
+    e.estadoVer,
+  ),
+  caso(
+    "app/(app)/recibos/estado/actions.ts#obtenerUrlFirmaAdmin",
+    "admin",
+    estadoFirmas.obtenerUrlFirmaAdmin,
+    { firmaId: ID },
+    [...raiz({ firmaId: ID }), { firmaId: ID, path: firmaPath }, { firmaId: ID, version: 1 }],
+    e.estadoFirma,
+  ),
+
   // Mis Recibos (F2-05)
   caso("app/(app)/mis-recibos/actions.ts#prepararSubidaFirma", "empleado", misRecibos.prepararSubidaFirma, { tamano: 2048, tipo: "image/png" }, raiz({ tamano: 2048, tipo: "image/png" }), e.misFirma),
   caso("app/(app)/mis-recibos/actions.ts#registrarFirma", "empleado", misRecibos.registrarFirma, { path: firmaPath }, raiz({ path: firmaPath }), e.misFirma),
@@ -440,7 +467,7 @@ describe("strict inputs", () => {
     const claves = [...CASOS.map((c) => c.clave), ...EXENTAS].sort();
     expect(new Set(claves).size).toBe(claves.length);
     expect(claves).toEqual(inventario);
-    expect(inventario).toHaveLength(53);
+    expect(inventario).toHaveLength(55);
   });
 
   describe.each(CASOS.map((c) => [c.clave, c] as const))("%s", (_clave, c) => {

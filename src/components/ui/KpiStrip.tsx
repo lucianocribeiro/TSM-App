@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { cx } from "./cx";
 
-export type KpiItem = { key: string; label: string; value: number };
+// link: an optional way on from the number (its own line under the value).
+export type KpiItem = { key: string; label: string; value: number; link?: { href: string; label: string } };
 
 // KPI strip from the design system: one bordered surface container, auto-fit
 // cells of at least 148px separated by --line-soft; label in the input label
@@ -25,6 +27,11 @@ export function KpiStrip({ label, items, className }: { label: string; items: Kp
         >
           <dt className="text-[10.5px] uppercase tracking-[.18em] text-ink-soft">{item.label}</dt>
           <dd className="font-heading text-[36px] leading-none lining-nums tabular-nums">{item.value}</dd>
+          {item.link ? (
+            <dd className="text-[12.5px]">
+              <Link href={item.link.href}>{item.link.label}</Link>
+            </dd>
+          ) : null}
         </div>
       ))}
     </dl>

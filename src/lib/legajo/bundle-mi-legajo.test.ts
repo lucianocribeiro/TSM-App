@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buscarProhibidos, IDS_PROHIBIDOS, MARCA_XLSX, MARCAS_PDF, RECIBOS_PROHIBIDOS, TEXTOS_PROHIBIDOS } from "../../../scripts/bundle-mi-legajo.mjs";
+import { buscarProhibidos, ESTADO_PROHIBIDOS, IDS_PROHIBIDOS, MARCA_XLSX, MARCAS_PDF, RECIBOS_PROHIBIDOS, TEXTOS_PROHIBIDOS } from "../../../scripts/bundle-mi-legajo.mjs";
 import { copyLaborales } from "@/lib/copy/laborales";
 import { copyRecibos } from "@/lib/copy/recibos";
 import { CAMPOS_LABORALES } from "./laborales";
@@ -24,6 +24,14 @@ describe("Mi Legajo bundle check", () => {
 
   it("looks for the Carga de recibos title and two of its dialog titles (F2-04)", () => {
     expect(RECIBOS_PROHIBIDOS).toEqual([copyRecibos.title, copyRecibos.dialogos.dniNoEncontrado.title, copyRecibos.dialogos.reemplazo.title]);
+  });
+
+  it("looks for the Estado de firmas title and two of its detail sections (F2-06)", () => {
+    expect(ESTADO_PROHIBIDOS).toEqual([
+      copyRecibos.estado.title,
+      copyRecibos.estado.dialogo.dni.title,
+      copyRecibos.estado.dialogo.reemplazos.title,
+    ]);
   });
 
   it("looks for the PDF libraries by their own error strings (F2-05)", () => {

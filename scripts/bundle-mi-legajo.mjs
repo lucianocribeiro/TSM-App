@@ -18,6 +18,10 @@
 // Admin only. Mi Legajo's client chunks must not carry it; as a control, the
 // /recibos route's chunks must.
 //
+// F2-06 adds the Estado de firmas texts (same copy module): neither Mi
+// Legajo's nor Mis Recibos' client chunks may carry them; as a control, the
+// /recibos/estado route's chunks must.
+//
 // F2-05 adds two more: the employee's Mis Recibos client chunks must not
 // carry the Admin receipts copy either; and the PDF libraries (unpdf,
 // @cantoo/pdf-lib) are server only: no client chunk of any route may contain
@@ -53,6 +57,10 @@ export const MARCA_XLSX = "xl/worksheets/";
 // src/lib/legajo/bundle-mi-legajo.test.ts.
 export const RECIBOS_PROHIBIDOS = ["Carga de recibos", "No encontramos el DNI", "Reemplazar recibo"];
 
+// Estado de firmas texts (src/lib/copy/recibos.ts, F2-06): the screen's title
+// and two of its detail sections, kept in step by the same test.
+export const ESTADO_PROHIBIDOS = ["Estado de firmas", "Verificación de DNI", "Archivos reemplazados"];
+
 // Strings only the PDF libraries carry: pdf-lib's encrypted-input error and
 // pdf.js's structure error.
 export const MARCAS_PDF = ["Input document to `PDFDocument.load` is encrypted", "Invalid PDF structure"];
@@ -61,6 +69,7 @@ const RUTA = "/(app)/mi-legajo/page";
 const CONTROL = "/(app)/legajos/[id]/page";
 const CONTROL_RECIBOS = "/(app)/recibos/page";
 const MIS_RECIBOS = "/(app)/mis-recibos/page";
+const CONTROL_ESTADO = "/(app)/recibos/estado/page";
 
 // The text and its \u-escaped form (a minifier may escape non-ASCII).
 function variantes(texto) {
@@ -137,6 +146,14 @@ function main() {
   const misRecibos = chunksDeRuta(nextDir, MIS_RECIBOS);
   const recibosEnMisRecibos = buscarProhibidos(misRecibos, RECIBOS_PROHIBIDOS);
   for (const { chunk, texto } of recibosEnMisRecibos) console.log(`  found receipts Admin text "${texto}" in Mis Recibos chunk ${chunk}`);
+  const estadoProhibidos = [
+    ...buscarProhibidos(miLegajo, ESTADO_PROHIBIDOS).map((h) => ({ ...h, ruta: "Mi Legajo" })),
+    ...buscarProhibidos(misRecibos, ESTADO_PROHIBIDOS).map((h) => ({ ...h, ruta: "Mis Recibos" })),
+  ];
+  for (const { chunk, texto, ruta } of estadoProhibidos) console.log(`  found Estado de firmas text "${texto}" in ${ruta} chunk ${chunk}`);
+  const estadoControl = new Set(buscarProhibidos(chunksDeRuta(nextDir, CONTROL_ESTADO), ESTADO_PROHIBIDOS).map((h) => h.texto));
+  const estadoControlOk = estadoControl.size === ESTADO_PROHIBIDOS.length;
+  if (!estadoControlOk) console.log("  control failed: the Estado de firmas texts were not found in the /recibos/estado chunks.");
   const pdfCliente = buscarProhibidos(clientes, MARCAS_PDF);
   const pdfServidor = new Set(buscarProhibidos(archivosJs(path.join(nextDir, "server")), MARCAS_PDF).map((h) => h.texto)).size === MARCAS_PDF.length;
   for (const { chunk, texto } of pdfCliente) console.log(`  PDF library marker "${texto}" found in client chunk ${chunk}`);
@@ -152,6 +169,8 @@ function main() {
     !recibosControlOk ||
     misRecibos.length === 0 ||
     recibosEnMisRecibos.length > 0 ||
+    estadoProhibidos.length > 0 ||
+    !estadoControlOk ||
     pdfCliente.length > 0 ||
     !pdfServidor
   ) {
@@ -162,6 +181,7 @@ function main() {
   console.log("Bundle check passed: the .xlsx writer is in no client chunk (control found it server side).");
   console.log("Bundle check passed: no Carga de recibos texts in Mi Legajo's client chunks (control found them in /recibos).");
   console.log("Bundle check passed: no Carga de recibos texts in Mis Recibos' client chunks.");
+  console.log("Bundle check passed: no Estado de firmas texts in Mi Legajo's or Mis Recibos' client chunks (control found them in /recibos/estado).");
   console.log("Bundle check passed: the PDF libraries are in no client chunk (control found them server side).");
 }
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button, buttonClassName } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Field } from "@/components/ui/Field";
@@ -34,9 +34,11 @@ type LegajosScreenProps = {
   // The Configuración lists, for the filter options.
   items: CatalogoItem[];
   listaFallo: boolean;
+  // The "Recibos sin firmar" card, streamed by the page (PRD Fase 2 RF-22).
+  kpi?: ReactNode;
 };
 
-export function LegajosScreen({ legajos, items, listaFallo }: LegajosScreenProps) {
+export function LegajosScreen({ legajos, items, listaFallo, kpi }: LegajosScreenProps) {
   const router = useRouter();
   const [filtros, setFiltros] = useState<FiltrosLegajos>(FILTROS_INICIALES);
   const [exportando, setExportando] = useState(false);
@@ -75,6 +77,7 @@ export function LegajosScreen({ legajos, items, listaFallo }: LegajosScreenProps
         }
       />
       <div className="flex flex-col gap-4 px-[34px] pb-10 pt-[26px]">
+        {kpi}
         <div role="search" aria-label={t.filtros.label} className="flex flex-col gap-3">
           <div className="grid items-end gap-3 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
             <div className="[grid-column:span_2] max-[560px]:[grid-column:auto]">

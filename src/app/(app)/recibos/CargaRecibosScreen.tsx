@@ -15,6 +15,7 @@ import { formatCopy } from "@/lib/copy/format";
 import { copyRecibos } from "@/lib/copy/recibos";
 import { pasoSiguiente, responder, type Confirmaciones, type Paso } from "@/lib/recibos/carga-flujo";
 import type { FilaCarga, PeriodoVista } from "@/lib/recibos/carga-datos";
+import { etiquetaPeriodo } from "@/lib/recibos/etiqueta";
 import { createClient } from "@/lib/supabase/client";
 import {
   cerrarPeriodoRecibos,
@@ -26,6 +27,7 @@ import {
   reabrirPeriodoRecibos,
   registrarRecibo,
 } from "./actions";
+import { VistasRecibos } from "./VistasRecibos";
 
 const t = copyRecibos;
 const PDF = "application/pdf";
@@ -37,10 +39,8 @@ type CargaRecibosScreenProps = {
   listaFallo: boolean;
 };
 
-// MM/AAAA.
-export function etiquetaPeriodo(periodo: Pick<PeriodoVista, "anio" | "mes">): string {
-  return `${String(periodo.mes).padStart(2, "0")}/${periodo.anio}`;
-}
+// MM/AAAA (kept as an export of this screen for its callers).
+export { etiquetaPeriodo };
 
 export function CargaRecibosScreen({ periodos, periodo, filas, listaFallo }: CargaRecibosScreenProps) {
   const router = useRouter();
@@ -61,6 +61,7 @@ export function CargaRecibosScreen({ periodos, periodo, filas, listaFallo }: Car
         }
       />
       <div className="flex flex-col gap-4 px-[34px] pb-10 pt-[26px]">
+        <VistasRecibos actual="carga" periodoId={periodo?.id ?? null} />
         <p className="text-ink-soft">{t.intro}</p>
         {aviso ? (
           <p role="status" className="text-[12.5px] italic text-ink-soft" data-testid="aviso-recibos">
