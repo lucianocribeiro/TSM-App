@@ -56,6 +56,7 @@ const aprobaciones = await import("@/app/(app)/aprobaciones/actions");
 const usuarios = await import("@/app/(app)/usuarios/actions");
 const configuracion = await import("@/app/(app)/configuracion/actions");
 const recibos = await import("@/app/(app)/recibos/actions");
+const estadoFirmas = await import("@/app/(app)/recibos/estado/actions");
 const misRecibos = await import("@/app/(app)/mis-recibos/actions");
 const auth = await import("@/lib/auth/actions");
 
@@ -157,6 +158,7 @@ const L = "app/(app)/legajos/actions.ts#";
 const U = "app/(app)/usuarios/actions.ts#";
 const C = "app/(app)/configuracion/actions.ts#";
 const R = "app/(app)/recibos/actions.ts#";
+const RE = "app/(app)/recibos/estado/actions.ts#";
 
 // F2-04: receipt periods are global (no employee owns one) and an Admin
 // reaches every receipt by design. The fixture period, a draft created in
@@ -486,6 +488,29 @@ const CASOS: Record<string, Caso> = {
     noAplica: { ajeno: GLOBAL },
   },
 
+  // /recibos/estado (F2-06): read only; an Admin reads every receipt,
+  // replaced file and signature by design.
+  [`${RE}obtenerUrlArchivoReciboAdmin`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => estadoFirmas.obtenerUrlArchivoReciboAdmin({ origen: "actual", id: randomUUID(), modo: "ver" }),
+    invalido: {
+      llamar: () => estadoFirmas.obtenerUrlArchivoReciboAdmin({ origen: "actual", id: "x", modo: "ver" }),
+      esperado: fallo(copyRecibos.estado.errors.verFallo),
+    },
+    noAplica: { ajeno: GLOBAL },
+  },
+  [`${RE}obtenerUrlFirmaAdmin`]: {
+    clase: "admin",
+    rechazo: noAutorizado,
+    llamar: () => estadoFirmas.obtenerUrlFirmaAdmin({ firmaId: randomUUID() }),
+    invalido: {
+      llamar: () => estadoFirmas.obtenerUrlFirmaAdmin({ firmaId: "x" }),
+      esperado: fallo(copyRecibos.estado.errors.firmaFallo),
+    },
+    noAplica: { ajeno: "an Admin sees every employee's registered signatures by design (PRD Fase 2 §2)" },
+  },
+
   // /mis-recibos (F2-05)
   [`${M2}prepararSubidaFirma`]: {
     clase: "empleado",
@@ -753,11 +778,11 @@ describe("action boundary matrix (GAP-04)", () => {
     return resultado;
   }
 
-  it("covers exactly the inventory's actions (53), each with every applicable column or a reason", () => {
+  it("covers exactly the inventory's actions (55), each with every applicable column or a reason", () => {
     const claves = inventarioAcciones()
       .map((accion) => accion.clave)
       .sort();
-    expect(claves).toHaveLength(53);
+    expect(claves).toHaveLength(55);
     expect(Object.keys(CASOS).sort()).toEqual(claves);
     for (const [clave, caso] of Object.entries(CASOS)) {
       if (caso.clase !== "empleado" && caso.clase !== "admin") continue;

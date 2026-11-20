@@ -9,7 +9,7 @@ import { THEME_COOKIE, type Theme } from "../src/lib/theme/theme";
 import { adminNuevo, altaAfipCargada, empleadoCompleto, registro, solicitudPendiente } from "./datos";
 import { fillLogin, loginAs } from "./helpers";
 import { assertNoSecretOnPage } from "./secrets";
-import { firmaRegistrada, reciboPublicado } from "./recibos-datos";
+import { archivoReemplazado, firmaRegistrada, firmadoConServicio, periodoPublicado, reciboEnPeriodo, reciboPublicado } from "./recibos-datos";
 import { createE2EUser, fillLaboral, fillLegajo, itemIdE2E, localServiceClient } from "./service";
 
 // F1-11B, GAP-08 (partial): the main screens in light and dark, at desktop
@@ -138,6 +138,35 @@ async function abrirMisRecibos(page: Page, etiqueta: string, { conRecibo = true,
 }
 const misRecibos = copyMisRecibos;
 
+// F2-06: an Admin on Estado de firmas for a published period with a signed
+// receipt (with a replaced file and a DNI override) and a pending one; with
+// detalle, the signed receipt's detail is open (from the URL, so it survives
+// every reload).
+async function abrirEstado(page: Page, etiqueta: string, { detalle = false } = {}): Promise<string> {
+  const admin = await adminNuevo(`visual-${etiqueta}`, cuentas.add);
+  await fillLegajo(admin.id, { nombres: "Visual", apellido: "Admin Estado" });
+  const sufijo = randomUUID().slice(0, 6);
+  const firmante = await createE2EUser(`visual-${etiqueta}-firmante`);
+  const pendiente = await createE2EUser(`visual-${etiqueta}-pendiente`);
+  cuentas.add(firmante.id);
+  cuentas.add(pendiente.id);
+  await fillLegajo(firmante.id, { nombres: `Visual ${sufijo}`, apellido: "Firmado" });
+  await fillLegajo(pendiente.id, { nombres: `Visual ${sufijo}`, apellido: "Pendiente" });
+  const periodo = await periodoPublicado(admin.id);
+  const recibo = await reciboEnPeriodo(periodo, firmante.id, admin.id);
+  await archivoReemplazado({ id: recibo.id, periodoId: periodo.id }, firmante.id, admin.id);
+  const override = await localServiceClient()
+    .from("recibo_overrides")
+    .insert({ recibo_id: recibo.id, motivo: "no_verificable", archivo_path: recibo.path, admin_id: admin.id });
+  expect(override.error).toBeNull();
+  await firmadoConServicio(recibo.id, firmante.id);
+  await reciboEnPeriodo(periodo, pendiente.id, admin.id);
+  await loginAs(page, admin);
+  await page.goto(`/recibos/estado?periodo=${periodo.id}${detalle ? `&recibo=${recibo.id}` : ""}`);
+  return `Visual ${sufijo} Firmado`;
+}
+let estadoVisual = "";
+
 const PANTALLAS: Pantalla[] = [
   {
     nombre: "login",
@@ -177,7 +206,8 @@ const PANTALLAS: Pantalla[] = [
       await loginAs(page, await adminNuevo("visual-legajos", cuentas.add));
       await page.goto("/legajos");
     },
-    lista: (page) => page.getByRole("heading", { level: 1, name: copy.legajos.title }),
+    // F2-06: with the "Recibos sin firmar" card.
+    lista: (page) => page.locator('[data-kpi="recibos-sin-firmar"]'),
   },
   {
     nombre: "legajo-detalle",
@@ -381,6 +411,20 @@ const PANTALLAS: Pantalla[] = [
         .setInputFiles({ name: "recibo.pdf", mimeType: "application/pdf", buffer: pdfConTexto(["RECIBO DE PRUEBA", "DNI 11222333"]) });
     },
     lista: (page) => page.getByRole("dialog", { name: copyRecibos.dialogos.dniNoEncontrado.title }),
+  },
+  {
+    nombre: "recibos-estado",
+    abrir: async (page) => {
+      estadoVisual = await abrirEstado(page, "recibos-estado");
+    },
+    lista: (page) => page.getByRole("listitem", { name: estadoVisual, exact: true }),
+  },
+  {
+    nombre: "recibos-estado-detalle",
+    abrir: async (page) => {
+      estadoVisual = await abrirEstado(page, "recibos-estado-detalle", { detalle: true });
+    },
+    lista: (page) => page.getByRole("dialog").getByTestId("detalle-firma-imagen"),
   },
   {
     nombre: "mis-recibos",
