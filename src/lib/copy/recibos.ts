@@ -10,6 +10,10 @@ type PeriodoEstado = Database["public"]["Enums"]["recibo_periodo_estado"];
 
 export type MotivoNoVerificableCopy = "sin_texto" | "ilegible" | "demasiado_grande" | "tiempo_agotado";
 export type EstadoFilaRecibo = "sin_recibo" | "cargado" | "firmado";
+// Estado de firmas (F2-06): the state of an employee in a period.
+export type EstadoFirmaFila = "sin_recibo" | "pendiente" | "firmado";
+export type FiltroEstadoFirma = "todos" | EstadoFirmaFila;
+type MotivoOverride = Database["public"]["Enums"]["recibo_override_motivo"];
 
 type Confirmacion = { title: string; body: string; confirmar: string };
 type DialogoDni = { title: string; body: string };
@@ -65,6 +69,9 @@ export type CopyRecibos = {
     rechazar: string;
     reemplazo: { title: string; body: string; firmado: string; confirmar: string };
   };
+  // The two views of /recibos (F2-06, decision 5).
+  vistas: { label: string; carga: string; estado: string };
+  estado: EstadoFirmasCopy;
   common: { cancelar: string };
   usuarioNoDisponible: string;
   errors: {
@@ -88,6 +95,76 @@ export type CopyRecibos = {
     verFallo: string;
     listaFallo: string;
   };
+};
+
+export type EstadoFirmasCopy = {
+  title: string;
+  intro: string;
+  // {firmados}, {pendientes}, {sinRecibo}.
+  conteo: string;
+  filtros: { label: string; opciones: Record<FiltroEstadoFirma, string> };
+  banners: { borrador: string };
+  tabla: {
+    label: string;
+    empleado: string;
+    estado: string;
+    firmado: string;
+    acciones: string;
+    sinEmpleados: string;
+    sinResultados: string;
+  };
+  estados: Record<EstadoFirmaFila, string>;
+  // {fecha}: dd/mm/aaaa HH:mm.
+  firmadoEl: string;
+  inactiva: string;
+  detalle: string;
+  // {nombre}: the accessible name of a row's Detalle button.
+  detalleDe: string;
+  dialogo: {
+    // {nombre}, {periodo}.
+    title: string;
+    cargando: string;
+    cerrar: string;
+    ver: string;
+    descargar: string;
+    actual: {
+      title: string;
+      estado: string;
+      cargado: string;
+      cargadoPor: string;
+    };
+    firma: {
+      title: string;
+      sinFirma: string;
+      firmadoAt: string;
+      version: string;
+      // {version}.
+      versionValor: string;
+      imagen: string;
+      imagenFallo: string;
+    };
+    dni: {
+      title: string;
+      vacio: string;
+      motivo: string;
+      quien: string;
+      cuando: string;
+      motivos: Record<MotivoOverride, string>;
+    };
+    reemplazos: {
+      title: string;
+      vacio: string;
+      // {n}: the replaced file's number, oldest first.
+      item: string;
+      quien: string;
+      cuando: string;
+      estadoAlReemplazo: string;
+      firmadoAt: string;
+      cargado: string;
+      estados: Record<"pendiente" | "firmado", string>;
+    };
+  };
+  errors: { listaFallo: string; detalleFallo: string; verFallo: string; firmaFallo: string };
 };
 
 export const copyRecibos: CopyRecibos = {
@@ -197,6 +274,82 @@ export const copyRecibos: CopyRecibos = {
       body: "{nombre} ya tiene un recibo en {periodo}. Si continuás, se reemplaza y el anterior queda en el historial.",
       firmado: "Ese recibo ya está firmado: {nombre} va a tener que firmar el nuevo.",
       confirmar: "Reemplazar",
+    },
+  },
+  vistas: { label: "Vistas de recibos", carga: "Carga", estado: "Estado de firmas" },
+  estado: {
+    title: "Estado de firmas",
+    intro: "Elegí un período para ver quién firmó su recibo, quién lo tiene pendiente y a quién le falta cargarlo.",
+    conteo: "Firmados: {firmados} · Pendientes: {pendientes} · Sin recibo: {sinRecibo}",
+    filtros: {
+      label: "Filtrar por estado",
+      opciones: { todos: "Todos", firmado: "Firmados", pendiente: "Pendientes", sin_recibo: "Sin recibo" },
+    },
+    banners: { borrador: "Los empleados todavía no ven este período. Publicalo desde Carga cuando termines." },
+    tabla: {
+      label: "Estado de firmas del período",
+      empleado: "Empleado",
+      estado: "Estado",
+      firmado: "Firmado el",
+      acciones: "Acciones",
+      sinEmpleados: "No hay empleados para mostrar en este período.",
+      sinResultados: "No hay empleados con ese estado en este período.",
+    },
+    estados: { sin_recibo: "Sin recibo", pendiente: "Pendiente", firmado: "Firmado" },
+    firmadoEl: "Firmado el {fecha}",
+    inactiva: "Inactiva",
+    detalle: "Detalle",
+    detalleDe: "Detalle del recibo de {nombre}",
+    dialogo: {
+      title: "Recibo de {nombre} · {periodo}",
+      cargando: "Cargando el detalle…",
+      cerrar: "Cerrar",
+      ver: "Ver",
+      descargar: "Descargar",
+      actual: {
+        title: "Recibo actual",
+        estado: "Estado",
+        cargado: "Cargado el",
+        cargadoPor: "Cargado por",
+      },
+      firma: {
+        title: "Firma",
+        sinFirma: "Todavía no firmó este recibo.",
+        firmadoAt: "Firmado el",
+        version: "Versión de la firma",
+        versionValor: "Versión {version}",
+        imagen: "Firma registrada usada en este recibo",
+        imagenFallo: "No pudimos mostrar la imagen de la firma.",
+      },
+      dni: {
+        title: "Verificación de DNI",
+        vacio: "El DNI se verificó sin observaciones en cada carga.",
+        motivo: "Motivo",
+        quien: "Aceptado por",
+        cuando: "Fecha",
+        motivos: {
+          dni_no_encontrado: "No se encontró el DNI en el archivo",
+          no_verificable: "No se pudo verificar el DNI",
+          sin_dni: "Sin DNI cargado en el legajo",
+        },
+      },
+      reemplazos: {
+        title: "Archivos reemplazados",
+        vacio: "Este recibo no tuvo reemplazos.",
+        item: "Archivo {n}",
+        quien: "Reemplazado por",
+        cuando: "Reemplazado el",
+        estadoAlReemplazo: "Estado al reemplazarlo",
+        firmadoAt: "Había sido firmado el",
+        cargado: "Cargado el",
+        estados: { pendiente: "Pendiente de firma", firmado: "Firmado" },
+      },
+    },
+    errors: {
+      listaFallo: "No pudimos cargar el estado de firmas. Actualizá la página para volver a intentar.",
+      detalleFallo: "No pudimos cargar el detalle del recibo. Probá de nuevo.",
+      verFallo: "No pudimos abrir el archivo. Probá de nuevo.",
+      firmaFallo: "No pudimos abrir la imagen de la firma. Probá de nuevo.",
     },
   },
   common: { cancelar: "Cancelar" },
