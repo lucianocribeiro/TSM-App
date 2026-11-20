@@ -239,3 +239,68 @@ describe("contarEmpleadosConRecibosSinFirmar", () => {
     await expect(estado.contarEmpleadosConRecibosSinFirmar()).resolves.toBe(0);
   });
 });
+
+describe("only Empleado receipt owners (RF-05, decision 1; AUD-06-01)", () => {
+  // An in-memory query double that honours eq / in on plain and embedded
+  // ("profiles.role") columns, ordering and ranges, like the database does.
+  type Fila = Record<string, unknown>;
+  const valor = (fila: Fila, columna: string): unknown =>
+    columna.split(".").reduce<unknown>((v, parte) => (v as Fila | null | undefined)?.[parte], fila);
+  function clienteEnMemoria(tablas: Record<string, Fila[]>) {
+    return {
+      from(tabla: string) {
+        let filas = [...(tablas[tabla] ?? [])];
+        const consulta = {
+          select: () => consulta,
+          eq: (columna: string, v: unknown) => ((filas = filas.filter((f) => valor(f, columna) === v)), consulta),
+          in: (columna: string, vs: unknown[]) => ((filas = filas.filter((f) => vs.includes(valor(f, columna)))), consulta),
+          order: (columna: string) => ((filas = [...filas].sort((a, b) => String(valor(a, columna)).localeCompare(String(valor(b, columna))))), consulta),
+          range: async (desde: number, hasta: number) => ({ data: filas.slice(desde, hasta + 1), error: null }),
+          then: (resolver: (r: { data: Fila[]; error: null }) => unknown) => Promise.resolve({ data: filas, error: null }).then(resolver),
+        };
+        return consulta;
+      },
+    };
+  }
+  const PERIODO = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+  const perfiles = [
+    { id: A, role: "empleado", estado_cuenta: "activa" },
+    { id: C, role: "empleado", estado_cuenta: "desactivada" },
+    { id: ADMIN, role: "admin", estado_cuenta: "activa" },
+  ];
+  const perfilDe = (id: string) => perfiles.find((p) => p.id === id)!;
+  const recibo = (id: string, empleado: string) => ({
+    id,
+    empleado_id: empleado,
+    periodo_id: PERIODO,
+    estado: "pendiente",
+    firmado_at: null,
+    cargado_at: "2026-11-10T13:00:00Z",
+    recibo_periodos: { estado: "publicado" },
+    profiles: { role: perfilDe(empleado).role, estado_cuenta: perfilDe(empleado).estado_cuenta },
+  });
+  const tablas = () => ({
+    profiles: perfiles,
+    recibos: [recibo("r-a", A), recibo("r-c", C), recibo("r-admin", ADMIN)],
+    legajos: [
+      { profile_id: A, nombres: "Ana", apellido: "Gómez" },
+      { profile_id: C, nombres: "Caro", apellido: "Medina" },
+      { profile_id: ADMIN, nombres: "Admin", apellido: "Prueba" },
+    ],
+  });
+
+  it("a receipt owned by a non-Empleado is not an extra row; a deactivated Empleado still is (tagged)", async () => {
+    mocks.createClient.mockResolvedValue(clienteEnMemoria(tablas()));
+    const resultado = await estado.cargarEstadoPeriodo(PERIODO);
+    expect(resultado?.filas.map((f) => [f.empleadoId, f.inactiva])).toEqual([
+      [A, false],
+      [C, true],
+    ]);
+    expect(resultado?.conteos).toEqual({ firmado: 0, pendiente: 2, sin_recibo: 0 });
+  });
+
+  it("a receipt owned by a non-Empleado is not counted on the card", async () => {
+    mocks.createClient.mockResolvedValue(clienteEnMemoria(tablas()));
+    await expect(estado.contarEmpleadosConRecibosSinFirmar()).resolves.toBe(2);
+  });
+});

@@ -78,12 +78,14 @@ async function limpiar(recibos: string[], periodos: string[]) {
 }
 
 // The same definition, straight from the database with the service role.
+// Only Empleado owners count (RF-05, decision 1; AUD-06-01).
 async function contarConServicio(): Promise<number> {
   const { data, error } = await service
     .from("recibos")
-    .select("empleado_id, recibo_periodos!inner(estado)")
+    .select("empleado_id, recibo_periodos!inner(estado), profiles!recibos_empleado_id_fkey!inner(role)")
     .eq("estado", "pendiente")
-    .in("recibo_periodos.estado", ["publicado", "cerrado"]);
+    .in("recibo_periodos.estado", ["publicado", "cerrado"])
+    .eq("profiles.role", "empleado");
   if (error) throw new Error(error.message);
   return new Set((data ?? []).map((fila) => fila.empleado_id)).size;
 }
@@ -251,6 +253,55 @@ async function reciboConHistoria() {
 }
 
 let historia: Awaited<ReturnType<typeof reciboConHistoria>>;
+
+describe("only Empleado receipt owners (RF-05, decision 1; AUD-06-01)", () => {
+  it("a pending receipt owned by an Admin is neither a row of the period nor counted on the card", async () => {
+    const recibos: string[] = [];
+    const periodos: string[] = [];
+    try {
+      const otroAdmin = await createTestUser(service, "estado-otro-admin", "admin");
+      cuentas.push(otroAdmin.id);
+      como(admin);
+      const antes = await estado.contarEmpleadosConRecibosSinFirmar();
+      const { count: yaPendientes } = await service
+        .from("recibos")
+        .select("id, recibo_periodos!inner(estado)", { count: "exact", head: true })
+        .eq("empleado_id", conNombre.id)
+        .eq("estado", "pendiente")
+        .in("recibo_periodos.estado", ["publicado", "cerrado"]);
+      const periodo = await nuevoPeriodo(service, admin.id, "publicado");
+      periodos.push(periodo.id);
+      // Inserted directly with the service role (recibo_registrar would
+      // refuse a non-Empleado owner), next to an Empleado's receipt.
+      recibos.push(await nuevoRecibo(service, periodo.id, otroAdmin.id, admin.id));
+      recibos.push(await nuevoRecibo(service, periodo.id, conNombre.id, admin.id));
+
+      como(admin);
+      const resultado = await estado.cargarEstadoPeriodo(periodo.id);
+      expect(resultado).not.toBeNull();
+      const ids = resultado!.filas.map((fila) => fila.empleadoId);
+      expect(ids).not.toContain(otroAdmin.id);
+      expect(ids).not.toContain(admin.id);
+      expect(resultado!.filas.find((fila) => fila.empleadoId === conNombre.id)).toMatchObject({ estado: "pendiente" });
+      expect(resultado!.conteos.pendiente).toBe(1);
+
+      // The Empleado adds one (unless already counted); the Admin adds none.
+      const despues = await estado.contarEmpleadosConRecibosSinFirmar();
+      expect(despues).toBe((antes ?? 0) + (yaPendientes ? 0 : 1));
+      expect(despues).toBe(await contarConServicio());
+      const { data: sinFiltro } = await service
+        .from("recibos")
+        .select("empleado_id, recibo_periodos!inner(estado)")
+        .eq("estado", "pendiente")
+        .in("recibo_periodos.estado", ["publicado", "cerrado"]);
+      // The Admin's receipt is really there, pending in a visible period.
+      expect(new Set((sinFiltro ?? []).map((fila) => fila.empleado_id)).has(otroAdmin.id)).toBe(true);
+    } finally {
+      // Both receipts have no evidence or history: removed, then the period.
+      await limpiar(recibos, periodos);
+    }
+  });
+});
 
 describe("cargarDetalleRecibo (decision 8)", () => {
   beforeAll(async () => {
