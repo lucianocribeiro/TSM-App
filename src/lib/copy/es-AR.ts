@@ -207,6 +207,8 @@ export type Copy = {
     sinNombre: string;
     sinDato: string;
     dadoDeBaja: string;
+    // The one KPI card of the list (PRD Fase 2 RF-22, F2-06).
+    kpi: { label: string; recibosSinFirmar: string; verEstado: string; cargando: string; fallo: string };
     detalle: {
       kicker: string;
       volver: string;
@@ -970,6 +972,13 @@ export const copy = {
     sinNombre: "Sin nombre cargado",
     sinDato: "—",
     dadoDeBaja: "Dado de baja",
+    kpi: {
+      label: "Indicadores de legajos",
+      recibosSinFirmar: "Empleados con recibos sin firmar",
+      verEstado: "Ver estado de firmas",
+      cargando: "Contando recibos sin firmar…",
+      fallo: "No pudimos contar los recibos sin firmar. Actualizá la página para volver a intentar.",
+    },
     detalle: {
       kicker: "Legajo",
       volver: "Volver a Legajos",
