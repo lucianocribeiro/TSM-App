@@ -36,6 +36,7 @@ export const RUTAS = [
   { patron: "/configuracion", clase: "admin" },
   { patron: "/configuracion/historial", clase: "admin" },
   { patron: "/recibos", clase: "admin" },
+  { patron: "/recibos/estado", clase: "admin" },
 ] as const satisfies readonly EntradaRuta[];
 
 // Admin sections: anything below them is Admin only as well, even a path
